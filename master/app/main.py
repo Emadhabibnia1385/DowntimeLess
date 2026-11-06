@@ -32,6 +32,10 @@ def _prepare_claim(username: str) -> None:
         if db.execute("SELECT 1 FROM users WHERE role='owner'").fetchone():
             s.claim_file.unlink(missing_ok=True)
             return
+        if s.claim_file.exists():  # keep the pending link stable across restarts
+            old = s.claim_file.read_text().strip().split("claim_")[-1]
+            if db.execute("SELECT 1 FROM claims WHERE token_hash=? AND used_at IS NULL", (digest(old),)).fetchone():
+                return
         token = new_token(18)
         db.execute("DELETE FROM claims WHERE used_at IS NULL")
         db.execute("INSERT INTO claims (token_hash, created_at) VALUES (?,?)", (digest(token), int(time.time())))

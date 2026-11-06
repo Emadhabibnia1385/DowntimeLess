@@ -48,3 +48,19 @@ def test_password_set_then_login_same_error_for_everything(owner):
     ghost = owner.post("/api/v1/auth/login", json={"username": "nobody", "password": "wrong-password"})
     assert bad.json() == ghost.json() and bad.status_code == 401
     assert owner.post("/api/v1/auth/login", json={"username": "emad", "password": "long-enough-1"}).status_code == 200
+
+
+def test_pending_claim_link_survives_restart(tmp_path, monkeypatch):
+    from app import main, settings as settings_mod
+    from app.db import connect, migrate
+
+    monkeypatch.setenv("DL_DATA_DIR", str(tmp_path))
+    settings_mod._settings = None
+    db = connect()
+    migrate(db)
+    db.close()
+    main._prepare_claim("testbot")
+    first = (tmp_path / "claim_link.txt").read_text()
+    main._prepare_claim("testbot")
+    assert (tmp_path / "claim_link.txt").read_text() == first
+    settings_mod._settings = None
