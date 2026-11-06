@@ -240,7 +240,13 @@ EOF
     systemctl reload nginx; ok "$(m nginx_on): $domain"
     if [[ "$tls" == "certbot" ]]; then
       apt-get install -y -qq certbot python3-certbot-nginx >/dev/null
-      certbot --nginx -d "$domain" --non-interactive --agree-tos --register-unsafely-without-email --redirect || info "certbot failed; the panel stays on http"
+      # a host with several Let's Encrypt accounts needs one named: reuse the one most renewals already use
+      local acct=""
+      if (( $(find /etc/letsencrypt/accounts -mindepth 3 -maxdepth 3 -type d 2>/dev/null | wc -l) > 1 )); then
+        acct="$(grep -h '^account' /etc/letsencrypt/renewal/*.conf 2>/dev/null | sort | uniq -c | sort -rn | awk 'NR==1{print $4}')"
+      fi
+      certbot --nginx -d "$domain" --non-interactive --agree-tos --register-unsafely-without-email --redirect ${acct:+--account "$acct"} \
+        || info "certbot failed; the panel stays on http"
     fi
   else
     rm -f "$NGINX_SITE"; nginx -t >/dev/null 2>&1 || true; err "$(m nginx_fail)"
