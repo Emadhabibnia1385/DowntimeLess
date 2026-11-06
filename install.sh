@@ -103,8 +103,8 @@ EN[updated]="Updated"
 FA[updated]="به‌روز شد"
 EN[rolled_back]="Update failed, rolled back to the previous version"
 FA[rolled_back]="به‌روزرسانی ناموفق بود؛ به نسخهٔ قبلی برگشت"
-EN[env_menu]="1) Bot token   2) Public URL   3) Port   4) Open in editor   0) Back"
-FA[env_menu]="۱) توکن ربات   ۲) آدرس عمومی   ۳) پورت   ۴) باز کردن در ویرایشگر   ۰) بازگشت"
+EN[env_menu]="1) Bot token   2) Public URL   3) Port   4) Open in editor   5) Domain   0) Back"
+FA[env_menu]="۱) توکن ربات   ۲) آدرس عمومی   ۳) پورت   ۴) باز کردن در ویرایشگر   ۵) دامنه   ۰) بازگشت"
 EN[saved_restart]="Saved. Restarting the service"
 FA[saved_restart]="ذخیره شد. سرویس ریستارت می‌شود"
 EN[backup_done]="Backup written to"
@@ -331,9 +331,22 @@ do_env() {
     2|۲) local u; u="$(ask "$(m panel_url)" "$(env_get DL_PUBLIC_URL)")"; sane "$u"; env_set DL_PUBLIC_URL "$u" ;;
     3|۳) local p; p="$(ask "$(m ask_port)" "$(env_get DL_PORT)")"; sane "$p"; env_set DL_PORT "$p"; write_unit; write_nginx ;;
     4|۴) "${EDITOR:-nano}" "$ENV_FILE" ;;
+    5|۵) do_domain; return 0 ;;
     *) return 0 ;;
   esac
   info "$(m saved_restart)"; systemctl restart "$SERVICE"; wait_healthy || true
+}
+
+do_domain() {
+  need_root; installed || err "$(m not_installed)"
+  local d="${1:-}" tls scheme="http"
+  [[ -n "$d" ]] || d="$(ask "$(m ask_domain)" "$(env_get DL_DOMAIN)")"
+  sane "$d"; [[ -n "$d" ]] || err "$(m ask_domain)"
+  tls="$(env_get DL_TLS)"; [[ "$tls" == "none" ]] || scheme="https"
+  env_set DL_DOMAIN "$d"; env_set DL_PUBLIC_URL "$scheme://$d"
+  write_nginx
+  info "$(m saved_restart)"; systemctl restart "$SERVICE"
+  wait_healthy && show_access
 }
 
 do_status() { systemctl status "$SERVICE" --no-pager -l | head -25 || true; }
@@ -399,9 +412,9 @@ main() {
   load_lang
   case "${1:-}" in
     install) do_install ;; update) do_update ;; env) do_env ;; status) do_status ;;
-    logs) do_logs ;; restart) do_restart ;; claim) do_claim ;; backup) do_backup ;;
+    logs) do_logs ;; domain) do_domain "${2:-}" ;; restart) do_restart ;; claim) do_claim ;; backup) do_backup ;;
     uninstall) do_uninstall ;; "") [[ -t 0 ]] || exec < /dev/tty; menu ;;
-    *) echo "usage: downtimeless [install|update|env|status|logs|restart|claim|backup|uninstall]"; exit 2 ;;
+    *) echo "usage: downtimeless [install|update|env|domain <host>|status|logs|restart|claim|backup|uninstall]"; exit 2 ;;
   esac
 }
 
