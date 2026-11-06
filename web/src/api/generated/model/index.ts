@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./domainCreate";
 export * from "./enrollRequest";
 export * from "./enrollResult";
 export * from "./hTTPValidationError";
@@ -46,6 +47,7 @@ export * from "./serversMetricsParams";
 export * from "./settingsGet200";
 export * from "./settingsPut200";
 export * from "./settingsPutBody";
+export * from "./sslRow";
 export * from "./startResult";
 export * from "./userOut";
 export * from "./validationError";

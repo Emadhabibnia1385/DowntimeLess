@@ -21,6 +21,6 @@ export function evidenceRows(evidence: Record<string, unknown>): EvidenceRow[] {
 		key,
 		label: LABELS[key] ?? key,
 		value: valueText(key, value),
-		ltr: typeof value !== "number",
+		ltr: typeof value !== "number" && key !== "error",
 	}));
 }

@@ -10,8 +10,8 @@ export interface Issue {
 	code: string;
 	evidence: IssueEvidence;
 	id: string;
-	server_id: number;
-	server_name: string;
+	server_id: number | null;
+	server_name: string | null;
 	severity: string;
 	suggestion: string;
 	title: string;

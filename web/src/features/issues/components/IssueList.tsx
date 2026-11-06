@@ -7,13 +7,32 @@ import { evidenceRows } from "../lib/evidence";
 const TONES = { critical: "danger", warning: "warning", info: "info" } as const;
 const LABELS: Record<string, string> = t.severity;
 
+// Certificate problems belong to the SSL page; the rest to their server, and some to neither.
+function IssueLink({ issue }: { issue: Issue }) {
+	if (issue.code.startsWith("ssl_")) {
+		return (
+			<LinkButton href="/ssl" size="sm" variant="secondary">
+				{t.issues.openSsl}
+				<ForwardIcon aria-hidden className="rtl:rotate-180" />
+			</LinkButton>
+		);
+	}
+	if (issue.server_id === null) return null;
+	return (
+		<LinkButton href={`/servers/${issue.server_id}`} size="sm" variant="secondary">
+			{t.issues.openServer}
+			<ForwardIcon aria-hidden className="rtl:rotate-180" />
+		</LinkButton>
+	);
+}
+
 function IssueItem({ issue }: { issue: Issue }) {
 	const tone = TONES[issue.severity as keyof typeof TONES] ?? "neutral";
 	return (
 		<li className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
 			<div className="flex flex-wrap items-center gap-2">
 				<StatusChip tone={tone} label={LABELS[issue.severity] ?? issue.severity} size="sm" />
-				<span className="text-sm text-muted">{issue.server_name}</span>
+				{issue.server_name ? <span className="text-sm text-muted">{issue.server_name}</span> : null}
 			</div>
 			<h3 className="font-semibold">{issue.title}</h3>
 			<KeyValueList
@@ -29,10 +48,7 @@ function IssueItem({ issue }: { issue: Issue }) {
 				{issue.suggestion}
 			</p>
 			<div>
-				<LinkButton href={`/servers/${issue.server_id}`} size="sm" variant="secondary">
-					{t.issues.openServer}
-					<ForwardIcon aria-hidden className="rtl:rotate-180" />
-				</LinkButton>
+				<IssueLink issue={issue} />
 			</div>
 		</li>
 	);

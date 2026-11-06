@@ -5,3 +5,4 @@ export * from "./meta/meta.zod";
 export * from "./overview/overview.zod";
 export * from "./servers/servers.zod";
 export * from "./settings/settings.zod";
+export * from "./ssl/ssl.zod";

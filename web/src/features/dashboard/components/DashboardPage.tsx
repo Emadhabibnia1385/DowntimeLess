@@ -9,6 +9,7 @@ import {
 import { useOverviewGet } from "@/api/generated/overview/overview";
 import { IssueList, useIssues } from "@/features/issues";
 import { ServerCard, useServers } from "@/features/servers";
+import { SslRiskCard } from "@/features/ssl";
 import { Loadable } from "@/shared/Loadable";
 import { useDocumentTitle } from "@/shared/useDocumentTitle";
 import { formatBytes, formatNumber, t } from "@/strings";
@@ -94,6 +95,7 @@ export function DashboardPage() {
 			<PageHeader title={t.dashboard.title} description={t.dashboard.subtitle} />
 			<Stats />
 			<CurrentIssues />
+			<SslRiskCard />
 			<FleetGrid />
 		</div>
 	);

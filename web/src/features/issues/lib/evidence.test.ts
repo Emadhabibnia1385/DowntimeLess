@@ -18,6 +18,14 @@ describe("evidenceRows", () => {
 		]);
 	});
 
+	it("labels certificate evidence and keeps an error message in the page direction", () => {
+		const rows = evidenceRows({ days_left: 3, error: "اتصال ممکن نشد" });
+		expect(rows).toEqual([
+			{ key: "days_left", label: "روز تا انقضا", value: "۳", ltr: false },
+			{ key: "error", label: "خطا", value: "اتصال ممکن نشد", ltr: false },
+		]);
+	});
+
 	it("shows an unknown key by its own name", () => {
 		expect(evidenceRows({ mystery: 3 })[0]).toMatchObject({ label: "mystery", value: "۳" });
 	});
