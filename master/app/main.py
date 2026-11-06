@@ -17,6 +17,7 @@ from .features.keys.router import router as keys_router
 from .features.overview.router import router as overview_router
 from .features.servers.router import router as servers_router
 from .features.settings.router import router as settings_router
+from .features.ssl.router import router as ssl_router
 from .security import digest, new_token
 from .settings import get_settings
 from .telegram import Telegram
@@ -70,7 +71,7 @@ def create_app() -> FastAPI:
     s = get_settings()
     app = FastAPI(title="DowntimeLess", version="0.1.0", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json")
     app.add_exception_handler(DLError, dl_error_handler)
-    for r in (auth_router, servers_router, overview_router, settings_router, keys_router):
+    for r in (auth_router, servers_router, overview_router, settings_router, keys_router, ssl_router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(agent_router, prefix="/api")
 

@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 
 from ..servers.service import latest_of, status_of
 from ..settings.router import thresholds
+from ..ssl import service as ssl_svc
 
 
 def ping_matrix(db: sqlite3.Connection) -> List[Dict[str, Any]]:
@@ -72,8 +73,9 @@ def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
             "همین ارتباط را از یک سرور دیگر هم بسنجید؛ فقط وقتی دو مبدأ هم‌نظر باشند DNS را تغییر دهید.",
             to=m["to_name"], loss_pct=m["loss_pct"], rtt_ms=m["rtt_ms"],
         ))
+    out.extend(ssl_svc.issues(db))
     order = {"critical": 0, "warning": 1, "info": 2}
-    return sorted(out, key=lambda i: (order[i["severity"]], i["server_name"]))
+    return sorted(out, key=lambda i: (order[i["severity"]], i["server_name"] or ""))
 
 
 def traffic_24h(db: sqlite3.Connection) -> Dict[str, int]:

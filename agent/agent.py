@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """DowntimeLess agent: standard-library collector and whitelisted job runner."""
 import argparse
+import calendar
 import concurrent.futures
 import http.client
 import json
+import glob
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -14,12 +17,15 @@ import time
 import urllib.parse
 import urllib.request
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 UA = "DowntimeLess-Agent/" + VERSION
 SELF_PATH = os.path.realpath(__file__)
 GEO_URLS = ("https://ipinfo.io/json", "https://ipwho.is/")
 GEO_TTL_S = 6 * 3600
 GEO_RETRY_S = 900
+SSL_TTL_S = 1800
+CERT_GLOBS = ("/etc/letsencrypt/live/*/cert.pem", "/root/.acme.sh/*/*.cer")
+ACME_SKIP = ("ca.cer", "fullchain.cer")
 MUTATING = ("apt_upgrade_safe", "reboot", "self_update")
 HOLD_PKGS = ("docker-ce", "docker-ce-cli", "containerd.io", "docker-compose-plugin", "docker-buildx-plugin")
 # Hold only what is not held already, and release only our own holds afterwards.
@@ -364,9 +370,85 @@ def build_report(state):
                                        read("/proc/sys/net/netfilter/nf_conntrack_max")),
         "failed_units": failed_units(),
         "reboot_required": os.path.exists("/var/run/reboot-required"),
+        "ssl": ssl_cached(state),
         "ping": run_pings(state["ping_targets"]),
         "jobs_done": list(state["jobs_done"]),
     }
+
+
+# ---- ssl ----
+
+def parse_cert_end(text):
+    m = re.search(r"notAfter=(.+)", text)
+    if not m:
+        return None
+    try:
+        return calendar.timegm(time.strptime(m.group(1).strip(), "%b %d %H:%M:%S %Y %Z"))
+    except ValueError:
+        return None
+
+
+def parse_cert_names(text):
+    return re.findall(r"DNS:([^\s,]+)", text)
+
+
+def run_text(argv, timeout=10):
+    try:
+        return subprocess.run(argv, capture_output=True, text=True, timeout=timeout).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def read_cert(path, now):
+    out = run_text(["openssl", "x509", "-noout", "-enddate", "-ext", "subjectAltName", "-in", path])
+    end = parse_cert_end(out)
+    if end is None:
+        return None
+    source = "acme.sh" if "/.acme.sh/" in path else "certbot"
+    name = os.path.basename(os.path.dirname(path)).replace("_ecc", "")
+    return {"name": name, "source": source, "domains": parse_cert_names(out) or [name],
+            "not_after": end, "days_left": int((end - now) // 86400)}
+
+
+def renew_status():
+    def unit(verb, name):
+        return run_text(["systemctl", verb, name]).strip()
+    crontab = run_text(["crontab", "-l"])
+    return {
+        "certbot_installed": bool(shutil.which("certbot")) or os.path.isdir("/etc/letsencrypt"),
+        "certbot_timer_enabled": unit("is-enabled", "certbot.timer") == "enabled",
+        "certbot_timer_active": unit("is-active", "certbot.timer") == "active",
+        "certbot_last_run_failed": unit("is-failed", "certbot.service") == "failed",
+        "certbot_cron": os.path.exists("/etc/cron.d/certbot"),
+        "acme_sh_cron": "acme.sh" in crontab,
+    }
+
+
+def ssl_report(now=None):
+    now = now or time.time()
+    certs = []
+    for pattern in CERT_GLOBS:
+        for path in sorted(glob.glob(pattern)):
+            if os.path.basename(path) in ACME_SKIP:
+                continue
+            c = read_cert(path, now)
+            if c:
+                certs.append(c)
+    renew = renew_status()
+    if not certs and not renew["certbot_installed"]:
+        return None
+    return {"certs": certs, "renew": renew}
+
+
+def ssl_cached(state):
+    at, value = state.get("ssl") or (0, None)
+    if time.time() - at > SSL_TTL_S:
+        try:
+            value = ssl_report()
+        except Exception as e:  # a broken cert file must never stop the report
+            log("ssl scan failed: %s" % e)
+        state["ssl"] = (time.time(), value)
+    return value
 
 
 # ---- jobs ----

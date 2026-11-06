@@ -11,6 +11,7 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 DEFAULTS: Dict[str, float] = {
     "cpu_warn": 90, "steal_warn": 10, "ram_warn": 90, "disk_warn": 85, "disk_crit": 95,
     "retrans_warn": 5, "conntrack_crit": 85, "loss_warn": 10, "loss_crit": 50,
+    "ssl_warn_days": 21, "ssl_crit_days": 7,
 }
 
 

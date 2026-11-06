@@ -19,6 +19,9 @@ REGISTRY: Dict[str, Tuple[int, str]] = {
     "job.permission": (403, "سطح دسترسی این سرور اجازهٔ این عمل را نمی‌دهد."),
     "agent.invalid": (401, "کلید agent معتبر نیست."),
     "agent.enroll_invalid": (401, "توکن نصب معتبر نیست یا قبلاً استفاده شده است."),
+    "domain.not_found": (404, "دامنه پیدا نشد."),
+    "domain.invalid": (422, "این آدرس مجاز نیست (فقط نام دامنهٔ عمومی)."),
+    "domain.exists": (409, "این دامنه قبلاً ثبت شده است."),
     "key.not_found": (404, "کلید API پیدا نشد."),
     "bot.not_configured": (409, "ربات تلگرام تنظیم نشده است."),
 }

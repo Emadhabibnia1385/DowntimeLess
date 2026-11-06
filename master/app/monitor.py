@@ -5,6 +5,7 @@ import time
 from .bot import notify_admins
 from .db import connect
 from .features.servers.service import status_of
+from .features.ssl import service as ssl_svc
 from .telegram import Telegram
 
 log = logging.getLogger("dl.monitor")
@@ -22,12 +23,35 @@ def sweep(tg: Telegram) -> None:
             elif st == "online" and s["offline_notified"]:
                 db.execute("UPDATE servers SET offline_notified=0 WHERE id=?", (s["id"],))
                 notify_admins(tg, "🟢 <b>%s</b> دوباره آنلاین شد." % label)
+        ssl_svc.probe_due(db)
+        _ssl_alerts(db, tg)
         cut = int(time.time())
         db.execute("DELETE FROM metrics WHERE ts<?", (cut - 90 * 86400,))
         db.execute("DELETE FROM pings WHERE ts<?", (cut - 7 * 86400,))
         db.execute("DELETE FROM sessions WHERE expires_at<?", (cut,))
     finally:
         db.close()
+
+
+def _ssl_alerts(db, tg: Telegram) -> None:
+    """One Telegram message per certificate each time its level changes, none while it stays the same."""
+    seen = set()
+    for r in ssl_svc.rows(db):
+        if r["stale"]:
+            continue
+        seen.add(r["key"])
+        old = db.execute("SELECT level FROM alert_state WHERE key=?", ("ssl:" + r["key"],)).fetchone()
+        if (old["level"] if old else "ok") == r["level"]:
+            continue
+        db.execute("INSERT INTO alert_state (key, level) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET level=excluded.level", ("ssl:" + r["key"], r["level"]))
+        if r["level"] == "ok":
+            continue
+        why = r["error"] or ("%d روز تا انقضا" % r["days_left"])
+        where = r["server_name"] or "بررسی از بیرون"
+        notify_admins(tg, "🔐 گواهی <b>%s</b> (%s): %s · تمدید خودکار: %s" % (r["name"], where, why, {"on": "فعال", "off": "غیرفعال", "unknown": "نامشخص"}[r["auto_renew"]]))
+    for row in db.execute("SELECT key FROM alert_state WHERE key LIKE 'ssl:%'").fetchall():
+        if row["key"][4:] not in seen:
+            db.execute("DELETE FROM alert_state WHERE key=?", (row["key"],))
 
 
 def run_forever(tg: Telegram, stop: threading.Event) -> None:

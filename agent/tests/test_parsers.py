@@ -110,3 +110,27 @@ def test_geo_is_cached_and_failures_retry_sooner(monkeypatch):
 
 def test_version_matches_user_agent():
     assert agent.UA == "DowntimeLess-Agent/" + agent.VERSION
+
+
+def test_cert_end_and_names_from_openssl_output():
+    out = "notAfter=Feb  4 12:33:37 2027 GMT\nX509v3 Subject Alternative Name: \n    DNS:a.example.com, DNS:*.example.com\n"
+    assert agent.parse_cert_end(out) == 1801744417
+    assert agent.parse_cert_names(out) == ["a.example.com", "*.example.com"]
+    assert agent.parse_cert_end("garbage") is None
+
+
+def test_ssl_report_is_none_without_certs_or_certbot(monkeypatch):
+    monkeypatch.setattr(agent, "CERT_GLOBS", ())
+    monkeypatch.setattr(agent, "renew_status", lambda: {"certbot_installed": False})
+    assert agent.ssl_report() is None
+
+
+def test_ssl_report_lists_days_left(monkeypatch, tmp_path):
+    cert = tmp_path / "live" / "x.example.com" / "cert.pem"
+    cert.parent.mkdir(parents=True)
+    cert.write_text("x")
+    monkeypatch.setattr(agent, "CERT_GLOBS", (str(tmp_path / "live" / "*" / "cert.pem"),))
+    monkeypatch.setattr(agent, "renew_status", lambda: {"certbot_installed": True})
+    monkeypatch.setattr(agent, "run_text", lambda argv, timeout=10: "notAfter=Feb  4 12:33:37 2027 GMT\nDNS:x.example.com\n")
+    rep = agent.ssl_report(now=1801744417 - 10 * 86400 - 5)
+    assert rep["certs"][0]["days_left"] == 10 and rep["certs"][0]["domains"] == ["x.example.com"]

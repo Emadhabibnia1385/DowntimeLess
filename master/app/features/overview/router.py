@@ -1,6 +1,6 @@
 import sqlite3
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -15,8 +15,8 @@ router = APIRouter(tags=["overview"])
 
 class Issue(BaseModel):
     id: str
-    server_id: int
-    server_name: str
+    server_id: Optional[int]
+    server_name: Optional[str]
     code: str
     severity: str
     title: str
