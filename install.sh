@@ -130,7 +130,7 @@ need_root() { [[ $EUID -eq 0 ]] || err "$(m need_root)"; }
 
 load_lang() {
   if [[ -r "$LANG_FILE" ]]; then L="$(cat "$LANG_FILE")"; return; fi
-  [[ -t 0 ]] || { L="en"; return; }
+  [[ -t 0 ]] || { L="${DL_LANG:-en}"; return; }
   echo -e "${C}$(m choose_lang)${N}"
   read -r -p "> " c </dev/tty
   [[ "$c" == "2" ]] && L="en" || L="fa"
@@ -142,7 +142,11 @@ env_set() {
   touch "$ENV_FILE"; chmod 600 "$ENV_FILE"
   if grep -q "^$1=" "$ENV_FILE"; then sed -i "s|^$1=.*|$1=$2|" "$ENV_FILE"; else echo "$1=$2" >> "$ENV_FILE"; fi
 }
-ask() { local v; read -r -p "$(echo -e "${C}$1${N} [${2:-}]: ")" v </dev/tty; echo "${v:-${2:-}}"; }
+ask() {
+  local v
+  if [[ "${DL_YES:-0}" == "1" ]]; then echo "${2:-}"; return; fi # unattended: take the default
+  read -r -p "$(echo -e "${C}$1${N} [${2:-}]: ")" v </dev/tty; echo "${v:-${2:-}}"
+}
 sane() { [[ "$1" =~ ^[A-Za-z0-9:._/@+-]*$ ]] || err "unsafe characters in value"; }
 
 installed() { [[ -d "$APP_DIR/.git" && -f "$UNIT" ]]; }
@@ -275,11 +279,12 @@ do_install() {
     token="$(ask "$(m ask_token)" "$(env_get DL_BOT_TOKEN)")"; sane "$token"
     if curl -fsS "https://api.telegram.org/bot${token}/getMe" >/dev/null 2>&1; then break; fi
     echo -e "${R}$(m bad_token)${N}"
+    [[ "${DL_YES:-0}" == "1" ]] && exit 1
   done
   port="$(ask "$(m ask_port)" "$(env_get DL_PORT || true)")"; port="${port:-7390}"; sane "$port"
   tls="none"; scheme="http"
   if [[ -n "$domain" ]]; then
-    case "$(ask "$(m ask_tls)" "1")" in
+    case "$(ask "$(m ask_tls)" "${DL_TLS_CHOICE:-1}")" in
       2) tls="certbot"; scheme="https" ;;
       3) tls="none"; scheme="http" ;;
       *) tls="proxy"; scheme="https" ;;
