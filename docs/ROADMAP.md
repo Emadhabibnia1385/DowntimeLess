@@ -22,9 +22,11 @@ What DowntimeLess takes from the three systems it merges, and where each idea la
 
 ## Phases
 
-1. **v0.1 (this release line)**: installer menu, Telegram login + password, servers, agent metrics, ping matrix between servers, dashboard, alerts to Telegram.
-2. **Traffic**: purchased-traffic ledger ("I bought 2 TB"), remaining GB, alerts N days ahead; daily/weekly/monthly charts per relay and exit.
-3. **Monitors + status page**: HTTP/TCP/keyword/DNS/cert monitors from probe groups, maintenance windows, public status page.
-4. **Cloudflare**: tokens, DNS name inventory, tunnel map (which exit serves which relay, which relay is cut), failover and weighted LB rules.
-5. **Panels**: PasarGuard first, then 3x-ui, Marzban, Marzneshin, Hiddify. Read nodes, inbounds, hosts/domains/ports from a subscription link, panel and node update.
-6. **Speed and upgrade jobs**, ArvanCloud and Hetzner providers, AI operator (Claude) with the vpnopsnyx skill as its knowledge.
+1. **v0.1 (done)**: installer menu, Telegram login + password, servers, agent metrics, link matrix, dashboard, issues, API keys, offline alerts.
+2. **SSL (in progress)**: every agent reports the certificates it finds (certbot, acme.sh) with days left and whether auto-renew is really active; the master also probes any domain from outside. Telegram alert on level change. Flags a failed last renewal.
+3. **Topology (next)**: one place to declare which server runs the PasarGuard panel (master) and which are nodes, every exit-to-relay tunnel (kind, ports, direction, subscription domains), shown as a map with live state from the agents and the link matrix.
+4. **Traffic**: purchased-traffic ledger ("I bought 2 TB"), remaining GB, alerts N days ahead; hourly/daily/weekly/monthly charts per relay and exit.
+5. **Cloudflare**: tokens per account, DNS name inventory, add/remove/disable IPs, per-name health (two probes must agree, never remove the last record, data test before re-adding), failover and weighted load balancing, change log.
+6. **Panels**: PasarGuard first (nodes, hosts/domains/ports from the subscription, restart, update panel and nodes with rollback, users/admins/quota views), then 3x-ui, Marzban, Marzneshin, Hiddify. Every change is a whitelisted job behind a permission level and a human.
+7. **Monitors + status page**: HTTP/TCP/keyword/DNS monitors from several probe locations, maintenance windows, public status page.
+8. **Speed jobs, upgrade/reboot jobs, ArvanCloud and Hetzner providers, AI operator.**
