@@ -1,0 +1,1 @@
+import{Xn as e,hn as t,v as n,x as r}from"./useDocumentTitle-BQTBhEma.js";var i=e();function a({query:e,children:a,skeleton:o=(0,i.jsx)(n,{})}){return e.isPending?o:e.isError?(0,i.jsx)(r,{message:t(e.error),onRetry:()=>void e.refetch()}):a(e.data)}export{a as t};

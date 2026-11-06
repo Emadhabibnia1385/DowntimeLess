@@ -1,0 +1,20 @@
+// Solar icons (linear) through unplugin-icons: pick the name by meaning.
+export { default as AccountIcon } from "~icons/solar/user-circle-linear";
+export { default as AddIcon } from "~icons/solar/add-circle-linear";
+export { default as BoltIcon } from "~icons/solar/bolt-linear";
+export { default as CodeIcon } from "~icons/solar/code-linear";
+export { default as DashboardIcon } from "~icons/solar/home-2-linear";
+export { default as EditIcon } from "~icons/solar/pen-linear";
+export { default as IssuesIcon } from "~icons/solar/danger-triangle-linear";
+export { default as KeyIcon } from "~icons/solar/key-linear";
+export { default as LogoutIcon } from "~icons/solar/logout-2-linear";
+export { default as PingIcon } from "~icons/solar/routing-2-linear";
+export { default as PowerIcon } from "~icons/solar/power-linear";
+export { default as RefreshIcon } from "~icons/solar/refresh-linear";
+export { default as ServerIcon } from "~icons/solar/server-linear";
+export { default as SettingsIcon } from "~icons/solar/settings-linear";
+export { default as ShieldIcon } from "~icons/solar/shield-check-linear";
+export { default as TelegramIcon } from "~icons/solar/plain-linear";
+export { default as TrashIcon } from "~icons/solar/trash-bin-minimalistic-linear";
+// Points forward in a left-to-right page: turn it with `rtl:rotate-180` in a right-to-left one
+export { default as ForwardIcon } from "~icons/solar/alt-arrow-right-linear";

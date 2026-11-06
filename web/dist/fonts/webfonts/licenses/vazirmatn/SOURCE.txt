@@ -1,0 +1,11 @@
+Vazirmatn v33.003 by Saber Rastikerdar
+Homepage: https://github.com/rastikerdar/vazirmatn
+License: OFL-1.1
+
+Files (sha256, size, fetched from):
+  Vazirmatn[wght].woff2
+    sha256 4e3fa217d38fdafc1fea4414ceb58ca5e662cf0ab5fa735a8c8c20e8b42cad92  111152 bytes
+    https://raw.githubusercontent.com/rastikerdar/vazirmatn/master/fonts/webfonts/Vazirmatn%5Bwght%5D.woff2 (byte-identical to web_frontend/public/fonts/webfonts/Vazirmatn[wght].woff2)
+  OFL.txt
+    sha256 17e355067c8284f47743a1ee3b1ef7ff684ff0601eda357f9353b10b3016ab31  4391 bytes
+    https://raw.githubusercontent.com/rastikerdar/vazirmatn/master/OFL.txt

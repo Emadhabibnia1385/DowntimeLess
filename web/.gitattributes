@@ -1,0 +1,3 @@
+src/api/generated/** linguist-generated=true
+src/api/zod/** linguist-generated=true
+openapi.json linguist-generated=true

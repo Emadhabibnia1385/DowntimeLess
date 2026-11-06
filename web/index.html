@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fa" dir="rtl" class="dark" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0a0e12" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preload" href="/fonts/webfonts/Vazirmatn[wght].woff2" as="font" type="font/woff2" crossorigin />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>DowntimeLess</title>
+    <!-- Dark is the default; only a saved light choice (or a light device in follow-device mode) flips it. -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("nasim-theme");
+          var scheme = saved === "light" ? "light"
+            : saved === "system" && !matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark";
+          document.documentElement.classList.remove("dark", "light");
+          document.documentElement.classList.add(scheme);
+          document.documentElement.dataset.theme = scheme;
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/app/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,3 @@
+[install]
+# One flat node_modules at the root, like Seamless: the vendored Nasim must hold no folder of its own.
+linker = "hoisted"

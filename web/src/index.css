@@ -1,0 +1,7 @@
+@import "tailwindcss" source("../src");
+@import "@heroui/styles";
+@import "@nyxon/nasim/tokens.css";
+@import "@nyxon/nasim/fonts.css";
+@import "./app/fonts.css";
+/* Tailwind skips node_modules, where the workspace link lives, so it reads the real folder. */
+@source "../vendor/nasim/src";

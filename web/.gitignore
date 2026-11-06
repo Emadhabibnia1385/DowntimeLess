@@ -1,0 +1,5 @@
+node_modules
+*.local
+.DS_Store
+.tanstack
+# dist/ is NOT ignored: the master serves the committed build

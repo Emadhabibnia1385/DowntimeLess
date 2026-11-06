@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fa" dir="rtl" class="dark" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0a0e12" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preload" href="/fonts/webfonts/Vazirmatn[wght].woff2" as="font" type="font/woff2" crossorigin />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>DowntimeLess</title>
+    <!-- Dark is the default; only a saved light choice (or a light device in follow-device mode) flips it. -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("nasim-theme");
+          var scheme = saved === "light" ? "light"
+            : saved === "system" && !matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark";
+          document.documentElement.classList.remove("dark", "light");
+          document.documentElement.classList.add(scheme);
+          document.documentElement.dataset.theme = scheme;
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-Bd5jJSgS.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-WkwZ5CU-.js">
+    <link rel="modulepreload" crossorigin href="/assets/useDocumentTitle-BQTBhEma.js">
+    <link rel="modulepreload" crossorigin href="/assets/auth-DRIpgwEY.js">
+    <link rel="modulepreload" crossorigin href="/assets/useLocalizedStringFormatter-C2Okm-3m.js">
+    <link rel="modulepreload" crossorigin href="/assets/PageHeader-Bx4-qMCQ.js">
+    <link rel="modulepreload" crossorigin href="/assets/overlays-BOKzOHc7.js">
+    <link rel="modulepreload" crossorigin href="/assets/link-_mmsXOty.js">
+    <link rel="modulepreload" crossorigin href="/assets/StatusChip-CeVsyX8H.js">
+    <link rel="modulepreload" crossorigin href="/assets/SectionCard-O3s0Q1z3.js">
+    <link rel="modulepreload" crossorigin href="/assets/Loadable-B5hiXlO9.js">
+    <link rel="modulepreload" crossorigin href="/assets/useRefreshAll-BU9F2YIg.js">
+    <link rel="modulepreload" crossorigin href="/assets/table.styles-o5gmRvbl.js">
+    <link rel="modulepreload" crossorigin href="/assets/Modal-l5OZyr9u.js">
+    <link rel="modulepreload" crossorigin href="/assets/KeyValueList-CAeINwES.js">
+    <link rel="modulepreload" crossorigin href="/assets/servers-DsIrDAtm.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-CKGZE3LO.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
