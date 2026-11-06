@@ -10,7 +10,8 @@ MIGRATIONS = Path(__file__).parent / "migrations"
 def connect() -> sqlite3.Connection:
     path = get_settings().db_path
     path.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(path, timeout=10, isolation_level=None)
+    # FastAPI runs a dependency and its handler on different worker threads
+    db = sqlite3.connect(path, timeout=10, isolation_level=None, check_same_thread=False)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA foreign_keys=ON")

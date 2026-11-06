@@ -58,3 +58,13 @@ def test_mutating_job_needs_permission_and_a_human(owner):
     jobs = report(owner, key).json()["jobs"]
     assert [j["kind"] for j in jobs] == ["reboot"]
     assert report(owner, key).json()["jobs"] == []  # delivered once
+
+
+def test_concurrent_requests_do_not_trip_sqlite_thread_check(owner):
+    from concurrent.futures import ThreadPoolExecutor
+
+    sid, key = make_server(owner)
+    report(owner, key)
+    with ThreadPoolExecutor(8) as pool:
+        codes = list(pool.map(lambda _: owner.get("/api/v1/servers/%d/metrics?range=1h" % sid).status_code, range(40)))
+    assert set(codes) == {200}
