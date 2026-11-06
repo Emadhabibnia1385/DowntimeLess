@@ -84,7 +84,8 @@ The agent only makes outbound HTTPS calls to the master, so no SSH key or root c
 | `GET /servers`, `POST /servers`, `GET /servers/{id}`, `PATCH /servers/{id}`, `DELETE /servers/{id}` | fleet (`POST` returns the install command once) |
 | `GET /servers/{id}/metrics?range=1h|24h|7d|30d` | time series |
 | `GET /servers/{id}/jobs`, `POST /servers/{id}/jobs` | whitelisted actions |
-| `GET /overview` | counts, down servers, traffic totals |
+| `GET /overview`, `GET /issues`, `GET /ping-matrix`, `GET /snapshot` | counts; current problems with evidence and a suggested next step; link matrix; the whole fleet in one secret-free JSON |
+| `GET/POST/DELETE /keys` | API keys (owner, session only). Token shown once, only a SHA-256 is stored |
 | `GET /settings`, `PUT /settings` | alert thresholds, intervals |
 | `POST /agent/v1/enroll`, `POST /agent/v1/report` | agent side (agent key header `X-Agent-Key`) |
 | `GET /agent/install.sh`, `GET /agent/agent.py` | served by master, unauthenticated |
@@ -92,6 +93,16 @@ The agent only makes outbound HTTPS calls to the master, so no SSH key or root c
 
 Money-free, but the same house rules as Seamless apply: tenant-less single owner now, parameterised SQL, epoch seconds,
 errors from a closed registry, `Page[T]` for lists, operation id `<tag>_<function>`.
+
+## API-first and AI agents
+
+Everything the panel shows comes from the same JSON API. A program (Claude, a script, another agent) authenticates with
+`Authorization: Bearer dl_...`:
+
+- `read` key = viewer: `GET /snapshot` and `GET /issues` give the fleet state and what is wrong, with evidence.
+- `operate` key = admin: may also queue the read-only jobs (`ping`, `tcp_check`, `speedtest_*`).
+- Keys can never queue `reboot` / `apt_upgrade_safe` / `self_update`, never manage users or keys; a signed-in human does that.
+- `/llms.txt` describes the API for agents, `/api/openapi.json` is the schema, `docs/openapi.json` is the committed copy.
 
 ## Roadmap (see ROADMAP.md)
 
