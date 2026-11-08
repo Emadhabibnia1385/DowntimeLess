@@ -103,7 +103,9 @@ def rows(db: sqlite3.Connection) -> List[Dict[str, Any]]:
 
 
 def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
-    out = []
+    out: List[Dict[str, Any]] = []
+    off: Dict[int, List[Dict[str, Any]]] = {}
+    failed: Dict[int, Dict[str, Any]] = {}
     for r in rows(db):
         if r["stale"]:
             continue
@@ -115,11 +117,19 @@ def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
             out.append({**base, "id": "ssl:%s" % r["key"], "code": "ssl_expiry", "severity": r["level"], "title": title, "suggestion": hint,
                         "evidence": {"days_left": r["days_left"], "error": r["error"]}})
         elif r["kind"] == "file" and r["auto_renew"] == "off" and r["days_left"] is not None and r["days_left"] <= 45:
-            out.append({**base, "id": "ssl:%s:auto" % r["key"], "code": "ssl_auto_renew_off", "severity": "warning",
-                        "title": "تمدید خودکار گواهی %s فعال نیست" % r["name"], "suggestion": "systemctl enable --now certbot.timer را اجرا کنید یا کرون تمدید را برگردانید.",
-                        "evidence": {"days_left": r["days_left"]}})
+            off.setdefault(r["server_id"], []).append(r)
         if r["kind"] == "file" and r["renew_failed"]:
-            out.append({**base, "id": "ssl:%s:failed" % r["key"], "code": "ssl_renew_failed", "severity": "warning",
-                        "title": "آخرین تمدید خودکار certbot ناموفق بوده (%s)" % r["server_name"],
-                        "suggestion": "journalctl -u certbot را بخوانید؛ معمولاً DNS یا پورت ۸۰ یا یک گواهی قدیمی خراب باعث آن است.", "evidence": {}})
+            failed.setdefault(r["server_id"], r)
+    # renewal is one thing per server, not one per certificate on it
+    for sid, certs in off.items():
+        first = certs[0]
+        out.append({"server_id": sid, "server_name": first["server_name"], "id": "ssl:s%d:auto" % sid, "code": "ssl_auto_renew_off",
+                    "severity": "warning", "title": "تمدید خودکار گواهی‌ها روی %s فعال نیست" % first["server_name"],
+                    "suggestion": "systemctl enable --now certbot.timer را اجرا کنید یا کرون تمدید را برگردانید.",
+                    "evidence": {"certs": len(certs), "days_left": min(c["days_left"] for c in certs)}})
+    for sid, r in failed.items():
+        out.append({"server_id": sid, "server_name": r["server_name"], "id": "ssl:s%d:failed" % sid, "code": "ssl_renew_failed",
+                    "severity": "warning", "title": "آخرین تمدید خودکار certbot ناموفق بوده (%s)" % r["server_name"],
+                    "suggestion": "journalctl -u certbot را بخوانید؛ معمولاً DNS، پورت ۸۰ یا مسیر چالش .well-known یک گواهی باعث آن است.",
+                    "evidence": {}})
     return out

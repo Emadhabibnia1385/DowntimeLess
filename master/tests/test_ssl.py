@@ -56,3 +56,15 @@ def test_alert_sent_once_per_level_change(owner, tg):
     monitor._ssl_alerts(db, tg)
     assert len(sent) == 1 and "x.example.com" in sent[0]
     db.close()
+
+
+def test_renewal_problems_are_one_issue_per_server_not_one_per_certificate(owner):
+    sid, key = make_server(owner)
+    renew = {"certbot_installed": True, "certbot_timer_enabled": False, "certbot_timer_active": False, "certbot_last_run_failed": True}
+    certs = [cert("a.example.com", 40), cert("b.example.com", 30), cert("c.example.com", 20)]
+    report(owner, key, ssl={"certs": certs, "renew": renew})
+    codes = [i["code"] for i in owner.get("/api/v1/issues").json()]
+    assert codes.count("ssl_renew_failed") == 1 and codes.count("ssl_auto_renew_off") == 1
+    off = next(i for i in owner.get("/api/v1/issues").json() if i["code"] == "ssl_auto_renew_off")
+    # the 20-day certificate already has its own expiry warning, so only the other two count here
+    assert off["evidence"] == {"certs": 2, "days_left": 30}
