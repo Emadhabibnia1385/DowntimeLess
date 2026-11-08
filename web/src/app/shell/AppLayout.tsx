@@ -38,7 +38,7 @@ function Shell() {
 					<Outlet />
 				</div>
 				<Footer />
-				<div aria-hidden className="h-16 lg:hidden" />
+				<div aria-hidden className="h-24 lg:hidden" />
 			</div>
 			<BottomBar />
 		</AppShell>

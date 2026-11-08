@@ -1,9 +1,10 @@
-import { FilterChips, SectionCard, Spinner } from "@nyxon/nasim";
+import { SectionCard, Spinner } from "@nyxon/nasim";
 import { useState } from "react";
 import type { FleetPoint } from "@/api/generated/model";
 import { CHIP_RANGES, RANGES, type Range } from "@/features/servers";
 import { LineChart } from "@/shared/charts/LineChart";
 import { Loadable } from "@/shared/Loadable";
+import { Segmented } from "@/shared/ui/Segmented";
 import { t } from "@/strings";
 import { useFleetHistory } from "../api";
 import { buildFleet, TABS, type TabId } from "../lib/fleet";
@@ -50,25 +51,24 @@ export function FleetHistoryCard({
 	const [tab, setTab] = useState<TabId>("traffic");
 	const history = useFleetHistory(range);
 	return (
-		<SectionCard
-			title={t.dashboard.history.title}
-			description={t.dashboard.history.subtitle}
-			actions={
-				<FilterChips
-					label={t.server.range}
-					value={range}
-					onChange={(value) => onRangeChange(value as Range)}
-					options={rangeOptions}
-				/>
-			}
-		>
+		<SectionCard title={t.dashboard.history.title} description={t.dashboard.history.subtitle}>
 			<div className="flex flex-col gap-5">
-				<FilterChips
-					label={t.dashboard.history.tabsLabel}
-					value={tab}
-					onChange={(value) => setTab(value as TabId)}
-					options={tabOptions}
-				/>
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+					<Segmented
+						label={t.server.range}
+						value={range}
+						onChange={onRangeChange}
+						options={rangeOptions}
+						className="sm:w-80"
+					/>
+					<Segmented
+						label={t.dashboard.history.tabsLabel}
+						value={tab}
+						onChange={setTab}
+						options={tabOptions}
+						className="sm:w-96"
+					/>
+				</div>
 				<Loadable query={history} skeleton={<Spinner />}>
 					{(data) => <Charts tab={tab} range={range} data={data.points} />}
 				</Loadable>

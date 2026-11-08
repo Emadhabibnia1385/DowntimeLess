@@ -101,6 +101,21 @@ describe("the workspace switcher", () => {
 		expect(items[0]?.textContent).not.toContain("دعوت از");
 	});
 
+	it("sits right beside the menu button in the phone top bar, with a name and a chevron", async () => {
+		boot("/servers");
+		const button = await pill();
+		const header = button.closest("header");
+		if (!header) throw new Error("the switcher is not in the top bar");
+		const menu = within(header).getByRole("button", { name: "باز کردن منو" });
+		expect(menu).toBeTruthy();
+		// phones: pinned to the start side just past the menu button, desktop: in the bar's flow
+		expect(button.className).toContain("max-sm:absolute");
+		expect(button.className).toContain("max-sm:start-[3.75rem]");
+		expect(button.className).toContain("sm:max-w-[min(16rem,40vw)]");
+		expect(within(button).getByText("فضای کار اصلی").className).not.toContain("hidden ");
+		expect(button.querySelectorAll("svg")).toHaveLength(2);
+	});
+
 	it("switches through the API, then asks for every list again", async () => {
 		const { calls } = boot("/servers");
 		await userEvent.click(await pill());

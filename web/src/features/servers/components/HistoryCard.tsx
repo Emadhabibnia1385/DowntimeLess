@@ -1,7 +1,8 @@
-import { FilterChips, SectionCard, Spinner } from "@nyxon/nasim";
+import { SectionCard, Spinner } from "@nyxon/nasim";
 import { useState } from "react";
 import { useServersMetrics } from "@/api/generated/servers/servers";
 import { Loadable } from "@/shared/Loadable";
+import { Segmented } from "@/shared/ui/Segmented";
 import { t } from "@/strings";
 import { CHIP_RANGES, RANGES, type Range } from "../lib/chart";
 import { TABS, type TabId } from "../lib/history";
@@ -25,25 +26,24 @@ export function HistoryCard({
 	const [tab, setTab] = useState<TabId>("usage");
 	const metrics = useServersMetrics(serverId, { range }, { query: { refetchInterval: 60_000 } });
 	return (
-		<SectionCard
-			title={t.history.title}
-			description={t.history.subtitle}
-			actions={
-				<FilterChips
-					label={t.server.range}
-					value={range}
-					onChange={(value) => onRangeChange(value as Range)}
-					options={rangeOptions}
-				/>
-			}
-		>
+		<SectionCard title={t.history.title} description={t.history.subtitle}>
 			<div className="flex flex-col gap-5">
-				<FilterChips
-					label={t.history.tabsLabel}
-					value={tab}
-					onChange={(value) => setTab(value as TabId)}
-					options={tabOptions}
-				/>
+				<div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+					<Segmented
+						label={t.server.range}
+						value={range}
+						onChange={onRangeChange}
+						options={rangeOptions}
+						className="xl:w-80"
+					/>
+					<Segmented
+						label={t.history.tabsLabel}
+						value={tab}
+						onChange={setTab}
+						options={tabOptions}
+						className="xl:min-w-0 xl:flex-1 xl:max-w-xl"
+					/>
+				</div>
 				<Loadable query={metrics} skeleton={<Spinner />}>
 					{(data) => (
 						<HistoryCharts

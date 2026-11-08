@@ -17,6 +17,10 @@ import { safePathAfterSwitch } from "./workspacePath";
 
 const ME_KEY = getAuthMeQueryKey()[0];
 
+// Phones: right after the menu button (12px pad + 44px + 4px gap), name up to the logo.
+const PHONE_BESIDE_MENU =
+	"max-sm:absolute max-sm:start-[3.75rem] max-sm:top-1/2 max-sm:max-w-[calc(100vw-15.5rem)] max-sm:-translate-y-1/2";
+
 function Item({ space }: { space: WorkspaceOut }) {
 	return (
 		<Dropdown.Item id={String(space.id)} textValue={space.name} className="min-h-11 gap-3">
@@ -67,10 +71,11 @@ export function WorkspaceSwitcher() {
 				variant="secondary"
 				aria-label={t.workspace.switcher(current.name)}
 				isPending={change.isPending}
-				className="min-h-11 max-w-[min(16rem,40vw)] gap-1 rounded-full px-2.5 max-sm:me-11 sm:gap-1.5 sm:px-3"
+				data-slot="workspace-switcher"
+				className={`${PHONE_BESIDE_MENU} min-h-11 gap-1 rounded-full px-2.5 sm:max-w-[min(16rem,40vw)] sm:gap-1.5 sm:px-3`}
 			>
 				<WorkspaceIcon aria-hidden className="size-5 shrink-0" />
-				<span className="hidden min-w-0 truncate sm:inline">{current.name}</span>
+				<span className="min-w-0 truncate max-[339px]:hidden">{current.name}</span>
 				<ChevronDownIcon aria-hidden className="size-4 shrink-0 text-muted" />
 			</Button>
 			<Dropdown.Popover placement="bottom end" className="w-72 max-w-[calc(100vw-2rem)]">

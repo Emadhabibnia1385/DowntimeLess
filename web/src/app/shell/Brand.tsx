@@ -4,18 +4,18 @@ import { GithubIcon } from "@/shared/GithubIcon";
 import { PROJECT_GITHUB_URL } from "@/shared/links";
 import { t } from "@/strings";
 
-// The logo and GitHub; the phone top bar swaps GitHub for the theme toggle.
+// The logo and GitHub; the phone bar swaps GitHub for the theme toggle, logo beside it.
 export function Brand() {
 	const { scheme } = useTheme();
 	return (
 		<span className="flex w-full items-center justify-between gap-3 in-[header]:contents in-[[role=dialog]]:pb-6">
-			<span className="flex flex-col items-start gap-0.5 in-[header]:absolute in-[header]:inset-x-0 in-[header]:top-1/2 in-[header]:mx-auto in-[header]:w-fit in-[header]:-translate-y-1/2 in-[header]:items-center">
+			<span className="flex flex-col items-start gap-0.5 in-[header]:absolute in-[header]:top-1/2 in-[header]:w-fit in-[header]:-translate-y-1/2 in-[header]:items-center in-[header]:max-sm:end-[4.25rem] in-[header]:sm:inset-x-0 in-[header]:sm:mx-auto">
 				<img
 					src={brandLogo(scheme)}
 					alt={t.brand.logoAlt}
 					width={1200}
 					height={339}
-					className="h-12 w-auto in-[header]:h-10"
+					className="h-12 w-auto in-[header]:h-10 in-[header]:max-sm:h-8"
 				/>
 			</span>
 			<a

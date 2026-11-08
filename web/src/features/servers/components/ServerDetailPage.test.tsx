@@ -197,11 +197,11 @@ describe("ServerDetailPage", () => {
 		await open(server());
 		const history = await screen.findByRole("region", { name: "تاریخچه" });
 		for (const name of ["مصرف (درصد)", "سرعت شبکه", "بار سیستم", "کیفیت شبکه", "اتصال‌ها"]) {
-			expect(within(history).getByRole("radio", { name })).toBeTruthy();
+			expect(within(history).getByRole("tab", { name })).toBeTruthy();
 		}
-		expect(within(history).getByRole("radio", { name: "۲۴ ساعت" })).toBeTruthy();
+		expect(within(history).getByRole("tab", { name: "۲۴ ساعت" })).toBeTruthy();
 		expect(await screen.findByText("a.example.com")).toBeTruthy();
-		await userEvent.click(within(history).getByRole("radio", { name: "سرعت شبکه" }));
+		await userEvent.click(within(history).getByRole("tab", { name: "سرعت شبکه" }));
 		expect(await within(history).findByText("حجم منتقل‌شده در هر نقطه")).toBeTruthy();
 	});
 

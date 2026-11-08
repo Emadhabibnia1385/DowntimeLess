@@ -287,7 +287,7 @@ describe("DashboardPage", () => {
 		await screen.findByRole("region", { name: "آمار ناوگان" });
 		await waitFor(() => expect(calls("/overview/history").length).toBeGreaterThan(0));
 		expect(calls("/overview/history").every((url) => url.includes("range=7d"))).toBe(true);
-		await userEvent.click(screen.getByRole("radio", { name: "۳۰ روز" }));
+		await userEvent.click(screen.getByRole("tab", { name: "۳۰ روز" }));
 		await waitFor(() =>
 			expect(calls("/overview/history").some((url) => url.includes("range=30d"))).toBe(true),
 		);
@@ -303,7 +303,7 @@ describe("DashboardPage", () => {
 
 	it("switches the history tab", async () => {
 		open("/");
-		await userEvent.click(await screen.findByRole("radio", { name: "مصرف (درصد)" }));
+		await userEvent.click(await screen.findByRole("tab", { name: "مصرف (درصد)" }));
 		expect(await screen.findByText(/میانگین مصرف پردازنده/)).toBeTruthy();
 	});
 
