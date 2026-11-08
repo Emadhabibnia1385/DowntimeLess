@@ -59,6 +59,8 @@ export const ServersListResponseItem = zod.object({
 	org: zod.union([zod.string(), zod.null()]),
 	permission: zod.string(),
 	public_ip: zod.union([zod.string(), zod.null()]),
+	quota_gb: zod.union([zod.number(), zod.null()]).optional(),
+	quota_reset_day: zod.union([zod.int(), zod.null()]).optional(),
 	role: zod.string(),
 	status: zod.string(),
 	system: zod
@@ -148,6 +150,8 @@ export const ServersCreateResponse = zod.object({
 		org: zod.union([zod.string(), zod.null()]),
 		permission: zod.string(),
 		public_ip: zod.union([zod.string(), zod.null()]),
+		quota_gb: zod.union([zod.number(), zod.null()]).optional(),
+		quota_reset_day: zod.union([zod.int(), zod.null()]).optional(),
 		role: zod.string(),
 		status: zod.string(),
 		system: zod
@@ -233,6 +237,8 @@ export const ServersGetResponse = zod.object({
 	org: zod.union([zod.string(), zod.null()]),
 	permission: zod.string(),
 	public_ip: zod.union([zod.string(), zod.null()]),
+	quota_gb: zod.union([zod.number(), zod.null()]).optional(),
+	quota_reset_day: zod.union([zod.int(), zod.null()]).optional(),
 	role: zod.string(),
 	status: zod.string(),
 	system: zod
@@ -263,6 +269,11 @@ export const serversUpdateBodyAliasOneMax = 64;
 export const serversUpdateBodyNameOneMax = 64;
 
 export const serversUpdateBodyPermissionOneRegExp = new RegExp("^(read|safe|full)$");
+export const serversUpdateBodyQuotaGbOneExclusiveMin = 0;
+export const serversUpdateBodyQuotaGbOneMax = 1000000;
+
+export const serversUpdateBodyQuotaResetDayOneMax = 31;
+
 export const serversUpdateBodyRoleOneRegExp = new RegExp("^(relay|exit|panel|panel_only|other)$");
 
 export const ServersUpdateBody = zod.object({
@@ -272,6 +283,15 @@ export const ServersUpdateBody = zod.object({
 	name: zod.union([zod.string().min(1).max(serversUpdateBodyNameOneMax), zod.null()]).optional(),
 	permission: zod
 		.union([zod.string().regex(serversUpdateBodyPermissionOneRegExp), zod.null()])
+		.optional(),
+	quota_gb: zod
+		.union([
+			zod.number().gt(serversUpdateBodyQuotaGbOneExclusiveMin).max(serversUpdateBodyQuotaGbOneMax),
+			zod.null(),
+		])
+		.optional(),
+	quota_reset_day: zod
+		.union([zod.int().min(1).max(serversUpdateBodyQuotaResetDayOneMax), zod.null()])
 		.optional(),
 	role: zod.union([zod.string().regex(serversUpdateBodyRoleOneRegExp), zod.null()]).optional(),
 });
@@ -322,6 +342,8 @@ export const ServersUpdateResponse = zod.object({
 	org: zod.union([zod.string(), zod.null()]),
 	permission: zod.string(),
 	public_ip: zod.union([zod.string(), zod.null()]),
+	quota_gb: zod.union([zod.number(), zod.null()]).optional(),
+	quota_reset_day: zod.union([zod.int(), zod.null()]).optional(),
 	role: zod.string(),
 	status: zod.string(),
 	system: zod
@@ -399,6 +421,8 @@ export const ServersNewEnrollTokenResponse = zod.object({
 		org: zod.union([zod.string(), zod.null()]),
 		permission: zod.string(),
 		public_ip: zod.union([zod.string(), zod.null()]),
+		quota_gb: zod.union([zod.number(), zod.null()]).optional(),
+		quota_reset_day: zod.union([zod.int(), zod.null()]).optional(),
 		role: zod.string(),
 		status: zod.string(),
 		system: zod

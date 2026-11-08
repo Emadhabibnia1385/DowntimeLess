@@ -63,6 +63,11 @@ export function valueOf(issue: Issue): string {
 					: t.issues.values.days(formatNumber(days));
 		return [typeof e.name === "string" ? e.name : "", what].filter(Boolean).join(": ");
 	}
+	if (family === "quota") {
+		const days = num(e.days_left);
+		return days === null ? "" : t.issues.values.days(formatNumber(days));
+	}
+	if (family === "ip_changed") return typeof e.new_ip === "string" ? e.new_ip : "";
 	if (family === "ssl_auto_renew_off") {
 		const certs = num(e.certs);
 		return certs === null ? "" : t.issues.values.certs(formatNumber(certs));

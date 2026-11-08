@@ -23,6 +23,8 @@ export interface ServerOut {
 	org: string | null;
 	permission: string;
 	public_ip: string | null;
+	quota_gb?: number | null;
+	quota_reset_day?: number | null;
 	role: string;
 	status: string;
 	system?: SystemInfo;

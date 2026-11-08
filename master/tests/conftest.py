@@ -10,9 +10,15 @@ from app.db import connect
 class FakeTelegram:
     def __init__(self):
         self.sent = []
+        self.threads = []
+        self.refuse = False  # a bot that is not allowed to post: send() answers False
 
-    def send(self, chat_id, text, buttons=None):
+    def send(self, chat_id, text, buttons=None, thread=None):
+        if self.refuse:
+            return False
         self.sent.append((chat_id, text, buttons))
+        self.threads.append(thread)
+        return True
 
     def edit(self, *a, **k):
         pass

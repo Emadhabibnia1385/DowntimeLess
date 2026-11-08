@@ -11,5 +11,7 @@ export interface ServerPatch {
 	category_id?: number | null;
 	name?: string | null;
 	permission?: string | null;
+	quota_gb?: number | null;
+	quota_reset_day?: number | null;
 	role?: string | null;
 }

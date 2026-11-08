@@ -12,10 +12,14 @@ DEFAULTS: Dict[str, float] = {
     "cpu_warn": 90, "steal_warn": 10, "ram_warn": 90, "disk_warn": 85, "disk_crit": 95,
     "retrans_warn": 5, "conntrack_crit": 85, "loss_warn": 10, "loss_crit": 50,
     "ssl_warn_days": 21, "ssl_crit_days": 7,
+    "quota_basis": 0,  # 0 = count outgoing bytes only, 1 = outgoing plus incoming (some providers bill both)
 }
 
 # One on/off switch per kind of alert (1 = on); an alert that is off is neither listed as an issue nor sent to Telegram.
-RULES = ("offline", "cpu", "ram", "disk", "steal", "retrans", "conntrack", "ping", "ssl", "failed_units", "reboot")
+RULES = (
+    "offline", "cpu", "ram", "disk", "steal", "retrans", "conntrack", "ping", "ssl", "failed_units", "reboot",
+    "rebooted", "ip_changed", "resized", "blacklisted", "relay_egress", "relay_filtered", "load_per_core", "quota", "quota_pair",
+)
 DEFAULTS.update({"on_" + r: 1 for r in RULES})
 
 
@@ -36,7 +40,7 @@ def get_settings_(_: Actor = Depends(require("viewer")), db: sqlite3.Connection 
 def put_settings(body: Dict[str, float], _: Actor = Depends(require("admin")), db: sqlite3.Connection = Depends(get_db)):
     for k, v in body.items():
         if k in DEFAULTS:
-            if k.startswith("on_"):
+            if k.startswith("on_") or k == "quota_basis":
                 v = 1 if v else 0
             db.execute("INSERT INTO settings (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (k, str(v)))
     return thresholds(db)

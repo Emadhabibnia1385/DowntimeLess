@@ -5,6 +5,8 @@ from typing import Any, Dict, List
 from ..servers.service import latest_of, status_of
 from ..settings.router import thresholds
 from ..ssl import service as ssl_svc
+from . import detectors
+from .detectors import make as _issue
 
 
 def ping_matrix(db: sqlite3.Connection) -> List[Dict[str, Any]]:
@@ -42,15 +44,9 @@ def ping_windows(db: sqlite3.Connection) -> List[Dict[str, Any]]:
     return [dict(r) for r in rows if r["n"] >= PING_MIN_SAMPLES]
 
 
-def _issue(row, code: str, severity: str, title: str, suggestion: str, **evidence: Any) -> Dict[str, Any]:
-    return {
-        "id": "server:%d:%s" % (row["id"], code), "server_id": row["id"], "server_name": row["alias"] or row["name"],
-        "code": code, "severity": severity, "title": title, "suggestion": suggestion, "evidence": evidence,
-    }
-
-
 def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
     th, now, out = thresholds(db), int(time.time()), []
+    forecasts: List[Any] = []
     servers = db.execute("SELECT * FROM servers").fetchall()
     for s in servers:
         st, lt = status_of(s), latest_of(s)
@@ -67,24 +63,32 @@ def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
             out.append(_issue(s, "disk", "critical" if crit else "warning", "دیسک رو به پر شدن است", "لاگ‌ها و بکاپ‌های قدیمی را پاک کنید (journalctl --vacuum-size، docker system df).", disk_pct=lt["disk_pct"]))
         if th["on_ram"] and lt["ram_pct"] is not None and lt["ram_pct"] >= th["ram_warn"]:
             out.append(_issue(s, "ram", "warning", "مصرف RAM بالاست", "پردازش‌های پرمصرف را ببینید؛ پس از اطمینان سرویس مربوط را ریستارت کنید.", ram_pct=lt["ram_pct"]))
-        if th["on_cpu"] and lt["cpu_pct"] is not None and lt["cpu_pct"] >= th["cpu_warn"]:
-            out.append(_issue(s, "cpu", "warning", "مصرف CPU بالاست", "بررسی کنید ترافیک کاربران یا یک پردازش گیرکرده باعث آن شده است.", cpu_pct=lt["cpu_pct"]))
-        if th["on_steal"] and lt["steal_pct"] is not None and lt["steal_pct"] >= th["steal_warn"]:
-            out.append(_issue(s, "steal", "warning", "steal بالا: میزبان مجازی شلوغ است", "اگر پایدار است به سرویس‌دهنده تیکت بدهید یا سرور را منتقل کنید.", steal_pct=lt["steal_pct"]))
         if th["on_retrans"] and lt["tcp_retrans_pct"] is not None and lt["tcp_retrans_pct"] >= th["retrans_warn"]:
             out.append(_issue(s, "retrans", "warning", "ارسال مجدد TCP بالاست (مسیر بد)", "مسیر بین رله و خروج را با تست حجمی بررسی کنید.", retrans_pct=lt["tcp_retrans_pct"]))
-        if th["on_conntrack"] and lt["conntrack_pct"] is not None and lt["conntrack_pct"] >= th["conntrack_crit"]:
-            out.append(_issue(s, "conntrack", "critical", "جدول conntrack نزدیک پر شدن است", "nf_conntrack_max را بالا ببرید و timeout اتصال‌های برقرار را کم کنید.", conntrack_pct=lt["conntrack_pct"]))
         if th["on_failed_units"] and lt["failed_units"]:
             out.append(_issue(s, "failed_units", "warning", "سرویس‌های ناموفق systemd", "با systemctl status وضعیت را ببینید و در صورت نیاز ریستارت کنید.", units=lt["failed_units"]))
+        out.extend(detectors.load_issues(s, th, lt, detectors.recent_metrics(db, s["id"])))
+        out.extend(detectors.event_issues(s, th, lt, now))
+        forecast = detectors.quota_forecast(db, s, th, now) if th["on_quota"] or th["on_quota_pair"] else None
+        if forecast:
+            forecasts.append((s, forecast))
+            found = detectors.quota_issue(s, forecast) if th["on_quota"] else None
+            if found:
+                out.append(found)
         if th["on_reboot"] and lt["reboot_required"]:
             out.append(_issue(s, "reboot_required", "info", "سرور برای اعمال آپدیت نیاز به ریبوت دارد", "در ساعت کم‌ترافیک و با تأیید خودتان ریبوت کنید؛ رله‌ها را یکی‌یکی."))
     names = {s["id"]: s for s in servers}
     by_target: Dict[int, List[Dict[str, Any]]] = {}
     for w in ping_windows(db):
         by_target.setdefault(w["to_id"], []).append(w)
+    classified, replaced = detectors.classify_paths(th, names, by_target)
+    out.extend(classified)
+    if th["on_quota_pair"]:
+        out.extend(detectors.quota_pairs(forecasts))
     for to_id, links in by_target.items():
         target = names.get(to_id)
+        if to_id in replaced:
+            continue
         bad = [w for w in links if w["loss"] is not None and w["loss"] >= th["loss_warn"]]
         if not th["on_ping"] or not target or not bad:
             continue

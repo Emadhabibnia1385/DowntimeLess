@@ -42,3 +42,23 @@ describe("evidenceRows for the multi-relay ping issue", () => {
 		expect(rows[0].value).toBe("iran-1, iran-2");
 	});
 });
+
+describe("evidenceRows for the Phase 1 detectors", () => {
+	it("labels the quota forecast and the IP change in Persian", () => {
+		const rows = evidenceRows({
+			used_gb: 75,
+			quota_gb: 100,
+			used_pct: 75,
+			old_ip: "1.1.1.1",
+			changed_s_ago: 600,
+		});
+		expect(rows.map((row) => row.label)).toEqual([
+			"مصرف (گیگابایت)",
+			"سقف (گیگابایت)",
+			"مصرف از سقف",
+			"آی‌پی قبلی",
+			"زمان تغییر",
+		]);
+		expect(rows[2].value).toBe("۷۵٪");
+	});
+});

@@ -7,7 +7,7 @@ import { errorMessage } from "@/api/transport";
 import { EditIcon, TrashIcon } from "@/shared/icons";
 import { useRefreshAll } from "@/shared/useRefreshAll";
 import { t } from "@/strings";
-import { categoryValue, toServerPayload } from "../lib/category";
+import { categoryValue, toServerPatch } from "../lib/category";
 import { ServerForm, type ServerFormValues } from "./ServerForm";
 
 const ROLES = ["exit", "relay", "panel", "panel_only", "other"];
@@ -43,6 +43,8 @@ export function ServerActions({ server }: { server: ServerOut }) {
 		name: server.name,
 		alias: server.alias,
 		category: categoryValue(server.category_id),
+		quota_gb: server.quota_gb ?? undefined,
+		quota_reset_day: server.quota_reset_day ?? undefined,
 		role: (ROLES.includes(server.role) ? server.role : "other") as ServerFormValues["role"],
 	};
 	return (
@@ -59,10 +61,9 @@ export function ServerActions({ server }: { server: ServerOut }) {
 				<ServerForm
 					defaults={defaults}
 					submitLabel={t.common.save}
+					withQuota
 					error={update.error}
-					onSubmit={(values) =>
-						update.mutate({ serverId: server.id, data: toServerPayload(values) })
-					}
+					onSubmit={(values) => update.mutate({ serverId: server.id, data: toServerPatch(values) })}
 				/>
 			</Modal>
 			<ConfirmDialog

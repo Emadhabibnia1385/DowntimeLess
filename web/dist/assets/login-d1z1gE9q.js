@@ -1,1 +1,0 @@
-import{Ri as e,_i as t,t as n}from"./auth-C-OibkI9.js";import{l as r}from"./index-CR5aCzOI.js";var i=t(),a=e();function o(){let e=(0,i.c)(2),{redirect:t}=r.useSearch(),o;return e[0]===t?o=e[1]:(o=(0,a.jsx)(n,{redirect:t}),e[0]=t,e[1]=o),o}export{o as component};

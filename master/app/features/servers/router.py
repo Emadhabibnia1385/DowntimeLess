@@ -64,6 +64,9 @@ def patch_server(server_id: int, body: ServerPatch, _: Actor = Depends(require("
     changes = body.model_dump(exclude_none=True)
     if "acct_on" in changes:
         changes["acct_on"] = 1 if changes["acct_on"] else 0
+    for nullable in ("quota_gb", "quota_reset_day"):  # null clears these; leaving them out keeps them
+        if nullable in body.model_fields_set:
+            changes[nullable] = getattr(body, nullable)
     if "category_id" in body.model_fields_set:
         changes["category_id"] = _category(db, body.category_id)
     if "role" in changes:

@@ -21,6 +21,7 @@ from .features.overview.router import router as overview_router
 from .features.servers.router import router as servers_router
 from .features.settings.router import router as settings_router
 from .features.ssl.router import router as ssl_router
+from .features.telegram.router import router as telegram_router
 from .features.traffic.router import router as traffic_router
 from .security import digest, new_token
 from .settings import get_settings
@@ -58,10 +59,12 @@ async def lifespan(app: FastAPI):
     db.close()
     stop = threading.Event()
     app.state.bot_username = ""
+    app.state.tg = None
     if s.bot_token:
         tg = Telegram(s.bot_token)
         try:
             app.state.bot_username = tg.me()["username"]
+            app.state.tg = tg
             _prepare_claim(app.state.bot_username)
             for target in (bot.poll_forever, monitor.run_forever):
                 threading.Thread(target=target, args=(tg, stop), daemon=True).start()
@@ -75,7 +78,7 @@ def create_app() -> FastAPI:
     s = get_settings()
     app = FastAPI(title="DowntimeLess", version="0.1.0", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json")
     app.add_exception_handler(DLError, dl_error_handler)
-    for r in (auth_router, servers_router, categories_router, overview_router, issues_router, settings_router, keys_router, ssl_router, links_router, traffic_router):
+    for r in (auth_router, servers_router, categories_router, overview_router, issues_router, settings_router, keys_router, ssl_router, links_router, traffic_router, telegram_router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(agent_router, prefix="/api")
 

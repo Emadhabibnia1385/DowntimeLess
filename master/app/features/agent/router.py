@@ -8,6 +8,7 @@ from ...db import get_db
 from ...errors import DLError
 from ...security import digest, new_token
 from ...settings import get_settings
+from ..servers import events
 from ..servers.service import swap_pct
 from ..links import service as links_svc
 from ..ssl.service import adopt_domains
@@ -45,6 +46,9 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
     pct = lambda used, total: round(used * 100 / total, 1) if total else None  # noqa: E731
     ram_pct = pct((body.ram_total_mb or 0) - (body.ram_avail_mb or 0), body.ram_total_mb)
     disk_pct = pct(body.disk_used_gb or 0, body.disk_total_gb)
+    changes = events.detect(server, body, public_ip, now)
+    for column, value in changes.items():
+        db.execute("UPDATE servers SET %s=? WHERE id=?" % column, (value, sid))  # column names come from detect()
     db.execute(
         "UPDATE servers SET last_seen=?, last_report=?, prev_rx=?, prev_tx=?, agent_version=?, hostname=COALESCE(NULLIF(?,''),hostname), "
         "public_ip=COALESCE(?,public_ip), country=COALESCE(?,country), city=COALESCE(?,city), org=COALESCE(?,org) WHERE id=?",

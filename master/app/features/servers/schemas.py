@@ -58,6 +58,8 @@ class ServerOut(BaseModel):
     agent_version: Optional[str]
     agent_outdated: bool = False
     acct_on: bool = False
+    quota_gb: Optional[float] = None
+    quota_reset_day: Optional[int] = None
     latest: Latest
     system: SystemInfo = SystemInfo()
 
@@ -76,6 +78,8 @@ class ServerPatch(BaseModel):
     category_id: Optional[int] = None  # null clears it; leave it out to keep it
     permission: Optional[str] = Field(default=None, pattern=PERMS)
     acct_on: Optional[bool] = None
+    quota_gb: Optional[float] = Field(default=None, gt=0, le=1_000_000)  # null clears it
+    quota_reset_day: Optional[int] = Field(default=None, ge=1, le=31)  # null clears it
 
 
 class ServerCreated(BaseModel):

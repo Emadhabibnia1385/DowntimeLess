@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import httpx
 
@@ -24,12 +24,17 @@ class Telegram:
     def updates(self, offset: int) -> List[Dict[str, Any]]:
         return self.call("getUpdates", offset=offset, timeout=25, allowed_updates=["message", "callback_query"])
 
-    def send(self, chat_id: int, text: str, buttons: Optional[List[List[Dict[str, str]]]] = None) -> None:
-        extra = {"reply_markup": {"inline_keyboard": buttons}} if buttons else {}
+    def send(self, chat_id: Union[int, str], text: str, buttons: Optional[List[List[Dict[str, str]]]] = None, thread: Optional[int] = None) -> bool:
+        """Send a message; False when Telegram refused it. A blocked bot must never break the caller."""
+        extra: Dict[str, Any] = {"reply_markup": {"inline_keyboard": buttons}} if buttons else {}
+        if thread is not None:
+            extra["message_thread_id"] = thread
         try:
             self.call("sendMessage", chat_id=chat_id, text=text, parse_mode="HTML", disable_web_page_preview=True, **extra)
-        except Exception as exc:  # a blocked bot must never break the caller
+            return True
+        except Exception as exc:
             log.warning("send to %s failed: %s", chat_id, exc)
+            return False
 
     def edit(self, chat_id: int, message_id: int, text: str) -> None:
         try:

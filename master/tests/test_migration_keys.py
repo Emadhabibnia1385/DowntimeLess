@@ -18,3 +18,19 @@ def test_migration_008_keeps_keys_and_turns_the_old_operate_scope_into_full():
     except sqlite3.IntegrityError:
         return
     raise AssertionError("the new table must refuse the old scope")
+
+
+def test_migration_012_keeps_servers_and_incidents_and_adds_the_alert_tables():
+    db = sqlite3.connect(":memory:")
+    for f in sorted(MIGRATIONS.glob("*.sql")):
+        if f.name < "012":
+            db.executescript(f.read_text())
+    db.execute("INSERT INTO servers (name, created_at, public_ip) VALUES ('de-1', 1, '198.51.100.1')")
+    db.execute("INSERT INTO incidents (key, opened_at, last_seen) VALUES ('server:1:cpu', 5, 6)")
+    db.executescript((MIGRATIONS / "012_alerts.sql").read_text())
+    server = db.execute("SELECT public_ip, rebooted_at, prev_ip, ip_changed_at, resized_at, quota_gb, quota_reset_day FROM servers").fetchone()
+    assert server == ("198.51.100.1", None, None, None, None, None, None)
+    assert db.execute("SELECT key, notified_at FROM incidents").fetchone() == ("server:1:cpu", None)
+    db.execute("INSERT INTO telegram_channels (name, chat_id, created_at) VALUES ('c', '-100123', 1)")
+    db.execute("INSERT INTO rule_routes VALUES ('cpu', 'admins')")
+    db.execute("INSERT INTO flapping VALUES ('k', 1)")

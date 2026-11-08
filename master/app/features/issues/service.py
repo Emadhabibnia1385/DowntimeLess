@@ -13,8 +13,11 @@ MAX_INCIDENTS = 300
 FLAPPING_AT = 3
 
 
-def record(db: sqlite3.Connection, now: int, found: Optional[List[Dict[str, Any]]] = None) -> None:
-    """Diff the current issues against the open incidents: open, refresh or close, then prune old rows."""
+def record(db: sqlite3.Connection, now: int, found: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+    """Diff the current issues against the open incidents: open, refresh or close, then prune old rows.
+
+    Returns what happened as events ({"type": "open"|"close", ...}) so the caller can tell people."""
+    events: List[Dict[str, Any]] = []
     found = overview.issues(db) if found is None else found
     present = {i["id"]: i for i in found}
     open_rows = db.execute("SELECT * FROM incidents WHERE closed_at IS NULL").fetchall()
@@ -31,18 +34,34 @@ def record(db: sqlite3.Connection, now: int, found: Optional[List[Dict[str, Any]
         )
     for key, issue in present.items():
         if key not in open_keys:
-            db.execute(
+            cur = db.execute(
                 "INSERT INTO incidents (key, code, server_id, server_name, severity, title, evidence, opened_at, last_seen) VALUES (?,?,?,?,?,?,?,?,?)",
                 (key, issue["code"], issue["server_id"], issue["server_name"], issue["severity"], issue["title"],
                  json.dumps(issue["evidence"], ensure_ascii=False), now, now),
             )
+            role = db.execute("SELECT role FROM servers WHERE id=?", (issue["server_id"],)).fetchone() if issue["server_id"] else None
+            events.append({
+                "type": "open", "incident_id": cur.lastrowid, "key": key, "code": issue["code"], "server_id": issue["server_id"],
+                "server_name": issue["server_name"], "severity": issue["severity"], "title": issue["title"],
+                "suggestion": issue.get("suggestion", ""), "evidence": issue["evidence"], "role": role["role"] if role else None,
+            })
     # the end of an incident is the last sweep that still saw it, not the sweep that noticed it was gone
+    for row in db.execute(
+        "SELECT * FROM incidents WHERE closed_at IS NULL AND last_seen<=? AND (server_id IS NULL OR server_id IN (SELECT id FROM servers))",
+        (now - GRACE_S,),
+    ).fetchall():
+        events.append({
+            "type": "close", "incident_id": row["id"], "key": row["key"], "code": row["code"], "server_id": row["server_id"],
+            "server_name": row["server_name"], "severity": row["severity"], "title": row["title"], "evidence": _evidence(row["evidence"]),
+            "notified_at": row["notified_at"], "duration_s": max(0, row["last_seen"] - row["opened_at"]),
+        })
     db.execute("UPDATE incidents SET closed_at=last_seen WHERE closed_at IS NULL AND last_seen<=?", (now - GRACE_S,))
     db.execute(
         "UPDATE incidents SET closed_at=last_seen WHERE closed_at IS NULL AND server_id IS NOT NULL "
         "AND server_id NOT IN (SELECT id FROM servers)"
     )
     db.execute("DELETE FROM incidents WHERE closed_at IS NOT NULL AND closed_at<?", (now - KEEP_S,))
+    return events
 
 
 def recent_counts(db: sqlite3.Connection, now: int, span: int = 86400) -> Dict[str, int]:

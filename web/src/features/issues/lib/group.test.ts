@@ -73,3 +73,29 @@ describe("groupIssues", () => {
 		expect(groups.find((g) => g.family === "offline")?.items[0].to).toBe("server");
 	});
 });
+
+describe("the Phase 1 detectors", () => {
+	it("groups each new kind under its own Persian title", () => {
+		const codes = [
+			"rebooted",
+			"ip_changed",
+			"resized",
+			"blacklisted",
+			"relay_egress",
+			"relay_filtered",
+		];
+		const groups = groupIssues(
+			[...codes, "load_per_core", "quota", "quota_pair"].map((code) => issue({ id: code, code })),
+		);
+		expect(groups.map((group) => group.title)).not.toContain("steal بالا");
+		expect(new Set(groups.map((group) => group.family)).size).toBe(9);
+		expect(groups.find((group) => group.family === "quota")?.title).toBe("حجم ماهانه رو به پایان");
+	});
+
+	it("shows the days left of a quota and the new address of a changed IP", () => {
+		expect(valueOf(issue({ code: "quota", evidence: { days_left: 1.5 } }))).toContain("روز");
+		expect(valueOf(issue({ code: "ip_changed", evidence: { new_ip: "203.0.113.7" } }))).toBe(
+			"203.0.113.7",
+		);
+	});
+});
