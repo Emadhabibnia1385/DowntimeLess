@@ -38,6 +38,6 @@ export const palette: Palette = {
 		success: { fill: "#5FD08A", onFill: "#0E1012" },
 		warning: { fill: "#FBBF24", onFill: "#0E1012" },
 		danger: { fill: "#FF9C92", onFill: "#0E1012" },
-		info: { fill: "#7DB8FF", onFill: "#0E1012" },
+		info: { fill: "#C3E26B", onFill: "#0E1012" },
 	},
 };

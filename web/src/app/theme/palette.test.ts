@@ -34,6 +34,19 @@ describe("the panel palette (green on white, soft green on black)", () => {
 		expect(Number.parseInt(palette.dark.background.slice(1, 3), 16)).toBeLessThan(40);
 	});
 
+	it("has no blue anywhere in the dark theme", () => {
+		for (const colour of [
+			palette.dark.accent.fill,
+			palette.dark.info.fill,
+			palette.dark.success.fill,
+			palette.dark.focus ?? "",
+		]) {
+			const g = Number.parseInt(colour.slice(3, 5), 16);
+			const b = Number.parseInt(colour.slice(5, 7), 16);
+			expect(b).toBeLessThan(g);
+		}
+	});
+
 	it("reads clearly on the surfaces it is drawn on", () => {
 		for (const mode of [palette.light, palette.dark]) {
 			expect(ratio(mode.foreground, mode.background)).toBeGreaterThanOrEqual(4.5);
