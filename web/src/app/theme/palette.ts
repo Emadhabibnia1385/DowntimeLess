@@ -1,22 +1,22 @@
 import type { Palette } from "@nyxon/nasim";
 
-// Light: slate blue on cold whites. Dark: neutral black with a soft green. Logo lime is never UI.
+// Neutral white or black with a green accent, never blue. The lime of the logo is never UI.
 export const palette: Palette = {
 	radius: "0.75rem",
 	fieldRadius: "0.625rem",
 	light: {
-		background: "#F1F5F7",
-		foreground: "#1D303B",
+		background: "#F5F7F5",
+		foreground: "#1B2120",
 		surface: "#FFFFFF",
-		surfaceSecondary: "#EAF1F5",
-		surfaceTertiary: "#DDE8EF",
+		surfaceSecondary: "#EEF1EF",
+		surfaceTertiary: "#E1E6E3",
 		overlay: "#FFFFFF",
-		muted: "#526675",
-		border: "#D4E0E7",
-		fieldBorder: "#6E8291",
+		muted: "#55605A",
+		border: "#D9DFDB",
+		fieldBorder: "#78847D",
 		fieldBackground: "#FFFFFF",
-		focus: "#315C75",
-		accent: { fill: "#315C75", onFill: "#FFFFFF", tint: "#E0EEF6", text: "#315C75" },
+		focus: "#2E6B45",
+		accent: { fill: "#2E6B45", onFill: "#FFFFFF", tint: "#E3F1E8", text: "#2E6B45" },
 		success: { fill: "#1A6B32", onFill: "#FFFFFF" },
 		warning: { fill: "#8A5A00", onFill: "#FFFFFF" },
 		danger: { fill: "#B42318", onFill: "#FFFFFF" },

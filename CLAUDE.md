@@ -19,19 +19,19 @@ Logos live in `assets/brand/` (README) and `web/public/brand/` (panel). Never re
 | `icon-light.png` / `icon-dark.png` | the shield mark alone, light/dark variant |
 | `web/public/icons/*` | favicon, PWA icons (192/512), maskable icons, apple-touch icon (dark tile, white mark) |
 
-Colour tokens (light: Arctic Light; dark: neutral black with a soft green; set once in the Nasim palette, components only use tokens, never hex). The lime of the logo is
+Colour tokens (neutral white or black with a green accent, never blue; set once in the Nasim palette, components only use tokens, never hex). The lime of the logo is
 part of the logo only: it is never a UI colour, and the logo files stay untouched.
 
 | Role | Light | Dark |
 | --- | --- | --- |
-| Page background | `#F1F5F7` | `#0E1012` |
+| Page background | `#F5F7F5` | `#0E1012` |
 | Card | `#FFFFFF` | `#16191C` |
-| Secondary / tertiary surface | `#EAF1F5` / `#DDE8EF` | `#1D2125` / `#272C31` |
-| Text | `#1D303B` | `#ECEFF1` |
-| Muted text | `#526675` | `#A9B1B8` |
-| Border | `#D4E0E7` | `#2B3036` |
-| Field border | `#6E8291` | `#8A939B` |
-| Accent (buttons, links, focus, tabs, chart highlight) | `#315C75`, tint `#E0EEF6` | `#8BD8A0` (soft green) |
+| Secondary / tertiary surface | `#EEF1EF` / `#E1E6E3` | `#1D2125` / `#272C31` |
+| Text | `#1B2120` | `#ECEFF1` |
+| Muted text | `#55605A` | `#A9B1B8` |
+| Border | `#D9DFDB` | `#2B3036` |
+| Field border | `#78847D` | `#8A939B` |
+| Accent (buttons, links, focus, tabs, chart highlight) | `#2E6B45` (forest green), tint `#E3F1E8` | `#8BD8A0` (soft green) |
 | Success / warning / danger / info | `#1A6B32` / `#8A5A00` / `#B42318` / `#1F5FAA` | `#5FD08A` / `#FBBF24` / `#FF9C92` / `#7DB8FF` |
 
 Rules: dark is the default theme (`defaultMode="dark"` in `web/src/app/providers.tsx`) and light is a toggle; a saved choice always wins.
