@@ -2,10 +2,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { getAuthMeQueryKey, useAuthLogout, useAuthMe } from "@/api/generated/auth/auth";
 import type { UserOut, WorkspaceOut } from "@/api/generated/model";
+import { setTabWorkspace } from "@/api/workspace";
 
-/** Who is signed in; a 401 here means nobody. The answer is kept until a sign-out or a switch. */
+/** Who is signed in and where; asked again after a minute or on window focus. */
 export function useMe() {
-	return useAuthMe({ query: { retry: false, staleTime: Number.POSITIVE_INFINITY } });
+	return useAuthMe({ query: { retry: false, staleTime: 60_000, refetchOnWindowFocus: true } });
 }
 
 export type Role = "owner" | "admin" | "operator" | "viewer";
@@ -44,7 +45,10 @@ export function useWorkspace(): WorkspaceOut | undefined {
 /** Remembers the user a sign-in returned so the gate lets them through at once. */
 export function useStartSession() {
 	const queryClient = useQueryClient();
-	return (user: UserOut) => queryClient.setQueryData(getAuthMeQueryKey(), user);
+	return (user: UserOut) => {
+		setTabWorkspace(user.workspace.id);
+		queryClient.setQueryData(getAuthMeQueryKey(), user);
+	};
 }
 
 /** Ends the session on the master, forgets everything cached, and goes to the login page. */
@@ -57,6 +61,7 @@ export function useSignOut() {
 		signOut: () =>
 			logout.mutate(undefined, {
 				onSettled: () => {
+					setTabWorkspace(null);
 					queryClient.clear();
 					void navigate({ to: "/login", search: { redirect: undefined }, replace: true });
 				},

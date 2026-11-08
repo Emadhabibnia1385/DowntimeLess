@@ -8,6 +8,7 @@ import {
 } from "@/api/generated/auth/auth";
 import type { WorkspaceOut } from "@/api/generated/model";
 import { errorMessage } from "@/api/transport";
+import { setTabWorkspace } from "@/api/workspace";
 import { useWorkspace } from "@/features/auth";
 import { PersonalChip, RoleChip } from "@/features/members";
 import { ChevronDownIcon, WorkspaceIcon } from "@/shared/icons";
@@ -21,6 +22,11 @@ function Item({ space }: { space: WorkspaceOut }) {
 		<Dropdown.Item id={String(space.id)} textValue={space.name} className="min-h-11 gap-3">
 			<div className="flex min-w-0 flex-1 flex-col gap-1">
 				<span className="truncate font-medium">{space.name}</span>
+				{space.invited_by ? (
+					<span className="truncate text-xs text-muted">
+						{t.workspace.invitedBy} <bdi>{space.invited_by}</bdi>
+					</span>
+				) : null}
 				<span className="flex flex-wrap items-center gap-1.5">
 					<RoleChip role={space.role} />
 					{space.is_personal ? <PersonalChip /> : null}
@@ -41,6 +47,8 @@ export function WorkspaceSwitcher() {
 	const change = useAuthSwitchWorkspace({
 		mutation: {
 			onSuccess: (user) => {
+				// this tab names the new workspace from now on; other tabs keep theirs
+				setTabWorkspace(user.workspace.id);
 				queryClient.setQueryData(getAuthMeQueryKey(), user);
 				const safe = safePathAfterSwitch(pathname);
 				if (safe) void navigate({ to: safe, replace: true });

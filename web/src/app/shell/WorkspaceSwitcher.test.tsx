@@ -6,10 +6,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { UserOut, WorkspaceOut } from "@/api/generated/model";
 import { AppProviders } from "@/app/providers";
 import { routeTree } from "@/routeTree.gen";
+import { setTabWorkspace, tabWorkspace } from "@/api/workspace";
 import { safePathAfterSwitch } from "./workspacePath";
 
 const MAIN: WorkspaceOut = { id: 1, name: "فضای کار اصلی", role: "owner", is_personal: true };
-const OTHER: WorkspaceOut = { id: 2, name: "ناوگان مبین", role: "viewer", is_personal: false };
+const OTHER: WorkspaceOut = {
+	id: 2,
+	name: "ناوگان مبین",
+	role: "viewer",
+	is_personal: false,
+	invited_by: "مبین",
+};
 const me = (workspace: WorkspaceOut): UserOut => ({
 	id: 1,
 	name: "امید",
@@ -23,7 +30,7 @@ const me = (workspace: WorkspaceOut): UserOut => ({
 const json = (body: unknown, status = 200) =>
 	new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
-type Call = { method: string; url: string; body: unknown };
+type Call = { method: string; url: string; body: unknown; workspace: string | null };
 
 function boot(path: string) {
 	const calls: Call[] = [];
@@ -33,7 +40,15 @@ function boot(path: string) {
 		vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
 			const url = String(input);
 			const method = init?.method ?? "GET";
-			calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : null });
+			const workspace = new Headers(init?.headers).get("X-Workspace-Id");
+			calls.push({
+				method,
+				url,
+				body: init?.body ? JSON.parse(String(init.body)) : null,
+				workspace,
+			});
+			if (workspace === "9" && !url.includes("/auth/workspace"))
+				return json({ code: "workspace.not_found", message: "x" }, 404);
 			if (url.endsWith("/auth/workspace") && method === "POST") {
 				active = OTHER;
 				return json(me(OTHER));
@@ -63,7 +78,10 @@ describe("the workspace switcher", () => {
 	beforeEach(() => {
 		window.scrollTo = () => {};
 	});
-	afterEach(() => vi.unstubAllGlobals());
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		setTabWorkspace(null);
+	});
 
 	it("shows the current workspace and lists mine with my role and the personal one marked", async () => {
 		boot("/servers");
@@ -79,6 +97,8 @@ describe("the workspace switcher", () => {
 		expect(within(items[0] as HTMLElement).getByText("شخصی")).toBeTruthy();
 		expect(within(items[0] as HTMLElement).getByText("مالک")).toBeTruthy();
 		expect(within(items[1] as HTMLElement).getByText("بیننده")).toBeTruthy();
+		expect(items[1]?.textContent).toContain("دعوت از مبین");
+		expect(items[0]?.textContent).not.toContain("دعوت از");
 	});
 
 	it("switches through the API, then asks for every list again", async () => {
@@ -88,11 +108,18 @@ describe("the workspace switcher", () => {
 		const before = calls.filter((c) => c.url.endsWith("/api/v1/servers")).length;
 		await userEvent.click(await screen.findByRole("menuitemradio", { name: /ناوگان مبین/ }));
 		await waitFor(() =>
-			expect(calls.find((c) => c.method === "POST")).toEqual({
+			expect(calls.find((c) => c.method === "POST")).toMatchObject({
 				method: "POST",
 				url: "/api/v1/auth/workspace",
 				body: { workspace_id: 2 },
 			}),
+		);
+		// this tab names workspace 2 on every request from now on
+		await waitFor(() => expect(tabWorkspace()).toBe(2));
+		await waitFor(() =>
+			expect(calls.some((c) => c.url.endsWith("/api/v1/servers") && c.workspace === "2")).toBe(
+				true,
+			),
 		);
 		await waitFor(() =>
 			expect(calls.filter((c) => c.url.endsWith("/api/v1/servers")).length).toBeGreaterThan(before),
@@ -113,5 +140,17 @@ describe("the workspace switcher", () => {
 		expect(safePathAfterSwitch("/servers")).toBeNull();
 		expect(safePathAfterSwitch("/members")).toBeNull();
 		expect(safePathAfterSwitch("/")).toBeNull();
+	});
+
+	it("moves a tab whose workspace is gone to my own one and says so", async () => {
+		setTabWorkspace(9);
+		const { calls } = boot("/servers");
+		expect(await screen.findByText(/آن فضای کار دیگر در دسترس شما نیست/)).toBeTruthy();
+		expect(tabWorkspace()).toBe(1);
+		await waitFor(() =>
+			expect(calls.some((c) => c.url.endsWith("/api/v1/servers") && c.workspace === "1")).toBe(
+				true,
+			),
+		);
 	});
 });

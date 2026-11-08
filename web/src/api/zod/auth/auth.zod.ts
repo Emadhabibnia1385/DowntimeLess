@@ -18,15 +18,19 @@ export const AuthLoginBody = zod.object({
 	username: zod.string().min(1).max(authLoginBodyUsernameMax),
 });
 
+export const authLoginResponseIsPanelOwnerDefault = false;
+
 export const AuthLoginResponse = zod.object({
 	has_password: zod.boolean(),
 	id: zod.int(),
+	is_panel_owner: zod.boolean().default(authLoginResponseIsPanelOwnerDefault),
 	name: zod.string(),
 	role: zod.string(),
 	tg_username: zod.union([zod.string(), zod.null()]),
 	username: zod.union([zod.string(), zod.null()]),
 	workspace: zod.object({
 		id: zod.int(),
+		invited_by: zod.union([zod.string(), zod.null()]).optional(),
 		is_personal: zod.boolean(),
 		name: zod.string(),
 		role: zod.string(),
@@ -45,15 +49,19 @@ export const AuthMeHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const authMeResponseIsPanelOwnerDefault = false;
+
 export const AuthMeResponse = zod.object({
 	has_password: zod.boolean(),
 	id: zod.int(),
+	is_panel_owner: zod.boolean().default(authMeResponseIsPanelOwnerDefault),
 	name: zod.string(),
 	role: zod.string(),
 	tg_username: zod.union([zod.string(), zod.null()]),
 	username: zod.union([zod.string(), zod.null()]),
 	workspace: zod.object({
 		id: zod.int(),
+		invited_by: zod.union([zod.string(), zod.null()]).optional(),
 		is_personal: zod.boolean(),
 		name: zod.string(),
 		role: zod.string(),
@@ -87,15 +95,19 @@ export const AuthSetPasswordBody = zod.object({
 		.optional(),
 });
 
+export const authSetPasswordResponseIsPanelOwnerDefault = false;
+
 export const AuthSetPasswordResponse = zod.object({
 	has_password: zod.boolean(),
 	id: zod.int(),
+	is_panel_owner: zod.boolean().default(authSetPasswordResponseIsPanelOwnerDefault),
 	name: zod.string(),
 	role: zod.string(),
 	tg_username: zod.union([zod.string(), zod.null()]),
 	username: zod.union([zod.string(), zod.null()]),
 	workspace: zod.object({
 		id: zod.int(),
+		invited_by: zod.union([zod.string(), zod.null()]).optional(),
 		is_personal: zod.boolean(),
 		name: zod.string(),
 		role: zod.string(),
@@ -110,6 +122,8 @@ export const AuthTelegramPollBody = zod.object({
 	poll_secret: zod.string(),
 });
 
+export const authTelegramPollResponseUserOneIsPanelOwnerDefault = false;
+
 export const AuthTelegramPollResponse = zod.object({
 	status: zod.string(),
 	user: zod
@@ -117,12 +131,14 @@ export const AuthTelegramPollResponse = zod.object({
 			zod.object({
 				has_password: zod.boolean(),
 				id: zod.int(),
+				is_panel_owner: zod.boolean().default(authTelegramPollResponseUserOneIsPanelOwnerDefault),
 				name: zod.string(),
 				role: zod.string(),
 				tg_username: zod.union([zod.string(), zod.null()]),
 				username: zod.union([zod.string(), zod.null()]),
 				workspace: zod.object({
 					id: zod.int(),
+					invited_by: zod.union([zod.string(), zod.null()]).optional(),
 					is_personal: zod.boolean(),
 					name: zod.string(),
 					role: zod.string(),
@@ -150,15 +166,19 @@ export const AuthTelegramWebappBody = zod.object({
 	init_data: zod.string(),
 });
 
+export const authTelegramWebappResponseIsPanelOwnerDefault = false;
+
 export const AuthTelegramWebappResponse = zod.object({
 	has_password: zod.boolean(),
 	id: zod.int(),
+	is_panel_owner: zod.boolean().default(authTelegramWebappResponseIsPanelOwnerDefault),
 	name: zod.string(),
 	role: zod.string(),
 	tg_username: zod.union([zod.string(), zod.null()]),
 	username: zod.union([zod.string(), zod.null()]),
 	workspace: zod.object({
 		id: zod.int(),
+		invited_by: zod.union([zod.string(), zod.null()]).optional(),
 		is_personal: zod.boolean(),
 		name: zod.string(),
 		role: zod.string(),
@@ -166,7 +186,10 @@ export const AuthTelegramWebappResponse = zod.object({
 });
 
 /**
- * Act in another workspace I am a member of; any other id is not found.
+ * Check that I may act in a workspace and remember it for my next sign-in; any other id is not found.
+ *
+ * The browser tab then names it in X-Workspace-Id on each request. Requests without that header (other tabs of an older
+ * panel, scripts on the cookie) keep the workspace the session started in, so a switch here never redirects them.
  * @summary Switch Workspace
  */
 export const AuthSwitchWorkspaceHeader = zod.object({
@@ -177,15 +200,19 @@ export const AuthSwitchWorkspaceBody = zod.object({
 	workspace_id: zod.int(),
 });
 
+export const authSwitchWorkspaceResponseIsPanelOwnerDefault = false;
+
 export const AuthSwitchWorkspaceResponse = zod.object({
 	has_password: zod.boolean(),
 	id: zod.int(),
+	is_panel_owner: zod.boolean().default(authSwitchWorkspaceResponseIsPanelOwnerDefault),
 	name: zod.string(),
 	role: zod.string(),
 	tg_username: zod.union([zod.string(), zod.null()]),
 	username: zod.union([zod.string(), zod.null()]),
 	workspace: zod.object({
 		id: zod.int(),
+		invited_by: zod.union([zod.string(), zod.null()]).optional(),
 		is_personal: zod.boolean(),
 		name: zod.string(),
 		role: zod.string(),
@@ -202,6 +229,7 @@ export const AuthWorkspacesHeader = zod.object({
 
 export const AuthWorkspacesResponseItem = zod.object({
 	id: zod.int(),
+	invited_by: zod.union([zod.string(), zod.null()]).optional(),
 	is_personal: zod.boolean(),
 	name: zod.string(),
 	role: zod.string(),

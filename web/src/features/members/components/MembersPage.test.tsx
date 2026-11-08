@@ -7,7 +7,8 @@ import type { MemberOut, UserOut } from "@/api/generated/model";
 import { AppProviders } from "@/app/providers";
 import { routeTree } from "@/routeTree.gen";
 
-const me = (role: string): UserOut => ({
+const me = (role: string, panelOwner = role === "owner"): UserOut => ({
+	is_panel_owner: panelOwner,
 	id: 1,
 	name: "امید",
 	username: null,
@@ -43,7 +44,7 @@ const MEMBERS = [
 
 type Call = { method: string; url: string; body: unknown };
 
-function boot(role = "owner") {
+function boot(role = "owner", panelOwner = role === "owner") {
 	const calls: Call[] = [];
 	vi.stubGlobal(
 		"fetch",
@@ -52,7 +53,7 @@ function boot(role = "owner") {
 			const method = init?.method ?? "GET";
 			calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : null });
 			const body = url.endsWith("/auth/me")
-				? me(role)
+				? me(role, panelOwner)
 				: url.endsWith("/members") && method === "POST"
 					? member({ user_id: 3, name: "رضا", tg_id: 555666 })
 					: url.endsWith("/members")
@@ -149,6 +150,14 @@ describe("members and access", () => {
 		expect(screen.queryByRole("button", { name: "افزودن ادمین" })).toBeNull();
 		expect(calls.some((c) => c.url.endsWith("/members"))).toBe(false);
 		expect(screen.queryByRole("link", { name: "اعضا" })).toBeNull();
+	});
+
+	it("lets only the panel owner add people; another workspace's owner manages roles", async () => {
+		boot("owner", false);
+		expect(await screen.findByRole("grid", { name: "فهرست اعضا" })).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "افزودن ادمین" })).toBeNull();
+		expect(screen.getByText(/فقط مالک پنل افراد تازه را اضافه می‌کند/)).toBeTruthy();
+		expect(screen.getByRole("button", { name: "حذف سارا" })).toBeTruthy();
 	});
 
 	it("puts the members page in the owner's navigation", async () => {

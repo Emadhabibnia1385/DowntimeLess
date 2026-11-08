@@ -80,7 +80,7 @@ export function MembersTable() {
 			isRowHeader: true,
 			cell: (member) => (
 				<span className="flex items-center gap-2">
-					<span className="font-medium">{nameOf(member)}</span>
+					<bdi className="font-medium">{nameOf(member)}</bdi>
 					{member.is_me ? <StatusChip tone="info" size="sm" label={t.members.you} /> : null}
 				</span>
 			),

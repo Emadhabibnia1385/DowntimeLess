@@ -708,7 +708,10 @@ export const getAuthSwitchWorkspaceUrl = () => {
 };
 
 /**
- * Act in another workspace I am a member of; any other id is not found.
+ * Check that I may act in a workspace and remember it for my next sign-in; any other id is not found.
+ *
+ * The browser tab then names it in X-Workspace-Id on each request. Requests without that header (other tabs of an older
+ * panel, scripts on the cookie) keep the workspace the session started in, so a switch here never redirects them.
  * @summary Switch Workspace
  */
 export const authSwitchWorkspace = async (

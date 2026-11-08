@@ -1,5 +1,6 @@
 // Every request goes through apiFetch: same-origin cookie, JSON, timeout, one ApiError shape.
 import { t } from "@/strings";
+import { tabWorkspace, WORKSPACE_HEADER } from "./workspace";
 
 export const REQUEST_TIMEOUT_MS = 20_000;
 
@@ -49,6 +50,9 @@ export async function apiFetch<T>(url: string, init: RequestInit = {}): Promise<
 	const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 	const headers = new Headers(init.headers);
 	if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+	const workspace = tabWorkspace();
+	if (workspace !== null && !headers.has(WORKSPACE_HEADER))
+		headers.set(WORKSPACE_HEADER, String(workspace));
 	try {
 		const response = await fetch(url, {
 			...init,

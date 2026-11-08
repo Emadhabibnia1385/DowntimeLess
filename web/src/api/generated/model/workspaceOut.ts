@@ -7,6 +7,7 @@
 
 export interface WorkspaceOut {
 	id: number;
+	invited_by?: string | null;
 	is_personal: boolean;
 	name: string;
 	role: string;

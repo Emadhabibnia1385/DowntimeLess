@@ -1,6 +1,6 @@
 import { Button, EmptyState, Notice, PageHeader } from "@nyxon/nasim";
 import { useState } from "react";
-import { useRole, useWorkspace } from "@/features/auth";
+import { useMe, useRole, useWorkspace } from "@/features/auth";
 import { UserPlusIcon } from "@/shared/icons";
 import { useDocumentTitle } from "@/shared/useDocumentTitle";
 import { t } from "@/strings";
@@ -12,6 +12,8 @@ export function MembersPage() {
 	useDocumentTitle(t.members.title);
 	const role = useRole();
 	const workspace = useWorkspace();
+	// adding people opens the panel to them, so only the panel owner does it
+	const canAdd = useMe().data?.is_panel_owner === true;
 	const [adding, setAdding] = useState(false);
 	if (role !== "owner") {
 		return (
@@ -24,13 +26,15 @@ export function MembersPage() {
 				title={t.members.title}
 				description={workspace ? `${t.members.subtitle} · ${workspace.name}` : t.members.subtitle}
 				actions={
-					<Button onPress={() => setAdding(true)}>
-						<UserPlusIcon aria-hidden />
-						{t.members.add}
-					</Button>
+					canAdd ? (
+						<Button onPress={() => setAdding(true)}>
+							<UserPlusIcon aria-hidden />
+							{t.members.add}
+						</Button>
+					) : undefined
 				}
 			/>
-			<Notice tone="info">{t.members.intro}</Notice>
+			<Notice tone="info">{canAdd ? t.members.intro : t.members.panelOwnerOnly}</Notice>
 			<MembersTable />
 			<AddMemberDialog isOpen={adding} onOpenChange={setAdding} />
 		</div>

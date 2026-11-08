@@ -9,6 +9,7 @@ import type { WorkspaceOut } from "./workspaceOut";
 export interface UserOut {
 	has_password: boolean;
 	id: number;
+	is_panel_owner?: boolean;
 	name: string;
 	role: string;
 	tg_username: string | null;

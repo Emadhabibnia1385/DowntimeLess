@@ -5360,6 +5360,11 @@
             "title": "Id",
             "type": "integer"
           },
+          "is_panel_owner": {
+            "default": false,
+            "title": "Is Panel Owner",
+            "type": "boolean"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -5487,6 +5492,17 @@
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "invited_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invited By"
           },
           "is_personal": {
             "title": "Is Personal",
@@ -5926,7 +5942,7 @@
     },
     "/api/v1/auth/workspace": {
       "post": {
-        "description": "Act in another workspace I am a member of; any other id is not found.",
+        "description": "Check that I may act in a workspace and remember it for my next sign-in; any other id is not found.\n\nThe browser tab then names it in X-Workspace-Id on each request. Requests without that header (other tabs of an older\npanel, scripts on the cookie) keep the workspace the session started in, so a switch here never redirects them.",
         "operationId": "auth_switch_workspace",
         "parameters": [
           {
@@ -6978,7 +6994,7 @@
         ]
       },
       "post": {
-        "description": "Add a person by their numeric Telegram id; they sign in with Telegram and see this workspace next to their own.",
+        "description": "Add a person by their numeric Telegram id; they sign in with Telegram and see this workspace next to their own.\n\nOnly the panel owner (owner of workspace 1) adds people: every new member can sign in and gets a workspace, so this\nis the registration door of the panel. The answer is the membership only, never the person's profile.",
         "operationId": "members_add",
         "parameters": [
           {
@@ -9064,6 +9080,7 @@
         ]
       },
       "post": {
+        "description": "A chat the shared bot may post this workspace's alerts to, checked with Telegram before it is saved.\n\nA group or channel: the bot must be an administrator that may post, and so must one of this workspace's owner or\nadmins. A private chat (a positive id): only one of those people's own id. One chat belongs to one workspace.",
         "operationId": "telegram_create_channel",
         "parameters": [
           {
