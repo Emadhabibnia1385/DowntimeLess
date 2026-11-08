@@ -10,7 +10,8 @@ export type SortKey =
 	| "steal"
 	| "download"
 	| "upload"
-	| "bandwidth";
+	| "bandwidth"
+	| "retrans";
 export type SortDirection = "asc" | "desc";
 export type SortState = { key: SortKey; direction: SortDirection } | null;
 
@@ -36,6 +37,8 @@ const value = (server: ServerOut, key: SortKey): number | string | null | undefi
 			return server.latest.rx_bps;
 		case "upload":
 			return server.latest.tx_bps;
+		case "retrans":
+			return server.latest.tcp_retrans_pct;
 		case "bandwidth":
 			return server.latest.rx_bps == null && server.latest.tx_bps == null
 				? null

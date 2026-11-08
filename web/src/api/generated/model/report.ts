@@ -12,6 +12,7 @@ import type { ReportPingItem } from "./reportPingItem";
 export interface Report {
 	agent_version?: string;
 	conntrack_pct?: number | null;
+	cpu_cores?: number | null;
 	cpu_pct?: number | null;
 	disk_total_gb?: number | null;
 	disk_used_gb?: number | null;

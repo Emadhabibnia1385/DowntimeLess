@@ -102,3 +102,20 @@ def test_only_ipv4_is_kept_as_the_public_ip(owner):
     report(owner, key, public_ip="203.0.113.5")
     report(owner, key, public_ip="2a14:4f80:800:4::1")
     assert owner.get("/api/v1/servers/%d" % sid).json()["public_ip"] == "203.0.113.5"
+
+
+def test_fleet_defaults_to_emad_and_can_change(owner):
+    r = owner.post("/api/v1/servers", json={"name": "f", "role": "exit", "fleet": "mobin"})
+    assert r.json()["server"]["fleet"] == "mobin"
+    sid = r.json()["server"]["id"]
+    assert owner.patch("/api/v1/servers/%d" % sid, json={"fleet": "shared"}).json()["fleet"] == "shared"
+    assert owner.post("/api/v1/servers", json={"name": "g"}).json()["server"]["fleet"] == "emad"
+    assert owner.post("/api/v1/servers", json={"name": "h", "fleet": "x"}).status_code == 422
+
+
+def test_latest_carries_cores_and_totals(owner):
+    sid, key = make_server(owner)
+    report(owner, key, cpu_cores=4)
+    latest = owner.get("/api/v1/servers/%d" % sid).json()["latest"]
+    assert latest["cpu_cores"] == 4 and latest["ram_total_mb"] == 1000 and latest["ram_used_mb"] == 200
+    assert latest["disk_total_gb"] == 100 and latest["disk_used_gb"] == 20

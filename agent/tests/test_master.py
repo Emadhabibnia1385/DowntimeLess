@@ -8,7 +8,7 @@ import agent
 from fakes import AGENT_KEY, FakeMaster
 
 REPORT_KEYS = {
-    "agent_version", "ts", "hostname", "public_ip", "geo", "uptime_s", "cpu_pct", "steal_pct", "load1",
+    "agent_version", "ts", "hostname", "public_ip", "geo", "uptime_s", "cpu_cores", "cpu_pct", "steal_pct", "load1",
     "ram_total_mb", "ram_avail_mb", "disk_total_gb", "disk_used_gb", "net", "tcp_retrans_pct",
     "conntrack_pct", "failed_units", "reboot_required", "ssl", "ping", "jobs_done",
 }

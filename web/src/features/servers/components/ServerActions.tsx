@@ -41,6 +41,9 @@ export function ServerActions({ server }: { server: ServerOut }) {
 	const defaults: ServerFormValues = {
 		name: server.name,
 		alias: server.alias,
+		fleet: (["emad", "mobin", "shared"].includes(server.fleet ?? "")
+			? server.fleet
+			: "emad") as ServerFormValues["fleet"],
 		role: (ROLES.includes(server.role) ? server.role : "other") as ServerFormValues["role"],
 	};
 	return (

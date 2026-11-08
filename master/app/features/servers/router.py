@@ -24,7 +24,7 @@ def _row(db: sqlite3.Connection, server_id: int) -> sqlite3.Row:
 
 @router.get("", response_model=List[ServerOut], operation_id="servers_list")
 def list_servers(_: Actor = Depends(require("viewer")), db: sqlite3.Connection = Depends(get_db)):
-    return [svc.server_out(r) for r in db.execute("SELECT * FROM servers ORDER BY role, name")]
+    return [svc.server_out(r) for r in db.execute("SELECT * FROM servers ORDER BY fleet, role, name")]
 
 
 @router.post("", response_model=ServerCreated, status_code=201, operation_id="servers_create")
@@ -32,8 +32,8 @@ def create_server(body: ServerCreate, _: Actor = Depends(require("admin")), db: 
     token = new_token(24)
     cols = svc.role_columns(body.role)
     cur = db.execute(
-        "INSERT INTO servers (name, alias, role, panel_only, enroll_hash, created_at) VALUES (?,?,?,?,?,?)",
-        (body.name, body.alias, cols["role"], cols["panel_only"], digest(token), int(time.time())),
+        "INSERT INTO servers (name, alias, role, panel_only, fleet, enroll_hash, created_at) VALUES (?,?,?,?,?,?,?)",
+        (body.name, body.alias, cols["role"], cols["panel_only"], body.fleet, digest(token), int(time.time())),
     )
     return {"server": svc.server_out(_row(db, cur.lastrowid)), "install_command": svc.install_command(token)}
 

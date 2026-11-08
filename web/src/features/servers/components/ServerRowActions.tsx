@@ -52,41 +52,61 @@ export function ServerRowActions({ server }: { server: ServerOut }) {
 	const defaults: ServerFormValues = {
 		name: server.name,
 		alias: server.alias,
+		fleet: (["emad", "mobin", "shared"].includes(server.fleet ?? "")
+			? server.fleet
+			: "emad") as ServerFormValues["fleet"],
 		role: (ROLES.includes(server.role) ? server.role : "other") as ServerFormValues["role"],
 	};
 	const canUpdate = server.status === "online";
 	return (
-		<div className="flex items-center gap-1">
-			{canUpdate ? (
+		<div className="flex flex-col items-start gap-1">
+			<div className="flex items-center gap-1">
+				{canUpdate ? (
+					<Button
+						isIconOnly
+						size="sm"
+						variant={server.agent_outdated ? "primary" : "secondary"}
+						isPending={selfUpdate.isPending}
+						aria-label={t.servers.updateAgent}
+						onPress={() => selfUpdate.mutate()}
+					>
+						<RefreshIcon aria-hidden />
+					</Button>
+				) : null}
 				<Button
 					isIconOnly
 					size="sm"
-					variant={server.agent_outdated ? "primary" : "secondary"}
-					isPending={selfUpdate.isPending}
-					aria-label={t.servers.updateAgent}
-					onPress={() => selfUpdate.mutate()}
+					variant="secondary"
+					aria-label={t.common.edit}
+					onPress={() => setEditing(true)}
 				>
-					<RefreshIcon aria-hidden />
+					<EditIcon aria-hidden />
 				</Button>
+				<Button
+					isIconOnly
+					size="sm"
+					variant="danger-soft"
+					aria-label={t.common.delete}
+					onPress={() => setDeleting(true)}
+				>
+					<TrashIcon aria-hidden />
+				</Button>
+			</div>
+			{server.agent_version ? (
+				<p className="text-xs text-muted">
+					{t.servers.version}{" "}
+					<span dir="ltr" className="font-mono">
+						{server.agent_version}
+					</span>
+					{server.agent_outdated ? (
+						<span title={t.servers.updateNeeded}>
+							{" "}
+							<span aria-hidden>🔄</span>
+							<span className="sr-only">{t.servers.updateNeeded}</span>
+						</span>
+					) : null}
+				</p>
 			) : null}
-			<Button
-				isIconOnly
-				size="sm"
-				variant="secondary"
-				aria-label={t.common.edit}
-				onPress={() => setEditing(true)}
-			>
-				<EditIcon aria-hidden />
-			</Button>
-			<Button
-				isIconOnly
-				size="sm"
-				variant="danger-soft"
-				aria-label={t.common.delete}
-				onPress={() => setDeleting(true)}
-			>
-				<TrashIcon aria-hidden />
-			</Button>
 			<Modal isOpen={editing} onOpenChange={setEditing} title={t.servers.editRowTitle}>
 				<ServerForm
 					defaults={defaults}

@@ -1,0 +1,1 @@
+import{S as e,er as t,gn as n,y as r}from"./useDocumentTitle-BI10zIvI.js";var i=t();function a({query:t,children:a,skeleton:o=(0,i.jsx)(r,{})}){return t.isPending?o:t.isError?(0,i.jsx)(e,{message:n(t.error),onRetry:()=>void t.refetch()}):a(t.data)}export{a as t};

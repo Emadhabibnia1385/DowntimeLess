@@ -12,6 +12,7 @@ export interface ServerOut {
 	alias: string;
 	city: string | null;
 	country: string | null;
+	fleet?: string;
 	hostname: string | null;
 	id: number;
 	last_seen: number | null;

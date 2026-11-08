@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 ROLES = "^(relay|exit|panel|panel_only|other)$"
 PERMS = "^(read|safe|full)$"
+FLEETS = "^(emad|mobin|shared)$"
 
 
 class Latest(BaseModel):
@@ -17,6 +18,11 @@ class Latest(BaseModel):
     load1: Optional[float] = None
     tcp_retrans_pct: Optional[float] = None
     conntrack_pct: Optional[float] = None
+    cpu_cores: Optional[int] = None
+    ram_total_mb: Optional[float] = None
+    ram_used_mb: Optional[float] = None
+    disk_total_gb: Optional[float] = None
+    disk_used_gb: Optional[float] = None
     reboot_required: bool = False
     failed_units: List[str] = []
 
@@ -26,6 +32,7 @@ class ServerOut(BaseModel):
     name: str
     alias: str
     role: str
+    fleet: str = "emad"
     permission: str
     status: str
     last_seen: Optional[int]
@@ -43,12 +50,14 @@ class ServerCreate(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     alias: str = Field(default="", max_length=64)
     role: str = Field(default="other", pattern=ROLES)
+    fleet: str = Field(default="emad", pattern=FLEETS)
 
 
 class ServerPatch(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=64)
     alias: Optional[str] = Field(default=None, max_length=64)
     role: Optional[str] = Field(default=None, pattern=ROLES)
+    fleet: Optional[str] = Field(default=None, pattern=FLEETS)
     permission: Optional[str] = Field(default=None, pattern=PERMS)
 
 

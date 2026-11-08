@@ -41,6 +41,7 @@ export const agentReportBodyPingDefault = [];
 export const AgentReportBody = zod.object({
 	agent_version: zod.string().default(agentReportBodyAgentVersionDefault),
 	conntrack_pct: zod.union([zod.number(), zod.null()]).optional(),
+	cpu_cores: zod.union([zod.int(), zod.null()]).optional(),
 	cpu_pct: zod.union([zod.number(), zod.null()]).optional(),
 	disk_total_gb: zod.union([zod.number(), zod.null()]).optional(),
 	disk_used_gb: zod.union([zod.number(), zod.null()]).optional(),

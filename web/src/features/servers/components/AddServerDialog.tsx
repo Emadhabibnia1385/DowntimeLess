@@ -44,7 +44,7 @@ export function AddServerDialog({
 				<InstallCommand serverId={created.server.id} command={created.install_command} />
 			) : (
 				<ServerForm
-					defaults={{ name: "", alias: "", role: "relay" }}
+					defaults={{ name: "", alias: "", fleet: "emad", role: "exit" }}
 					submitLabel={t.servers.create}
 					error={create.error}
 					onSubmit={(values) => create.mutate({ data: values })}

@@ -7,11 +7,16 @@
 
 export interface Latest {
 	conntrack_pct?: number | null;
+	cpu_cores?: number | null;
 	cpu_pct?: number | null;
 	disk_pct?: number | null;
+	disk_total_gb?: number | null;
+	disk_used_gb?: number | null;
 	failed_units?: string[];
 	load1?: number | null;
 	ram_pct?: number | null;
+	ram_total_mb?: number | null;
+	ram_used_mb?: number | null;
 	reboot_required?: boolean;
 	rx_bps?: number | null;
 	steal_pct?: number | null;

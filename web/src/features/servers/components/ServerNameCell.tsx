@@ -3,7 +3,7 @@ import type { ServerOut } from "@/api/generated/model";
 import { flagOf, ipv4Of, placeLine } from "@/strings";
 import { displayName } from "../lib/status";
 
-// Flag and name (a link), then place and IPv4 under it.
+// Flag and name (a link), then the IPv4 and the place under it.
 export function ServerNameCell({ server }: { server: ServerOut }) {
 	const place = placeLine(server);
 	const ip = ipv4Of(server.public_ip);
@@ -12,7 +12,7 @@ export function ServerNameCell({ server }: { server: ServerOut }) {
 			<span aria-hidden className="text-2xl leading-none">
 				{flagOf(server.country)}
 			</span>
-			<div className="min-w-0 max-w-48">
+			<div className="min-w-0 max-w-44">
 				<Link
 					to="/servers/$serverId"
 					params={{ serverId: String(server.id) }}
@@ -20,14 +20,14 @@ export function ServerNameCell({ server }: { server: ServerOut }) {
 				>
 					{displayName(server)}
 				</Link>
-				{place ? (
-					<p dir="ltr" className="text-start text-xs text-muted">
-						{place}
-					</p>
-				) : null}
 				{ip ? (
 					<p dir="ltr" className="text-start font-mono text-xs text-muted">
 						{ip}
+					</p>
+				) : null}
+				{place ? (
+					<p dir="ltr" className="text-start text-xs text-muted">
+						{place}
 					</p>
 				) : null}
 			</div>

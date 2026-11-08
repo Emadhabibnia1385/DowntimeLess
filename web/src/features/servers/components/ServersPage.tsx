@@ -1,5 +1,5 @@
-import { Button, type DataColumn, DataTable, PageHeader } from "@nyxon/nasim";
-import { useMemo, useState } from "react";
+import { Button, type DataColumn, DataTable, FilterChips, PageHeader } from "@nyxon/nasim";
+import { type ReactNode, useMemo, useState } from "react";
 import type { ServerOut } from "@/api/generated/model";
 import { useCanManage } from "@/features/auth";
 import { AddIcon } from "@/shared/icons";
@@ -14,6 +14,7 @@ import {
 	sortServers,
 } from "../lib/sort";
 import { roleLabel } from "../lib/status";
+import { cpuUsage, diskUsage, ramUsage, type Usage } from "../lib/usage";
 import { AddServerDialog } from "./AddServerDialog";
 import { ServerNameCell } from "./ServerNameCell";
 import { ServerRowActions } from "./ServerRowActions";
@@ -25,23 +26,21 @@ const percent = (value: number | null | undefined) =>
 	value == null ? t.common.none : formatPercent(value);
 const rate = (value: number | null | undefined) =>
 	value == null ? t.common.none : formatNumber(Math.round(value / 1_000_000));
-
 const bandwidth = (rx: number | null | undefined, tx: number | null | undefined) =>
 	rx == null && tx == null ? t.common.none : rate((rx ?? 0) + (tx ?? 0));
 
-// What a row says about its agent: the version, and whether the panel holds a newer one.
-const agentCell = (server: ServerOut) => {
-	if (!server.agent_version) return t.common.none;
-	return (
-		<span
-			dir="ltr"
-			title={server.agent_outdated ? t.servers.agentOutdated(server.agent_version) : undefined}
-			className={server.agent_outdated ? "font-mono text-warning" : "font-mono"}
-		>
-			{server.agent_version}
-		</span>
+// A level as its percent with, under it, what that means in cores or gigabytes.
+const usageCell = (usage: Usage | null): ReactNode =>
+	usage ? (
+		<div className="leading-tight">
+			<p>{usage.percent}</p>
+			{usage.detail ? <p className="text-xs text-muted">{usage.detail}</p> : null}
+		</div>
+	) : (
+		t.common.none
 	);
-};
+
+const FLEET_FILTERS = ["all", "emad", "mobin", "shared"] as const;
 
 export function ServersPage() {
 	useDocumentTitle(t.servers.title);
@@ -49,9 +48,17 @@ export function ServersPage() {
 	const canManage = useCanManage();
 	const [adding, setAdding] = useState(false);
 	const [sort, setSort] = useState<SortState>(null);
+	const [fleet, setFleet] = useState<string>("all");
 	const onSort = (key: SortKey, first: SortDirection) =>
 		setSort((current) => nextSort(current, key, first));
-	const rows = useMemo(() => sortServers(servers.data ?? [], sort), [servers.data, sort]);
+	const rows = useMemo(
+		() =>
+			sortServers(
+				(servers.data ?? []).filter((server) => fleet === "all" || server.fleet === fleet),
+				sort,
+			),
+		[servers.data, sort, fleet],
+	);
 	const head = (label: string, key: SortKey, first: SortDirection = "desc", unit?: string) => (
 		<SortHeader label={label} unit={unit} sortKey={key} first={first} sort={sort} onSort={onSort} />
 	);
@@ -63,17 +70,30 @@ export function ServersPage() {
 			cell: (server) => <ServerNameCell server={server} />,
 		},
 		{
-			id: "role",
-			header: head(t.servers.role, "role", "asc"),
-			cell: (server) => roleLabel(server.role),
-		},
-		{
 			id: "status",
 			header: head(t.servers.status, "status", "asc"),
-			cell: (server) => <ServerStatusChip status={server.status} />,
+			cell: (server) => (
+				<div className="flex flex-col items-start gap-1">
+					<ServerStatusChip status={server.status} />
+					<span className="text-xs text-muted">{roleLabel(server.role)}</span>
+				</div>
+			),
 		},
-		{ id: "cpu", header: head(t.servers.cpu, "cpu"), cell: (s) => percent(s.latest.cpu_pct) },
-		{ id: "ram", header: head(t.servers.ram, "ram"), cell: (s) => percent(s.latest.ram_pct) },
+		{
+			id: "cpu",
+			header: head(t.servers.cpu, "cpu"),
+			cell: (s) => usageCell(cpuUsage(s.latest)),
+		},
+		{
+			id: "ram",
+			header: head(t.servers.ram, "ram"),
+			cell: (s) => usageCell(ramUsage(s.latest)),
+		},
+		{
+			id: "disk",
+			header: head(t.servers.disk, "disk"),
+			cell: (s) => usageCell(diskUsage(s.latest)),
+		},
 		{
 			id: "steal",
 			header: head(t.servers.steal, "steal"),
@@ -94,7 +114,11 @@ export function ServersPage() {
 			header: head(t.servers.bandwidth, "bandwidth", "desc", t.servers.mbps),
 			cell: (s) => bandwidth(s.latest.rx_bps, s.latest.tx_bps),
 		},
-		{ id: "agent", header: t.servers.agent, cell: agentCell },
+		{
+			id: "retrans",
+			header: head(t.servers.retrans, "retrans"),
+			cell: (s) => percent(s.latest.tcp_retrans_pct),
+		},
 		...(canManage
 			? [
 					{
@@ -106,6 +130,10 @@ export function ServersPage() {
 				]
 			: []),
 	];
+	const filterOptions = FLEET_FILTERS.map((value) => ({
+		value,
+		label: value === "all" ? t.servers.filterAll : t.servers.fleets[value],
+	}));
 	return (
 		<div className="flex flex-col gap-6">
 			<PageHeader
@@ -122,6 +150,12 @@ export function ServersPage() {
 						</>
 					) : undefined
 				}
+			/>
+			<FilterChips
+				label={t.servers.filterLabel}
+				value={fleet}
+				onChange={setFleet}
+				options={filterOptions}
 			/>
 			<DataTable
 				ariaLabel={t.servers.tableLabel}

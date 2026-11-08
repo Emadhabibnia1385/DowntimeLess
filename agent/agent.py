@@ -19,7 +19,7 @@ import time
 import urllib.parse
 import urllib.request
 
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 UA = "DowntimeLess-Agent/" + VERSION
 SELF_PATH = os.path.realpath(__file__)
 GEO_URLS = ("https://ipinfo.io/json", "https://ipwho.is/")
@@ -401,6 +401,7 @@ def build_report(state):
         "public_ip": ip,
         "geo": geo,
         "uptime_s": int(uptime) if uptime is not None else None,
+        "cpu_cores": os.cpu_count(),
         "cpu_pct": cpu, "steal_pct": steal, "load1": parse_first_float(read("/proc/loadavg")),
         "ram_total_mb": mem[0] if mem else None, "ram_avail_mb": mem[1] if mem else None,
         "disk_total_gb": disk_total, "disk_used_gb": disk_used,

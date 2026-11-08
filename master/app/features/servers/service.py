@@ -33,6 +33,10 @@ def latest_of(row: sqlite3.Row) -> Dict[str, Any]:
         "rx_bps": net.get("rx_bps"), "tx_bps": net.get("tx_bps"),
         "uptime_s": rep.get("uptime_s"), "load1": rep.get("load1"),
         "tcp_retrans_pct": rep.get("tcp_retrans_pct"), "conntrack_pct": rep.get("conntrack_pct"),
+        "cpu_cores": rep.get("cpu_cores"),
+        "ram_total_mb": total,
+        "ram_used_mb": round(total - avail, 1) if total and avail is not None else None,
+        "disk_total_gb": dt, "disk_used_gb": du,
         "reboot_required": bool(rep.get("reboot_required")), "failed_units": rep.get("failed_units") or [],
     }
 
@@ -76,7 +80,7 @@ def role_of(row: sqlite3.Row) -> str:
 
 
 def server_out(row: sqlite3.Row) -> Dict[str, Any]:
-    keys = ("id", "name", "alias", "permission", "last_seen", "hostname", "public_ip", "country", "city", "org", "agent_version")
+    keys = ("id", "name", "alias", "fleet", "permission", "last_seen", "hostname", "public_ip", "country", "city", "org", "agent_version")
     return {
         **{k: row[k] for k in keys},
         "role": role_of(row),

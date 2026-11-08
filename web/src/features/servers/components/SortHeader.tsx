@@ -25,9 +25,11 @@ export function SortHeader({
 			onClick={() => onSort(sortKey, first)}
 			className="inline-flex cursor-pointer items-center gap-1 rounded px-1 font-semibold outline-none hover:text-foreground focus-visible:outline-2 focus-visible:outline-focus"
 		>
-			<span className="flex flex-col items-start leading-tight">
+			<span className="flex max-w-20 flex-col items-start whitespace-normal text-start leading-tight">
 				{label}
-				{unit ? <span className="text-xs font-normal text-muted">{unit}</span> : null}
+				{unit ? (
+					<span className="whitespace-nowrap text-xs font-normal text-muted">{unit}</span>
+				) : null}
 			</span>
 			<span aria-hidden className={active ? "text-accent" : "text-muted opacity-50"}>
 				{active === "asc" ? "▲" : active === "desc" ? "▼" : "↕"}

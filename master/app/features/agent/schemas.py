@@ -25,6 +25,7 @@ class Report(BaseModel):
     hostname: str = ""
     public_ip: Optional[str] = None
     geo: Optional[Dict[str, Any]] = None
+    cpu_cores: Optional[int] = None
     cpu_pct: Optional[float] = None
     steal_pct: Optional[float] = None
     ram_total_mb: Optional[float] = None

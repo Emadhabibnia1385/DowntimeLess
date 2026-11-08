@@ -424,6 +424,17 @@
             ],
             "title": "Conntrack Pct"
           },
+          "cpu_cores": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Cores"
+          },
           "cpu_pct": {
             "anyOf": [
               {
@@ -445,6 +456,28 @@
               }
             ],
             "title": "Disk Pct"
+          },
+          "disk_total_gb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Total Gb"
+          },
+          "disk_used_gb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Used Gb"
           },
           "failed_units": {
             "default": [],
@@ -475,6 +508,28 @@
               }
             ],
             "title": "Ram Pct"
+          },
+          "ram_total_mb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ram Total Mb"
+          },
+          "ram_used_mb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ram Used Mb"
           },
           "reboot_required": {
             "default": false,
@@ -889,6 +944,17 @@
             ],
             "title": "Conntrack Pct"
           },
+          "cpu_cores": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Cores"
+          },
           "cpu_pct": {
             "anyOf": [
               {
@@ -1069,6 +1135,12 @@
             "title": "Alias",
             "type": "string"
           },
+          "fleet": {
+            "default": "emad",
+            "pattern": "^(emad|mobin|shared)$",
+            "title": "Fleet",
+            "type": "string"
+          },
           "name": {
             "maxLength": 64,
             "minLength": 1,
@@ -1148,6 +1220,11 @@
               }
             ],
             "title": "Country"
+          },
+          "fleet": {
+            "default": "emad",
+            "title": "Fleet",
+            "type": "string"
           },
           "hostname": {
             "anyOf": [
@@ -1249,6 +1326,18 @@
               }
             ],
             "title": "Alias"
+          },
+          "fleet": {
+            "anyOf": [
+              {
+                "pattern": "^(emad|mobin|shared)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fleet"
           },
           "name": {
             "anyOf": [
