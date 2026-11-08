@@ -19,24 +19,26 @@ Logos live in `assets/brand/` (README) and `web/public/brand/` (panel). Never re
 | `icon-light.png` / `icon-dark.png` | the shield mark alone, light/dark variant |
 | `web/public/icons/*` | favicon, PWA icons (192/512), maskable icons, apple-touch icon (dark tile, white mark) |
 
-Colour tokens (set once in the Nasim palette, components only use tokens, never hex):
+Colour tokens (light: Arctic Light; dark: neutral black with a soft green; set once in the Nasim palette, components only use tokens, never hex). The lime of the logo is
+part of the logo only: it is never a UI colour, and the logo files stay untouched.
 
-| Role | Value |
-| --- | --- |
-| Brand green: primary accent and important buttons | `#A3E635` |
-| Muted olive: low-emphasis surfaces | `#344A2D` |
-| Dark background | `#0B1210` |
-| Dark card | `#17221C` |
-| Dark text | `#F4F8F2` |
-| Light background | `#F7FAF5` |
-| Light card | `#FFFFFF` |
-| Light text | `#142019` |
-| Readable accent on light backgrounds (text, links, borders) | `#3F6E18` |
+| Role | Light | Dark |
+| --- | --- | --- |
+| Page background | `#F1F5F7` | `#0E1012` |
+| Card | `#FFFFFF` | `#16191C` |
+| Secondary / tertiary surface | `#EAF1F5` / `#DDE8EF` | `#1D2125` / `#272C31` |
+| Text | `#1D303B` | `#ECEFF1` |
+| Muted text | `#526675` | `#A9B1B8` |
+| Border | `#D4E0E7` | `#2B3036` |
+| Field border | `#6E8291` | `#8A939B` |
+| Accent (buttons, links, focus, tabs, chart highlight) | `#315C75`, tint `#E0EEF6` | `#8BD8A0` (soft green) |
+| Success / warning / danger / info | `#1A6B32` / `#8A5A00` / `#B42318` / `#1F5FAA` | `#5FD08A` / `#FBBF24` / `#FF9C92` / `#7DB8FF` |
 
-Rules: in dark mode the accent fill is `#A3E635` with `#0B1210` text. In light mode lime cannot reach readable contrast on white
-(about 1.5:1), so the accent is `#3F6E18` (white text on filled buttons, and for green text, links, focus rings and thin lines). Dark is the
-default theme, light is a toggle. The palette lives in `web/src/app/theme/palette.ts` and must keep passing Nasim's `checkPalette`. Status is always a
-word plus colour, never colour alone.
+Rules: dark is the default theme (`defaultMode="dark"` in `web/src/app/providers.tsx`) and light is a toggle; a saved choice always wins.
+Dark is a neutral graphite black (not pure #000, not tinted blue or green); no neon and no glow. Use the accent for actions, navigation, tabs, filters and
+chart highlights, and pale surfaces to separate data cards. The palette lives in `web/src/app/theme/palette.ts` and must keep passing
+Nasim's `checkPalette` (never weaken the validator or its test). Status is always a word or icon plus colour, never colour alone.
+The PWA manifest, the pre-paint colours in `web/index.html` and `web/public/offline.html` use the same two backgrounds.
 
 ## Panel layout (modelled on KasbBook, see `docs/design/kasbbook-dashboard-reference.webp`)
 

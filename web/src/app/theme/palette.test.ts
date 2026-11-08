@@ -8,26 +8,44 @@ const ratio = (a: string, b: string) => {
 	return contrastRatio(x, y);
 };
 
-describe("the brand palette", () => {
+describe("the panel palette (Arctic Light, black and soft green dark)", () => {
 	it("keeps every contrast Nasim measures, in light and dark", () => {
 		expect(checkPalette(palette)).toEqual([]);
 	});
 
-	it("uses the colours the brand names", () => {
-		expect(palette.dark.accent.fill).toBe("#A3E635");
-		expect(palette.dark.background).toBe("#0B1210");
-		expect(palette.dark.surface).toBe("#17221C");
-		expect(palette.dark.foreground).toBe("#F4F8F2");
-		expect(palette.dark.surfaceTertiary).toBe("#344A2D");
-		expect(palette.light.background).toBe("#F7FAF5");
-		expect(palette.light.surface).toBe("#FFFFFF");
-		expect(palette.light.foreground).toBe("#142019");
-		expect(palette.light.accent.text).toBe("#3F6E18");
+	it("is slate blue in light and neutral black with a soft green in dark, with no neon lime", () => {
+		expect(palette.light.accent.fill).toBe("#315C75");
+		expect(palette.light.background).toBe("#F1F5F7");
+		expect(palette.dark.background).toBe("#0E1012");
+		expect(palette.dark.accent.fill).toBe("#8BD8A0");
+		for (const mode of [palette.light, palette.dark]) {
+			expect(mode.accent.fill.toLowerCase()).not.toBe("#a3e635");
+			expect(mode.background.toLowerCase()).not.toBe("#000000");
+		}
+		// the dark canvas is a neutral grey-black: red, green and blue within a few steps of each other
+		const [r, g, b] = ["1", "3", "5"].map((i) =>
+			Number.parseInt(palette.dark.background.slice(Number(i), Number(i) + 2), 16),
+		);
+		expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThanOrEqual(6);
+		expect(Math.max(r, g, b)).toBeLessThan(40);
 	});
 
-	it("puts dark text on the lime fill and readable green on light surfaces", () => {
-		expect(ratio(palette.dark.accent.fill, palette.dark.accent.onFill)).toBeGreaterThanOrEqual(4.5);
-		expect(ratio("#3F6E18", palette.light.background)).toBeGreaterThanOrEqual(4.5);
-		expect(ratio("#3F6E18", palette.light.surface)).toBeGreaterThanOrEqual(4.5);
+	it("reads clearly on the surfaces it is drawn on", () => {
+		for (const mode of [palette.light, palette.dark]) {
+			expect(ratio(mode.foreground, mode.background)).toBeGreaterThanOrEqual(4.5);
+			expect(ratio(mode.muted, mode.background)).toBeGreaterThanOrEqual(4.5);
+			expect(ratio(mode.muted, mode.surface)).toBeGreaterThanOrEqual(4.5);
+			expect(ratio(mode.accent.fill, mode.accent.onFill)).toBeGreaterThanOrEqual(4.5);
+			expect(ratio(mode.fieldBorder, mode.fieldBackground ?? mode.surface)).toBeGreaterThanOrEqual(
+				3,
+			);
+			expect(ratio(mode.focus ?? mode.accent.fill, mode.background)).toBeGreaterThanOrEqual(3);
+			for (const status of [mode.success, mode.warning, mode.danger, mode.info]) {
+				expect(ratio(status.fill, status.onFill)).toBeGreaterThanOrEqual(4.5);
+			}
+		}
+		expect(
+			ratio(palette.light.accent.text ?? "#000000", palette.light.accent.tint ?? "#FFFFFF"),
+		).toBeGreaterThanOrEqual(4.5);
 	});
 });
