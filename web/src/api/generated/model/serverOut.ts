@@ -7,6 +7,7 @@
 import type { Latest } from "./latest";
 
 export interface ServerOut {
+	agent_outdated?: boolean;
 	agent_version: string | null;
 	alias: string;
 	city: string | null;

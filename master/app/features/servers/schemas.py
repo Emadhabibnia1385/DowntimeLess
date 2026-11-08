@@ -35,6 +35,7 @@ class ServerOut(BaseModel):
     city: Optional[str]
     org: Optional[str]
     agent_version: Optional[str]
+    agent_outdated: bool = False
     latest: Latest
 
 

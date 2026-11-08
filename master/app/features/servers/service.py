@@ -1,4 +1,5 @@
 import json
+import re
 import sqlite3
 import time
 from typing import Any, Dict, Optional
@@ -9,6 +10,8 @@ RANGES = {"1h": (3600, 30), "24h": (86400, 300), "7d": (7 * 86400, 1800), "30d":
 # read-only kinds any admin may queue; the rest also need the server permission level
 SAFE_KINDS = {"ping", "tcp_check", "speedtest_down", "speedtest_up"}
 MUTATING_KINDS = {"apt_upgrade_safe", "reboot", "self_update"}
+# the agent replacing its own file from this master changes nothing else on the server
+ANY_LEVEL_KINDS = {"self_update"}
 
 
 def status_of(row: sqlite3.Row, now: Optional[float] = None) -> str:
@@ -34,9 +37,41 @@ def latest_of(row: sqlite3.Row) -> Dict[str, Any]:
     }
 
 
+_agent_cache: Dict[str, Any] = {"mtime": None, "version": None}
+
+
+def current_agent_version() -> Optional[str]:
+    """The version of the agent file this master serves, re-read when the file changes."""
+    path = get_settings().agent_dir / "agent.py"
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return None
+    if _agent_cache["mtime"] != mtime:
+        m = re.search(r'^VERSION\s*=\s*"(\d+\.\d+\.\d+)"', path.read_text(encoding="utf-8"), re.M)
+        _agent_cache.update(mtime=mtime, version=m.group(1) if m else None)
+    return _agent_cache["version"]
+
+
+def _version_key(v: str) -> tuple:
+    return tuple(int(x) for x in v.split("."))
+
+
+def agent_outdated(version: Optional[str]) -> bool:
+    latest = current_agent_version()
+    if not version or not latest or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        return False
+    return _version_key(version) < _version_key(latest)
+
+
 def server_out(row: sqlite3.Row) -> Dict[str, Any]:
     keys = ("id", "name", "alias", "role", "permission", "last_seen", "hostname", "public_ip", "country", "city", "org", "agent_version")
-    return {**{k: row[k] for k in keys}, "status": status_of(row), "latest": latest_of(row)}
+    return {
+        **{k: row[k] for k in keys},
+        "status": status_of(row),
+        "agent_outdated": agent_outdated(row["agent_version"]),
+        "latest": latest_of(row),
+    }
 
 
 def install_command(token: str) -> str:

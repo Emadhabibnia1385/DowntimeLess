@@ -1107,6 +1107,11 @@
       },
       "ServerOut": {
         "properties": {
+          "agent_outdated": {
+            "default": false,
+            "title": "Agent Outdated",
+            "type": "boolean"
+          },
           "agent_version": {
             "anyOf": [
               {

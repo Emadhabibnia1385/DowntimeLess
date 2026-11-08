@@ -68,3 +68,21 @@ def test_concurrent_requests_do_not_trip_sqlite_thread_check(owner):
     with ThreadPoolExecutor(8) as pool:
         codes = list(pool.map(lambda _: owner.get("/api/v1/servers/%d/metrics?range=1h" % sid).status_code, range(40)))
     assert set(codes) == {200}
+
+
+def test_self_update_is_allowed_at_read_level_but_other_changes_are_not(owner):
+    sid, _ = make_server(owner)
+    ok = owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": "self_update"})
+    assert ok.status_code == 201
+    denied = owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": "reboot"})
+    assert denied.json()["code"] == "job.permission"
+
+
+def test_agent_outdated_follows_the_served_agent_version(owner):
+    sid, key = make_server(owner)
+    report(owner, key, agent_version="0.0.1")
+    assert owner.get("/api/v1/servers/%d" % sid).json()["agent_outdated"] is True
+    from app.features.servers import service
+
+    report(owner, key, agent_version=service.current_agent_version())
+    assert owner.get("/api/v1/servers/%d" % sid).json()["agent_outdated"] is False

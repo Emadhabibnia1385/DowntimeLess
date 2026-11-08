@@ -100,8 +100,10 @@ def create_job(server_id: int, body: JobCreate, actor: Actor = Depends(require("
     server = _row(db, server_id)
     if body.kind not in svc.SAFE_KINDS | svc.MUTATING_KINDS:
         raise DLError("job.kind_unknown")
-    if body.kind in svc.MUTATING_KINDS and (server["permission"] == "read" or actor.via == "key"):
-        raise DLError("job.permission")  # changes to a server always come from a signed-in human
+    if body.kind in svc.MUTATING_KINDS:
+        too_low = server["permission"] == "read" and body.kind not in svc.ANY_LEVEL_KINDS
+        if too_low or actor.via == "key":
+            raise DLError("job.permission")  # changes to a server always come from a signed-in human
     cur = db.execute(
         "INSERT INTO jobs (server_id, kind, args, created_by, created_at) VALUES (?,?,?,?,?)",
         (server_id, body.kind, json.dumps(body.args), actor.user_id, int(time.time())),

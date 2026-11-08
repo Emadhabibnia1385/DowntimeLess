@@ -13,10 +13,12 @@ export const ServersListHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const serversListResponseAgentOutdatedDefault = false;
 export const serversListResponseLatestFailedUnitsDefault = [];
 export const serversListResponseLatestRebootRequiredDefault = false;
 
 export const ServersListResponseItem = zod.object({
+	agent_outdated: zod.boolean().default(serversListResponseAgentOutdatedDefault),
 	agent_version: zod.union([zod.string(), zod.null()]),
 	alias: zod.string(),
 	city: zod.union([zod.string(), zod.null()]),
@@ -68,12 +70,14 @@ export const ServersCreateBody = zod.object({
 	role: zod.string().regex(serversCreateBodyRoleRegExp).default(serversCreateBodyRoleDefault),
 });
 
+export const serversCreateResponseServerAgentOutdatedDefault = false;
 export const serversCreateResponseServerLatestFailedUnitsDefault = [];
 export const serversCreateResponseServerLatestRebootRequiredDefault = false;
 
 export const ServersCreateResponse = zod.object({
 	install_command: zod.string(),
 	server: zod.object({
+		agent_outdated: zod.boolean().default(serversCreateResponseServerAgentOutdatedDefault),
 		agent_version: zod.union([zod.string(), zod.null()]),
 		alias: zod.string(),
 		city: zod.union([zod.string(), zod.null()]),
@@ -132,10 +136,12 @@ export const ServersGetHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const serversGetResponseAgentOutdatedDefault = false;
 export const serversGetResponseLatestFailedUnitsDefault = [];
 export const serversGetResponseLatestRebootRequiredDefault = false;
 
 export const ServersGetResponse = zod.object({
+	agent_outdated: zod.boolean().default(serversGetResponseAgentOutdatedDefault),
 	agent_version: zod.union([zod.string(), zod.null()]),
 	alias: zod.string(),
 	city: zod.union([zod.string(), zod.null()]),
@@ -192,10 +198,12 @@ export const ServersUpdateBody = zod.object({
 	role: zod.union([zod.string().regex(serversUpdateBodyRoleOneRegExp), zod.null()]).optional(),
 });
 
+export const serversUpdateResponseAgentOutdatedDefault = false;
 export const serversUpdateResponseLatestFailedUnitsDefault = [];
 export const serversUpdateResponseLatestRebootRequiredDefault = false;
 
 export const ServersUpdateResponse = zod.object({
+	agent_outdated: zod.boolean().default(serversUpdateResponseAgentOutdatedDefault),
 	agent_version: zod.union([zod.string(), zod.null()]),
 	alias: zod.string(),
 	city: zod.union([zod.string(), zod.null()]),
@@ -236,12 +244,14 @@ export const ServersNewEnrollTokenHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const serversNewEnrollTokenResponseServerAgentOutdatedDefault = false;
 export const serversNewEnrollTokenResponseServerLatestFailedUnitsDefault = [];
 export const serversNewEnrollTokenResponseServerLatestRebootRequiredDefault = false;
 
 export const ServersNewEnrollTokenResponse = zod.object({
 	install_command: zod.string(),
 	server: zod.object({
+		agent_outdated: zod.boolean().default(serversNewEnrollTokenResponseServerAgentOutdatedDefault),
 		agent_version: zod.union([zod.string(), zod.null()]),
 		alias: zod.string(),
 		city: zod.union([zod.string(), zod.null()]),
