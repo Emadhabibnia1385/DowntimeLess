@@ -1,0 +1,1 @@
+import{t as e}from"./settings-BGEDot_w.js";var t=e;export{t as component};

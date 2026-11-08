@@ -115,10 +115,10 @@ export const fa = {
 		info: "اطلاع",
 	},
 	roles: {
-		relay: "رله",
-		exit: "خروج",
+		relay: "رله ایران",
+		exit: "نود",
 		panel: "پنل + نود",
-		other: "سایر",
+		other: "سرور جانبی",
 	},
 	permissions: {
 		read: "فقط خواندن",
