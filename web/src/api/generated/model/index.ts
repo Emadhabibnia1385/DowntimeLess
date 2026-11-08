@@ -7,6 +7,8 @@
 
 export * from "./categoryBody";
 export * from "./categoryOut";
+export * from "./channelIn";
+export * from "./channelOut";
 export * from "./domainCreate";
 export * from "./enrollRequest";
 export * from "./enrollResult";
@@ -71,6 +73,9 @@ export * from "./settingsPutBody";
 export * from "./sslRow";
 export * from "./startResult";
 export * from "./systemInfo";
+export * from "./telegramGetRoutes200";
+export * from "./telegramPutRoutes200";
+export * from "./telegramPutRoutesBody";
 export * from "./topDay";
 export * from "./trafficPoint";
 export * from "./trafficSeries";

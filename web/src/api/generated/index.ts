@@ -9,4 +9,5 @@ export * from "./overview/overview";
 export * from "./servers/servers";
 export * from "./settings/settings";
 export * from "./ssl/ssl";
+export * from "./telegram/telegram";
 export * from "./traffic/traffic";

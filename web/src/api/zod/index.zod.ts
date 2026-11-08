@@ -9,4 +9,5 @@ export * from "./overview/overview.zod";
 export * from "./servers/servers.zod";
 export * from "./settings/settings.zod";
 export * from "./ssl/ssl.zod";
+export * from "./telegram/telegram.zod";
 export * from "./traffic/traffic.zod";

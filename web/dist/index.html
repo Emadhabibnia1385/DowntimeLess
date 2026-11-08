@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fa" dir="rtl" class="dark" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0B1210" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="DowntimeLess" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="preload" href="/fonts/webfonts/Vazirmatn[wght].woff2" as="font" type="font/woff2" crossorigin />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>DowntimeLess</title>
+    <style>html.dark{background:#0b1210}html.light{background:#f7faf5}</style>
+    <!-- Dark is the default; only a saved light choice (or a light device in follow-device mode) flips it. -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("nasim-theme");
+          var scheme = saved === "light" ? "light"
+            : saved === "system" && !matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark";
+          document.documentElement.classList.remove("dark", "light");
+          document.documentElement.classList.add(scheme);
+          document.documentElement.dataset.theme = scheme;
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-DxMHTdyk.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-WkwZ5CU-.js">
+    <link rel="modulepreload" crossorigin href="/assets/color-MwUzspQ2.js">
+    <link rel="modulepreload" crossorigin href="/assets/auth-C_tX1kJO.js">
+    <link rel="modulepreload" crossorigin href="/assets/Modal-5y6g8Kr9.js">
+    <link rel="modulepreload" crossorigin href="/assets/useRefreshAll-DcjPyxOq.js">
+    <link rel="modulepreload" crossorigin href="/assets/StaticTable-DcOwfsRy.js">
+    <link rel="modulepreload" crossorigin href="/assets/Loadable-BrE2zYCB.js">
+    <link rel="modulepreload" crossorigin href="/assets/settings-DOb0-NMY.js">
+    <link rel="modulepreload" crossorigin href="/assets/Tabs-DIkoMHO_.js">
+    <link rel="modulepreload" crossorigin href="/assets/link-BRReOtVq.js">
+    <link rel="modulepreload" crossorigin href="/assets/useMatch-ZpPr0AJl.js">
+    <link rel="modulepreload" crossorigin href="/assets/lazyRouteComponent-Bjht9mME.js">
+    <link rel="modulepreload" crossorigin href="/assets/DataTable-CtzzgdCc.js">
+    <link rel="modulepreload" crossorigin href="/assets/tooltip-DI7vq01a.js">
+    <link rel="modulepreload" crossorigin href="/assets/ssl-DIfW3yZM.js">
+    <link rel="modulepreload" crossorigin href="/assets/CopyButton-CRHgEMhO.js">
+    <link rel="modulepreload" crossorigin href="/assets/servers-BsQAhV5D.js">
+    <link rel="modulepreload" crossorigin href="/assets/issues-B-0dJz9e.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-DnphI-5j.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
