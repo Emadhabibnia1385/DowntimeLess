@@ -141,6 +141,7 @@ export const fa = {
 	dashboard: {
 		title: "داشبورد",
 		subtitle: "ناوگان، نمودارها و مشکل‌ها در یک صفحه؛ هر ۳۰ ثانیه به‌روز می‌شود",
+		trafficLink: "جزئیات ترافیک",
 		statsLabel: "آمار ناوگان",
 		tiles: {
 			servers: "سرورهای آنلاین",
@@ -151,8 +152,10 @@ export const fa = {
 			issuesHint: (critical: string, warning: string, info: string) =>
 				`${critical} بحرانی، ${warning} هشدار، ${info} اطلاع`,
 			issuesNone: "مشکلی نیست",
-			rx: "دریافت",
-			tx: "ارسال",
+			trafficToday: "ترافیک امروز",
+			trafficRange: "ترافیک بازه",
+			yesterday: (bytes: string) => `دیروز ${bytes}`,
+			split: (rx: string, tx: string) => `دانلود ${rx}، آپلود ${tx}`,
 			inRange: (range: string) => `${range} اخیر`,
 			ssl: "گواهی در خطر",
 			sslHint: (critical: string, total: string) => `${critical} بحرانی از ${total} گواهی`,

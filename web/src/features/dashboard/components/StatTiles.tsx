@@ -7,7 +7,7 @@ import { useThresholds } from "@/features/settings";
 import { type Range, useServers } from "@/features/servers";
 import { summarize, useSsl } from "@/features/ssl";
 import { formatBytes, formatNumber, formatPercent, t } from "@/strings";
-import { useFleetHistory, useOverview } from "../api";
+import { useFleetHistory, useOverview, useTodayTraffic } from "../api";
 import { fleetAverages, issueCounts } from "../lib/stats";
 
 // Compact type so eight tiles fit one row beside the sidebar.
@@ -52,21 +52,30 @@ function sized(bytes: number): { value: string; unit: string } {
 const percentOrNone = (value: number | null) =>
 	value === null ? t.common.none : formatPercent(value);
 
-// Eight figures in one row: servers, issues, traffic both ways, certificates, CPU, RAM, worst link.
+// Eight figures: servers, issues, traffic today and in the range, SSL, CPU, RAM, worst link.
 export function StatTiles({ range }: { range: Range }) {
 	const overview = useOverview();
 	const fleet = useFleetHistory(range);
+	const today = useTodayTraffic();
 	const issues = useIssues();
 	const certs = useSsl();
 	const servers = useServers();
 	const pings = usePingMatrix();
 	const limits = useThresholds() as Thresholds;
 	const rangeLabel = COPY.inRange(t.server.ranges[range]);
-	const traffic =
-		(pick: "rx_total" | "tx_total") => (data: { rx_total: number; tx_total: number }) => {
-			const { value, unit } = sized(data[pick]);
-			return { value, hint: `${unit} · ${rangeLabel}` };
+	const rangeTraffic = (data: { rx_total: number; tx_total: number }) => {
+		const { value, unit } = sized(data.rx_total + data.tx_total);
+		return {
+			value,
+			hint: `${unit} · ${COPY.split(formatBytes(data.rx_total), formatBytes(data.tx_total))} · ${rangeLabel}`,
 		};
+	};
+	const todayTraffic = (data: {
+		fleet: { today: { total: number }; yesterday: { total: number } };
+	}) => {
+		const { value, unit } = sized(data.fleet.today.total);
+		return { value, hint: `${unit} · ${COPY.yesterday(formatBytes(data.fleet.yesterday.total))}` };
+	};
 	return (
 		<section
 			aria-label={t.dashboard.statsLabel}
@@ -101,8 +110,8 @@ export function StatTiles({ range }: { range: Range }) {
 					};
 				}}
 			/>
-			<Tile label={COPY.rx} source={fleet} icon={<ArrowDownIcon />} show={traffic("rx_total")} />
-			<Tile label={COPY.tx} source={fleet} icon={<ArrowUpIcon />} show={traffic("tx_total")} />
+			<Tile label={COPY.trafficToday} source={today} icon={<ArrowDownIcon />} show={todayTraffic} />
+			<Tile label={COPY.trafficRange} source={fleet} icon={<ArrowUpIcon />} show={rangeTraffic} />
 			<Tile
 				label={COPY.ssl}
 				source={certs}

@@ -41,7 +41,7 @@ export function IssuesCard() {
 				name={issue.server_name}
 				flag={issue.server_id === null ? "" : (flags.get(issue.server_id) ?? "")}
 			/>,
-			<span key="title" className="block whitespace-normal text-sm">
+			<span key="title" title={issue.title} className="line-clamp-2 whitespace-normal text-sm">
 				{issue.title}
 			</span>,
 			<OpenFor key="open" since={since.get(issue.id)} />,

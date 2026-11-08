@@ -1,4 +1,4 @@
-import { PageHeader } from "@nyxon/nasim";
+import { LinkButton, PageHeader } from "@nyxon/nasim";
 import type { Range } from "@/features/servers";
 import { useDocumentTitle } from "@/shared/useDocumentTitle";
 import { t } from "@/strings";
@@ -21,10 +21,18 @@ export function DashboardPage({
 	useDocumentTitle(t.dashboard.title);
 	return (
 		<div className="flex flex-col gap-5">
-			<PageHeader title={t.dashboard.title} description={t.dashboard.subtitle} />
+			<PageHeader
+				title={t.dashboard.title}
+				description={t.dashboard.subtitle}
+				actions={
+					<LinkButton href="/traffic" variant="secondary">
+						{t.dashboard.trafficLink}
+					</LinkButton>
+				}
+			/>
 			<StatTiles range={range} />
 			<FleetHistoryCard range={range} onRangeChange={onRangeChange} />
-			<div className="grid gap-5 xl:grid-cols-2">
+			<div className="grid items-start gap-5 xl:grid-cols-2">
 				<TopServersCard />
 				<IssuesCard />
 				<RecurringCard />

@@ -220,6 +220,13 @@ function open(entry: string, data: Data = full) {
 			"/ssl": data.certs,
 			"/ping-matrix": data.pings,
 			"/settings": {},
+			"/traffic/summary": {
+				fleet: {
+					today: { rx: 3 * GIB, tx: GIB, total: 4 * GIB },
+					yesterday: { rx: 6 * GIB, tx: 2 * GIB, total: 8 * GIB },
+				},
+				servers: [],
+			},
 		};
 		return new Response(JSON.stringify(bodies[path] ?? []), {
 			status: 200,
@@ -256,9 +263,14 @@ describe("DashboardPage", () => {
 		expect(within(tile("سرورهای آنلاین")).getByText("۱ آفلاین، ۲ نصب‌نشده")).toBeTruthy();
 		await waitFor(() => expect(within(tile("مشکل‌های باز")).getByText("۴")).toBeTruthy());
 		expect(within(tile("مشکل‌های باز")).getByText("۱ بحرانی، ۲ هشدار، ۱ اطلاع")).toBeTruthy();
-		await waitFor(() => expect(within(tile("دریافت")).getByText("۵")).toBeTruthy());
-		expect(within(tile("دریافت")).getByText("گیگابایت · ۲۴ ساعت اخیر")).toBeTruthy();
-		expect(within(tile("ارسال")).getByText("۲")).toBeTruthy();
+		await waitFor(() => expect(within(tile("ترافیک امروز")).getByText("۴")).toBeTruthy());
+		expect(within(tile("ترافیک امروز")).getByText("گیگابایت · دیروز ۸ گیگابایت")).toBeTruthy();
+		await waitFor(() => expect(within(tile("ترافیک بازه")).getByText("۷")).toBeTruthy());
+		expect(
+			within(tile("ترافیک بازه")).getByText(
+				"گیگابایت · دانلود ۵ گیگابایت، آپلود ۲ گیگابایت · ۲۴ ساعت اخیر",
+			),
+		).toBeTruthy();
 		await waitFor(() => expect(within(tile("گواهی در خطر")).getByText("۲")).toBeTruthy());
 		expect(within(tile("گواهی در خطر")).getByText("۱ بحرانی از ۳ گواهی")).toBeTruthy();
 		// The offline server (99%) is left out: (20 + 60 + 40) / 3 and (50 + 70 + 60) / 3.
@@ -279,9 +291,7 @@ describe("DashboardPage", () => {
 			expect(calls("/overview/history").some((url) => url.includes("range=30d"))).toBe(true),
 		);
 		expect(router.state.location.search).toMatchObject({ range: "30d" });
-		await waitFor(() =>
-			expect(within(tile("دریافت")).getByText("گیگابایت · ۳۰ روز اخیر")).toBeTruthy(),
-		);
+		await waitFor(() => expect(within(tile("ترافیک بازه")).getByText(/۳۰ روز اخیر/)).toBeTruthy());
 	});
 
 	it("falls back to 24 hours for a range the page does not offer", async () => {
