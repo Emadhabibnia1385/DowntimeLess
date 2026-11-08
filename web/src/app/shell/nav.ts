@@ -1,6 +1,7 @@
 import type { ComponentType, SVGProps } from "react";
 import {
 	AccountIcon,
+	ChartIcon,
 	DashboardIcon,
 	IssuesIcon,
 	KeyIcon,
@@ -13,7 +14,15 @@ import { t } from "@/strings";
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
 export type NavItem = {
-	to: "/" | "/servers" | "/issues" | "/ping-matrix" | "/ssl" | "/api-keys" | "/account";
+	to:
+		| "/"
+		| "/servers"
+		| "/issues"
+		| "/ping-matrix"
+		| "/traffic"
+		| "/ssl"
+		| "/api-keys"
+		| "/account";
 	label: string;
 	icon: Icon;
 	/** Shown in the phone's bottom bar too. */
@@ -26,6 +35,7 @@ export const NAV: readonly NavItem[] = [
 	{ to: "/servers", label: t.nav.servers, icon: ServerIcon, primary: true },
 	{ to: "/issues", label: t.nav.issues, icon: IssuesIcon, primary: true },
 	{ to: "/ping-matrix", label: t.nav.pingMatrix, icon: PingIcon, primary: true },
+	{ to: "/traffic", label: t.nav.traffic, icon: ChartIcon, primary: true },
 	{ to: "/ssl", label: t.nav.ssl, icon: ShieldIcon },
 	{ to: "/api-keys", label: t.nav.apiKeys, icon: KeyIcon, ownerOnly: true },
 	{ to: "/account", label: t.nav.account, icon: AccountIcon },

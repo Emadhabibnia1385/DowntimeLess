@@ -7,6 +7,7 @@ import {
 	formatDateTime,
 	formatDecimal,
 	formatDuration,
+	formatHour,
 	formatMs,
 	formatNumber,
 	formatPercent,
@@ -42,6 +43,20 @@ describe("sizes and rates", () => {
 		expect(formatBytes(1024)).toBe("۱ کیلوبایت");
 		expect(formatBytes(1.5 * 1024 ** 3)).toBe("۱٫۵ گیگابایت");
 		expect(formatBytes(250 * 1024 ** 2)).toBe("۲۵۰ مگابایت");
+	});
+
+	it("reads daily traffic from ten gigabytes to terabytes", () => {
+		expect(formatBytes(9.8 * 1024 ** 3)).toBe("۹٫۸ گیگابایت");
+		expect(formatBytes(10 * 1024 ** 3)).toBe("۱۰ گیگابایت");
+		expect(formatBytes(100 * 1024 ** 3)).toBe("۱۰۰ گیگابایت");
+		expect(formatBytes(1.2 * 1024 ** 4)).toBe("۱٫۲ ترابایت");
+		expect(formatBytes(2 * 1024 ** 4)).toBe("۲ ترابایت");
+	});
+
+	it("writes an hour of the day as a clock time", () => {
+		expect(formatHour(0)).toBe("۰۰:۰۰");
+		expect(formatHour(9)).toBe("۰۹:۰۰");
+		expect(formatHour(23)).toBe("۲۳:۰۰");
 	});
 
 	it("never goes past terabytes and ignores negatives", () => {

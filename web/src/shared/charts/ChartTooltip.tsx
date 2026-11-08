@@ -1,21 +1,24 @@
-import { formatDateTime, t } from "@/strings";
-import { type ChartSeries, TONE_TEXT } from "./types";
+import { t } from "@/strings";
+import { timeText } from "./timeText";
+import { type ChartSeries, type ChartTime, TONE_TEXT } from "./types";
 
 // The values of every shown series at one time, beside the crosshair; spoken politely too.
 export function ChartTooltip({
-	time,
+	moment,
 	index,
 	series,
 	format,
 	x,
 	width,
+	time,
 }: {
-	time: number;
+	moment: number;
 	index: number;
 	series: readonly ChartSeries[];
 	format: (value: number) => string;
 	x: number;
 	width: number;
+	time?: ChartTime;
 }) {
 	const flip = x > width / 2;
 	return (
@@ -26,7 +29,7 @@ export function ChartTooltip({
 				transform: `translateX(${flip ? "calc(-100% - 12px)" : "12px"})`,
 			}}
 		>
-			<p className="mb-1 font-semibold">{formatDateTime(time)}</p>
+			<p className="mb-1 font-semibold">{timeText(moment, time)}</p>
 			<ul className="flex flex-col gap-1">
 				{series.map((item) => {
 					const value = item.values[index];

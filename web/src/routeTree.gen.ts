@@ -18,6 +18,7 @@ import { Route as AppIssuesRouteImport } from './routes/_app/issues'
 import { Route as AppPingMatrixRouteImport } from './routes/_app/ping-matrix'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSslRouteImport } from './routes/_app/ssl'
+import { Route as AppTrafficRouteImport } from './routes/_app/traffic'
 import { Route as AppServersIndexRouteImport } from './routes/_app/servers.index'
 import { Route as AppServersServerIdRouteImport } from './routes/_app/servers.$serverId'
 
@@ -65,6 +66,11 @@ const AppSslRoute = AppSslRouteImport.update({
   path: '/ssl',
   getParentRoute: () => AppRoute,
 } as any)
+const AppTrafficRoute = AppTrafficRouteImport.update({
+  id: '/traffic',
+  path: '/traffic',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppServersIndexRoute = AppServersIndexRouteImport.update({
   id: '/servers/',
   path: '/servers/',
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/ping-matrix': typeof AppPingMatrixRoute
   '/settings': typeof AppSettingsRoute
   '/ssl': typeof AppSslRoute
+  '/traffic': typeof AppTrafficRoute
   '/servers/$serverId': typeof AppServersServerIdRoute
   '/servers/': typeof AppServersIndexRoute
 }
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/ping-matrix': typeof AppPingMatrixRoute
   '/settings': typeof AppSettingsRoute
   '/ssl': typeof AppSslRoute
+  '/traffic': typeof AppTrafficRoute
   '/': typeof AppIndexRoute
   '/servers/$serverId': typeof AppServersServerIdRoute
   '/servers': typeof AppServersIndexRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/_app/ping-matrix': typeof AppPingMatrixRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/ssl': typeof AppSslRoute
+  '/_app/traffic': typeof AppTrafficRoute
   '/_app/': typeof AppIndexRoute
   '/_app/servers/$serverId': typeof AppServersServerIdRoute
   '/_app/servers/': typeof AppServersIndexRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/ping-matrix'
     | '/settings'
     | '/ssl'
+    | '/traffic'
     | '/servers/$serverId'
     | '/servers/'
   fileRoutesByTo: FileRoutesByTo
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/ping-matrix'
     | '/settings'
     | '/ssl'
+    | '/traffic'
     | '/'
     | '/servers/$serverId'
     | '/servers'
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/_app/ping-matrix'
     | '/_app/settings'
     | '/_app/ssl'
+    | '/_app/traffic'
     | '/_app/'
     | '/_app/servers/$serverId'
     | '/_app/servers/'
@@ -224,6 +236,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSslRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/traffic': {
+      id: '/_app/traffic'
+      path: '/traffic'
+      fullPath: '/traffic'
+      preLoaderRoute: typeof AppTrafficRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/servers/': {
       id: '/_app/servers/'
       path: '/servers'
@@ -248,6 +267,7 @@ interface AppRouteChildren {
   AppPingMatrixRoute: typeof AppPingMatrixRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSslRoute: typeof AppSslRoute
+  AppTrafficRoute: typeof AppTrafficRoute
   AppIndexRoute: typeof AppIndexRoute
   AppServersServerIdRoute: typeof AppServersServerIdRoute
   AppServersIndexRoute: typeof AppServersIndexRoute
@@ -260,6 +280,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppPingMatrixRoute: AppPingMatrixRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSslRoute: AppSslRoute,
+  AppTrafficRoute: AppTrafficRoute,
   AppIndexRoute: AppIndexRoute,
   AppServersServerIdRoute: AppServersServerIdRoute,
   AppServersIndexRoute: AppServersIndexRoute,

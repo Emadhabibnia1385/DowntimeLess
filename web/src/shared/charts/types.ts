@@ -22,6 +22,9 @@ export type ChartSeries = {
 	format?: (value: number) => string;
 };
 
+/** How a moment is written: whole days (no clock), and/or in a fixed zone, not the device's. */
+export type ChartTime = { dateOnly?: boolean; timeZone?: string };
+
 /** The plot's box in pixels, the y axis' width and the reading direction. */
 export type PlotFrame = {
 	width: number;

@@ -6,7 +6,7 @@ import { ChartTable } from "./ChartTable";
 import { ChartToolbar } from "./ChartToolbar";
 import { downloadBlob } from "./download";
 import { csvBlob, csvTime, toCsv } from "./lib";
-import type { ChartSeries } from "./types";
+import type { ChartSeries, ChartTime } from "./types";
 
 export type LineChartProps = {
 	/** Names the chart for screen readers, the table and, unless hidden, the heading. */
@@ -28,6 +28,8 @@ export type LineChartProps = {
 	/** The CSV file's name without its extension. */
 	fileName: string;
 	height?: number;
+	/** For daily points or a fixed time zone; the default is date and clock in the device's zone. */
+	time?: ChartTime;
 };
 
 const hasData = (series: readonly ChartSeries[]) =>
@@ -46,6 +48,7 @@ export function LineChart({
 	spanSeconds,
 	fileName,
 	height = 260,
+	time,
 }: LineChartProps) {
 	const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
 	const [showTable, setShowTable] = useState(false);
@@ -62,8 +65,8 @@ export function LineChart({
 			csvBlob(
 				toCsv(
 					[t.chart.time, ...series.map((item) => item.label)],
-					times.map((time, index) => [
-						csvTime(time),
+					times.map((moment, index) => [
+						csvTime(moment),
 						...series.map((item) => item.values[index] ?? null),
 					]),
 				),
@@ -92,7 +95,7 @@ export function LineChart({
 				/>
 			</div>
 			{showTable ? (
-				<ChartTable title={title} times={times} series={series} format={format} />
+				<ChartTable title={title} times={times} series={series} format={format} time={time} />
 			) : (
 				<>
 					{unit ? <p className="text-xs text-muted">{unit}</p> : null}
@@ -105,6 +108,7 @@ export function LineChart({
 						domain={domain}
 						spanSeconds={spanSeconds}
 						height={height}
+						time={time}
 					/>
 				</>
 			)}

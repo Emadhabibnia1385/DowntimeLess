@@ -34,6 +34,20 @@ describe("LineChart", () => {
 		expect(cpu).toHaveLength(2);
 	});
 
+	it("writes the date alone for daily points, in the zone given", () => {
+		render(<LineChart {...props} time={{ dateOnly: true, timeZone: "Asia/Tehran" }} />);
+		const slider = screen.getByRole("slider");
+		fireEvent.focus(slider);
+		expect(screen.getByRole("status").textContent).not.toContain(":");
+		expect(slider.getAttribute("aria-valuetext")).not.toContain(":");
+	});
+
+	it("writes date and clock by default", () => {
+		render(<LineChart {...props} />);
+		fireEvent.focus(screen.getByRole("slider"));
+		expect(screen.getByRole("status").textContent).toContain(":");
+	});
+
 	it("has a toggle chip per series that hides it, and keeps the last one on", async () => {
 		const { container } = render(<LineChart {...props} />);
 		const cpu = chip("CPU");

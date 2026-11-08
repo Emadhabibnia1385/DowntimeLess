@@ -17,6 +17,7 @@ import { RelayPingCard } from "./RelayPingCard";
 import { ServerActions } from "./ServerActions";
 import { ServerBadges } from "./ServerBadges";
 import { ServerInfo } from "./ServerInfo";
+import { ServerTrafficCard } from "./ServerTrafficCard";
 
 export function ServerDetailPage({
 	serverId,
@@ -59,12 +60,19 @@ export function ServerDetailPage({
 					<SectionCard title={t.server.recentJobs}>
 						<RecentJobs serverId={data.id} />
 					</SectionCard>
-					<HistoryCard
-						serverId={data.id}
-						range={range}
-						onRangeChange={onRangeChange}
-						cores={data.system?.cpu_cores ?? data.latest.cpu_cores}
-					/>
+					<div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_17rem]">
+						<div className="min-w-0">
+							<HistoryCard
+								serverId={data.id}
+								range={range}
+								onRangeChange={onRangeChange}
+								cores={data.system?.cpu_cores ?? data.latest.cpu_cores}
+							/>
+						</div>
+						<div className="order-first min-w-0 xl:order-none">
+							<ServerTrafficCard serverId={data.id} />
+						</div>
+					</div>
 					{data.role === "relay" ? <RelayPingCard serverId={data.id} /> : null}
 				</div>
 			)}

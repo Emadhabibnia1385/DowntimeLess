@@ -1,6 +1,7 @@
 import { StaticTable } from "@nyxon/nasim";
-import { formatDateTime, t } from "@/strings";
-import type { ChartSeries } from "./types";
+import { t } from "@/strings";
+import { timeText } from "./timeText";
+import type { ChartSeries, ChartTime } from "./types";
 
 // The same data as the lines, newest first, with the exact values in text.
 export function ChartTable({
@@ -8,11 +9,13 @@ export function ChartTable({
 	times,
 	series,
 	format,
+	time,
 }: {
 	title: string;
 	times: readonly number[];
 	series: readonly ChartSeries[];
 	format: (value: number) => string;
+	time?: ChartTime;
 }) {
 	const order = times.map((_, index) => times.length - 1 - index);
 	return (
@@ -23,7 +26,7 @@ export function ChartTable({
 				rows={order.map((index) => ({
 					id: String(times[index]),
 					cells: [
-						formatDateTime(times[index] ?? 0),
+						timeText(times[index] ?? 0, time),
 						...series.map((item) => {
 							const value = item.values[index];
 							return value == null ? t.common.none : (item.format ?? format)(value);

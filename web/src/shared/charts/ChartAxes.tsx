@@ -1,6 +1,6 @@
 import { formatTick } from "@/strings";
 import type { Domain, XScale } from "./lib";
-import type { PlotFrame } from "./types";
+import type { ChartTime, PlotFrame } from "./types";
 
 const LABEL = "fill-current text-xs text-muted";
 
@@ -13,6 +13,7 @@ export function ChartAxes({
 	xs,
 	range,
 	spanSeconds,
+	time,
 }: {
 	frame: PlotFrame;
 	domain: Domain;
@@ -21,6 +22,7 @@ export function ChartAxes({
 	xs: XScale;
 	range: readonly [number, number];
 	spanSeconds: number;
+	time?: ChartTime;
 }) {
 	const { left, right, width, height, axis, rtl } = frame;
 	const count = Math.max(2, Math.min(7, Math.floor((right - left) / 80)));
@@ -54,7 +56,7 @@ export function ChartAxes({
 				const anchor = x - 32 < left ? "start" : x + 32 > right ? "end" : "middle";
 				return (
 					<text key={tick} x={x} y={height - 6} textAnchor={anchor} className={LABEL}>
-						{formatTick(tick, spanSeconds)}
+						{formatTick(tick, spanSeconds, time?.timeZone)}
 					</text>
 				);
 			})}

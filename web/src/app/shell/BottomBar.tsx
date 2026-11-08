@@ -12,7 +12,7 @@ const bar = tv({
 	},
 });
 
-// The phone's bottom bar: the four screens used most; the menu button holds the rest.
+// The phone's bottom bar: the screens used most; the menu button holds the rest.
 export function BottomBar() {
 	const ref = useBottomBar<HTMLElement>();
 	const slots = bar();

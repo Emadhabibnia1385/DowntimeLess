@@ -16,6 +16,13 @@ export function formatDecimal(value: number, digits = 1): string {
 	return new Intl.NumberFormat("fa-IR", { maximumFractionDigits: digits }).format(value);
 }
 
+const hourOfDay = new Intl.NumberFormat("fa-IR", { minimumIntegerDigits: 2 });
+
+/** An hour of the day (0 to 23) as a clock time: "۰۹:۰۰". */
+export function formatHour(hour: number): string {
+	return `${hourOfDay.format(hour)}:${hourOfDay.format(0)}`;
+}
+
 /** A value already in percent (0 to 100) as "۱۲٫۵٪". */
 export function formatPercent(pct: number): string {
 	return percent.format(pct / 100);

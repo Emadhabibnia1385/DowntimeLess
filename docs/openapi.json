@@ -197,6 +197,46 @@
         "title": "FleetPoint",
         "type": "object"
       },
+      "FleetTraffic": {
+        "properties": {
+          "active_days": {
+            "title": "Active Days",
+            "type": "integer"
+          },
+          "avg_per_day": {
+            "$ref": "#/components/schemas/Volume"
+          },
+          "peak_day": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeakDay"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "period": {
+            "$ref": "#/components/schemas/Volume"
+          },
+          "today": {
+            "$ref": "#/components/schemas/Volume"
+          },
+          "yesterday": {
+            "$ref": "#/components/schemas/Volume"
+          }
+        },
+        "required": [
+          "today",
+          "yesterday",
+          "period",
+          "avg_per_day",
+          "active_days",
+          "peak_day"
+        ],
+        "title": "FleetTraffic",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -236,6 +276,29 @@
           "critical"
         ],
         "title": "HistoryTotals",
+        "type": "object"
+      },
+      "HourProfile": {
+        "properties": {
+          "hour": {
+            "title": "Hour",
+            "type": "integer"
+          },
+          "rx": {
+            "title": "Rx",
+            "type": "integer"
+          },
+          "tx": {
+            "title": "Tx",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hour",
+          "rx",
+          "tx"
+        ],
+        "title": "HourProfile",
         "type": "object"
       },
       "IncidentOut": {
@@ -1503,6 +1566,34 @@
         "title": "PasswordRequest",
         "type": "object"
       },
+      "PeakDay": {
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "rx": {
+            "title": "Rx",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "tx": {
+            "title": "Tx",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rx",
+          "tx",
+          "total",
+          "date"
+        ],
+        "title": "PeakDay",
+        "type": "object"
+      },
       "PingCell": {
         "properties": {
           "from_id": {
@@ -2103,6 +2194,102 @@
         "title": "ServerPatch",
         "type": "object"
       },
+      "ServerTraffic": {
+        "properties": {
+          "active_days": {
+            "title": "Active Days",
+            "type": "integer"
+          },
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alias"
+          },
+          "avg_per_day": {
+            "$ref": "#/components/schemas/Volume"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "peak_day": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeakDay"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "period": {
+            "$ref": "#/components/schemas/Volume"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "integer"
+          },
+          "share_pct": {
+            "title": "Share Pct",
+            "type": "number"
+          },
+          "today": {
+            "$ref": "#/components/schemas/Volume"
+          },
+          "yesterday": {
+            "$ref": "#/components/schemas/Volume"
+          }
+        },
+        "required": [
+          "today",
+          "yesterday",
+          "period",
+          "avg_per_day",
+          "active_days",
+          "peak_day",
+          "server_id",
+          "name",
+          "alias",
+          "role",
+          "country",
+          "category_id",
+          "share_pct"
+        ],
+        "title": "ServerTraffic",
+        "type": "object"
+      },
       "SslRow": {
         "properties": {
           "auto": {
@@ -2380,6 +2567,176 @@
         "title": "SystemInfo",
         "type": "object"
       },
+      "TopDay": {
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "rx": {
+            "title": "Rx",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "tx": {
+            "title": "Tx",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rx",
+          "tx",
+          "total",
+          "date",
+          "ts"
+        ],
+        "title": "TopDay",
+        "type": "object"
+      },
+      "TrafficPoint": {
+        "properties": {
+          "rx": {
+            "title": "Rx",
+            "type": "integer"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "tx": {
+            "title": "Tx",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ts",
+          "rx",
+          "tx"
+        ],
+        "title": "TrafficPoint",
+        "type": "object"
+      },
+      "TrafficSeries": {
+        "properties": {
+          "bucket_s": {
+            "title": "Bucket S",
+            "type": "integer"
+          },
+          "hour_profile": {
+            "items": {
+              "$ref": "#/components/schemas/HourProfile"
+            },
+            "title": "Hour Profile",
+            "type": "array"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/TrafficPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "rx_total": {
+            "title": "Rx Total",
+            "type": "integer"
+          },
+          "server_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Id"
+          },
+          "since": {
+            "title": "Since",
+            "type": "integer"
+          },
+          "top_days": {
+            "items": {
+              "$ref": "#/components/schemas/TopDay"
+            },
+            "title": "Top Days",
+            "type": "array"
+          },
+          "tx_total": {
+            "title": "Tx Total",
+            "type": "integer"
+          },
+          "tz_offset_min": {
+            "title": "Tz Offset Min",
+            "type": "integer"
+          },
+          "until": {
+            "title": "Until",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "since",
+          "until",
+          "server_id",
+          "tz_offset_min",
+          "bucket_s",
+          "points",
+          "rx_total",
+          "tx_total",
+          "top_days",
+          "hour_profile"
+        ],
+        "title": "TrafficSeries",
+        "type": "object"
+      },
+      "TrafficSummary": {
+        "properties": {
+          "fleet": {
+            "$ref": "#/components/schemas/FleetTraffic"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "integer"
+          },
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/ServerTraffic"
+            },
+            "title": "Servers",
+            "type": "array"
+          },
+          "since": {
+            "title": "Since",
+            "type": "integer"
+          },
+          "tz_offset_min": {
+            "title": "Tz Offset Min",
+            "type": "integer"
+          },
+          "until": {
+            "title": "Until",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "generated_at",
+          "tz_offset_min",
+          "since",
+          "until",
+          "fleet",
+          "servers"
+        ],
+        "title": "TrafficSummary",
+        "type": "object"
+      },
       "UserOut": {
         "properties": {
           "has_password": {
@@ -2470,6 +2827,29 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "Volume": {
+        "properties": {
+          "rx": {
+            "title": "Rx",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "tx": {
+            "title": "Tx",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rx",
+          "tx",
+          "total"
+        ],
+        "title": "Volume",
         "type": "object"
       },
       "WebAppRequest": {
@@ -4641,6 +5021,222 @@
         "summary": "List Ssl",
         "tags": [
           "ssl"
+        ]
+      }
+    },
+    "/api/v1/traffic/series": {
+      "get": {
+        "description": "Traffic over time for a window [since, until) or a preset range (24h, 7d, 30d, 90d), with the busiest days and hours.\n\nHourly buckets for windows up to 8 days, daily ones beyond, aligned to the UTC offset. Without server_id: the whole fleet.",
+        "operationId": "traffic_series",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "in": "query",
+            "name": "range",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Range"
+            }
+          },
+          {
+            "in": "query",
+            "name": "server_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Server Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz_offset_min",
+            "required": false,
+            "schema": {
+              "default": 210,
+              "title": "Tz Offset Min",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrafficSeries"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Series",
+        "tags": [
+          "traffic"
+        ]
+      }
+    },
+    "/api/v1/traffic/summary": {
+      "get": {
+        "description": "Traffic per server and for the fleet over a window [since, until) in unix seconds (default: the last 30 days).\n\nAlways today and yesterday; for the window the total, daily average, peak day and share of the fleet.\nDays are local days at the UTC offset in minutes (default +03:30) and the window is counted in whole days (at most 366).\nDownload is rx (into the server), upload is tx (out of it).",
+        "operationId": "traffic_summary",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz_offset_min",
+            "required": false,
+            "schema": {
+              "default": 210,
+              "title": "Tz Offset Min",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrafficSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Summary",
+        "tags": [
+          "traffic"
         ]
       }
     }

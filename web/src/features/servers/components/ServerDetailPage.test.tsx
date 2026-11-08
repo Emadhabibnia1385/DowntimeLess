@@ -65,6 +65,30 @@ const points: MetricPoint[] = Array.from({ length: 20 }, (_, index) => ({
 	tx_bytes: 500,
 }));
 
+const GB = 1024 ** 3;
+const volume = (rx: number, tx: number) => ({ rx, tx, total: rx + tx });
+const trafficSummary = {
+	generated_at: NOW,
+	tz_offset_min: 210,
+	since: NOW - 30 * 86_400,
+	until: NOW,
+	fleet: {},
+	servers: [
+		{
+			server_id: 1,
+			name: "de-1",
+			role: "exit",
+			today: volume(8 * GB, 2 * GB),
+			yesterday: volume(16 * GB, 4 * GB),
+			period: volume(400 * GB, 100 * GB),
+			avg_per_day: volume(20 * GB, 5 * GB),
+			active_days: 20,
+			peak_day: { date: "2026-10-12", ...volume(40 * GB, 10 * GB) },
+			share_pct: 60,
+		},
+	],
+};
+
 const user = {
 	id: 1,
 	name: "T",
@@ -81,23 +105,25 @@ function answer(url: string, data: ServerOut): Response {
 			? user
 			: path === "/servers/1"
 				? data
-				: path === "/servers/1/metrics"
-					? { points, range: "24h", rx_total: 0, tx_total: 0 }
-					: path === "/categories"
-						? [{ id: 7, name: "اروپا", server_count: 1 }]
-						: path === "/ssl"
-							? [
-									{
-										key: "s1:a",
-										server_id: 1,
-										name: "a.example.com",
-										days_left: 12,
-										level: "warning",
-										error: null,
-										checked_at: NOW,
-									},
-								]
-							: [];
+				: path === "/traffic/summary"
+					? trafficSummary
+					: path === "/servers/1/metrics"
+						? { points, range: "24h", rx_total: 0, tx_total: 0 }
+						: path === "/categories"
+							? [{ id: 7, name: "اروپا", server_count: 1 }]
+							: path === "/ssl"
+								? [
+										{
+											key: "s1:a",
+											server_id: 1,
+											name: "a.example.com",
+											days_left: 12,
+											level: "warning",
+											error: null,
+											checked_at: NOW,
+										},
+									]
+								: [];
 	return new Response(JSON.stringify(body), {
 		status: 200,
 		headers: { "Content-Type": "application/json" },
@@ -170,6 +196,16 @@ describe("ServerDetailPage", () => {
 		expect(await screen.findByText("a.example.com")).toBeTruthy();
 		await userEvent.click(within(history).getByRole("radio", { name: "سرعت شبکه" }));
 		expect(await within(history).findByText("حجم منتقل‌شده در هر نقطه")).toBeTruthy();
+	});
+
+	it("has a compact traffic card that links to the details of this server", async () => {
+		await open(server());
+		const card = await screen.findByRole("region", { name: "ترافیک این سرور" });
+		expect(await within(card).findByText("۱۰ گیگابایت")).toBeTruthy();
+		expect(within(card).getByText("۵۰۰ گیگابایت")).toBeTruthy();
+		expect(within(card).getByText("۵۰ گیگابایت", { exact: false })).toBeTruthy();
+		const link = within(card).getByRole("link", { name: "جزئیات ترافیک" });
+		expect(link.getAttribute("href")).toBe("/traffic?server=1");
 	});
 
 	it("shows an Iran relay with the Iranian flag and no foreign provider", async () => {

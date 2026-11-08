@@ -6,7 +6,7 @@ import { Crosshair } from "./Crosshair";
 import { pointText } from "./pointText";
 import { gapLimit, makeXScale, nearestIndex, niceDomain } from "./lib";
 import { SeriesLines } from "./SeriesLines";
-import type { ChartSeries, PlotFrame } from "./types";
+import type { ChartSeries, ChartTime, PlotFrame } from "./types";
 import { useElementBox } from "./useElementWidth";
 import { useScrub } from "./useScrub";
 
@@ -23,6 +23,7 @@ type PlotProps = {
 	domain?: readonly [number, number];
 	spanSeconds: number;
 	height: number;
+	time?: ChartTime;
 };
 
 // Lines on a grid in plain SVG, 1 unit = 1 pixel so text stays crisp; newest at the left in RTL.
@@ -35,6 +36,7 @@ export function ChartPlot({
 	domain,
 	spanSeconds,
 	height,
+	time,
 }: PlotProps) {
 	const ref = useRef<HTMLDivElement>(null);
 	const { width, rtl } = useElementBox(ref);
@@ -78,7 +80,7 @@ export function ChartPlot({
 					min={0}
 					max={Math.max(0, times.length - 1)}
 					value={at ?? times.length - 1}
-					aria-valuetext={pointText(times[current] ?? 0, current, series, format)}
+					aria-valuetext={pointText(times[current] ?? 0, current, series, format, time)}
 					onChange={(event) => scrub.select(Number(event.target.value))}
 					onKeyDown={scrub.onKeyDown}
 					onFocus={scrub.onFocus}
@@ -101,6 +103,7 @@ export function ChartPlot({
 						xs={xs}
 						range={[first, last]}
 						spanSeconds={spanSeconds}
+						time={time}
 					/>
 					<SeriesLines
 						series={series}
@@ -117,7 +120,8 @@ export function ChartPlot({
 			</div>
 			{at === null ? null : (
 				<ChartTooltip
-					time={times[at] ?? 0}
+					moment={times[at] ?? 0}
+					time={time}
 					index={at}
 					series={series}
 					format={format}
