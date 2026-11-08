@@ -501,7 +501,7 @@ export const getReportsChangesUrl = (params?: ReportsChangesParams) => {
 };
 
 /**
- * The change log, newest first, at most 500 events (default last 24 h).
+ * The change log of the current workspace, newest first, at most 500 events (default last 24 h).
  * @summary Changes
  */
 export const reportsChanges = async (

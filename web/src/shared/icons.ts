@@ -26,3 +26,7 @@ export { default as ChartIcon } from "~icons/solar/chart-2-linear";
 export { default as DownloadIcon } from "~icons/solar/download-linear";
 export { default as TableIcon } from "~icons/solar/table-linear";
 export { default as WrenchIcon } from "~icons/solar/tuning-2-linear";
+export { default as WorkspaceIcon } from "~icons/solar/buildings-2-linear";
+export { default as ChevronDownIcon } from "~icons/solar/alt-arrow-down-linear";
+export { default as UsersIcon } from "~icons/solar/users-group-rounded-linear";
+export { default as UserPlusIcon } from "~icons/solar/user-plus-linear";

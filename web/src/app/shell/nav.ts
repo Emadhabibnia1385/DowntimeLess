@@ -9,6 +9,7 @@ import {
 	ServerIcon,
 	ShieldIcon,
 	TableIcon,
+	UsersIcon,
 } from "@/shared/icons";
 import { t } from "@/strings";
 
@@ -24,6 +25,7 @@ export type NavItem = {
 		| "/reports"
 		| "/ssl"
 		| "/api-keys"
+		| "/members"
 		| "/account";
 	label: string;
 	icon: Icon;
@@ -41,6 +43,7 @@ export const NAV: readonly NavItem[] = [
 	{ to: "/reports", label: t.nav.reports, icon: TableIcon },
 	{ to: "/ssl", label: t.nav.ssl, icon: ShieldIcon },
 	{ to: "/api-keys", label: t.nav.apiKeys, icon: KeyIcon, ownerOnly: true },
+	{ to: "/members", label: t.nav.members, icon: UsersIcon, ownerOnly: true },
 	{ to: "/account", label: t.nav.account, icon: AccountIcon },
 ];
 

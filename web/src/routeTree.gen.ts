@@ -15,6 +15,7 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAccountRouteImport } from './routes/_app/account'
 import { Route as AppApiKeysRouteImport } from './routes/_app/api-keys'
 import { Route as AppIssuesRouteImport } from './routes/_app/issues'
+import { Route as AppMembersRouteImport } from './routes/_app/members'
 import { Route as AppPingMatrixRouteImport } from './routes/_app/ping-matrix'
 import { Route as AppReportsRouteImport } from './routes/_app/reports'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
@@ -50,6 +51,11 @@ const AppApiKeysRoute = AppApiKeysRouteImport.update({
 const AppIssuesRoute = AppIssuesRouteImport.update({
   id: '/issues',
   path: '/issues',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMembersRoute = AppMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPingMatrixRoute = AppPingMatrixRouteImport.update({
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AppAccountRoute
   '/api-keys': typeof AppApiKeysRoute
   '/issues': typeof AppIssuesRoute
+  '/members': typeof AppMembersRoute
   '/ping-matrix': typeof AppPingMatrixRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByTo {
   '/account': typeof AppAccountRoute
   '/api-keys': typeof AppApiKeysRoute
   '/issues': typeof AppIssuesRoute
+  '/members': typeof AppMembersRoute
   '/ping-matrix': typeof AppPingMatrixRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
@@ -123,6 +131,7 @@ export interface FileRoutesById {
   '/_app/account': typeof AppAccountRoute
   '/_app/api-keys': typeof AppApiKeysRoute
   '/_app/issues': typeof AppIssuesRoute
+  '/_app/members': typeof AppMembersRoute
   '/_app/ping-matrix': typeof AppPingMatrixRoute
   '/_app/reports': typeof AppReportsRoute
   '/_app/settings': typeof AppSettingsRoute
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/api-keys'
     | '/issues'
+    | '/members'
     | '/ping-matrix'
     | '/reports'
     | '/settings'
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/api-keys'
     | '/issues'
+    | '/members'
     | '/ping-matrix'
     | '/reports'
     | '/settings'
@@ -168,6 +179,7 @@ export interface FileRouteTypes {
     | '/_app/account'
     | '/_app/api-keys'
     | '/_app/issues'
+    | '/_app/members'
     | '/_app/ping-matrix'
     | '/_app/reports'
     | '/_app/settings'
@@ -227,6 +239,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIssuesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/members': {
+      id: '/_app/members'
+      path: '/members'
+      fullPath: '/members'
+      preLoaderRoute: typeof AppMembersRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/ping-matrix': {
       id: '/_app/ping-matrix'
       path: '/ping-matrix'
@@ -283,6 +302,7 @@ interface AppRouteChildren {
   AppAccountRoute: typeof AppAccountRoute
   AppApiKeysRoute: typeof AppApiKeysRoute
   AppIssuesRoute: typeof AppIssuesRoute
+  AppMembersRoute: typeof AppMembersRoute
   AppPingMatrixRoute: typeof AppPingMatrixRoute
   AppReportsRoute: typeof AppReportsRoute
   AppSettingsRoute: typeof AppSettingsRoute
@@ -297,6 +317,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAccountRoute: AppAccountRoute,
   AppApiKeysRoute: AppApiKeysRoute,
   AppIssuesRoute: AppIssuesRoute,
+  AppMembersRoute: AppMembersRoute,
   AppPingMatrixRoute: AppPingMatrixRoute,
   AppReportsRoute: AppReportsRoute,
   AppSettingsRoute: AppSettingsRoute,

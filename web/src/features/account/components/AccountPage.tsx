@@ -1,6 +1,6 @@
 import { Button, KeyValueList, PageHeader, SectionCard, StatusChip, Tabs } from "@nyxon/nasim";
 import type { UserOut } from "@/api/generated/model";
-import { useMe, useSignOut } from "@/features/auth";
+import { asRole, useMe, useSignOut } from "@/features/auth";
 import { NotificationsTab } from "@/features/settings";
 import { Loadable } from "@/shared/Loadable";
 import { LogoutIcon } from "@/shared/icons";
@@ -9,16 +9,21 @@ import { t } from "@/strings";
 import { type AccountTab, isAccountTab } from "../tabs";
 import { PasswordForm } from "./PasswordForm";
 
-const ROLES: Record<string, string> = t.account.roles;
-
 function Profile({ user }: { user: UserOut }) {
+	const space = user.workspace;
 	return (
 		<SectionCard title={t.account.profile}>
 			<KeyValueList
 				layout="grid"
 				items={[
 					{ label: t.account.name, value: user.name },
-					{ label: t.account.role, value: ROLES[user.role] ?? user.role },
+					space
+						? {
+								label: t.account.workspace,
+								value: space.is_personal ? t.account.workspacePersonal(space.name) : space.name,
+							}
+						: null,
+					{ label: t.account.role, value: t.members.roles[asRole(user.role)] },
 					user.username ? { label: t.account.username, value: user.username, ltr: true } : null,
 				]}
 			/>

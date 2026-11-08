@@ -17,6 +17,7 @@ const user = {
 	username: null,
 	role: "owner",
 	has_password: false,
+	workspace: { id: 1, name: "فضای کار اصلی", role: "owner", is_personal: true },
 	tg_username: null,
 };
 

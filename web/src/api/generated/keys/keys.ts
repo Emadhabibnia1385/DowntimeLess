@@ -159,6 +159,7 @@ export const getKeysCreateUrl = () => {
 };
 
 /**
+ * A key that acts only inside the current workspace.
  * @summary Create Key
  */
 export const keysCreate = async (

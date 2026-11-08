@@ -97,7 +97,7 @@ export const OverviewPingMatrixResponseItem = zod.object({
 export const OverviewPingMatrixResponse = zod.array(OverviewPingMatrixResponseItem);
 
 /**
- * Everything an AI agent needs in one secret-free JSON document.
+ * Everything an AI agent needs about the current workspace in one secret-free JSON document.
  * @summary Snapshot
  */
 export const OverviewSnapshotHeader = zod.object({

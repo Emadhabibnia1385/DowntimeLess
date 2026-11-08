@@ -25,6 +25,12 @@ export const AuthLoginResponse = zod.object({
 	role: zod.string(),
 	tg_username: zod.union([zod.string(), zod.null()]),
 	username: zod.union([zod.string(), zod.null()]),
+	workspace: zod.object({
+		id: zod.int(),
+		is_personal: zod.boolean(),
+		name: zod.string(),
+		role: zod.string(),
+	}),
 });
 
 /**
@@ -46,6 +52,12 @@ export const AuthMeResponse = zod.object({
 	role: zod.string(),
 	tg_username: zod.union([zod.string(), zod.null()]),
 	username: zod.union([zod.string(), zod.null()]),
+	workspace: zod.object({
+		id: zod.int(),
+		is_personal: zod.boolean(),
+		name: zod.string(),
+		role: zod.string(),
+	}),
 });
 
 /**
@@ -82,6 +94,12 @@ export const AuthSetPasswordResponse = zod.object({
 	role: zod.string(),
 	tg_username: zod.union([zod.string(), zod.null()]),
 	username: zod.union([zod.string(), zod.null()]),
+	workspace: zod.object({
+		id: zod.int(),
+		is_personal: zod.boolean(),
+		name: zod.string(),
+		role: zod.string(),
+	}),
 });
 
 /**
@@ -103,6 +121,12 @@ export const AuthTelegramPollResponse = zod.object({
 				role: zod.string(),
 				tg_username: zod.union([zod.string(), zod.null()]),
 				username: zod.union([zod.string(), zod.null()]),
+				workspace: zod.object({
+					id: zod.int(),
+					is_personal: zod.boolean(),
+					name: zod.string(),
+					role: zod.string(),
+				}),
 			}),
 			zod.null(),
 		])
@@ -133,4 +157,53 @@ export const AuthTelegramWebappResponse = zod.object({
 	role: zod.string(),
 	tg_username: zod.union([zod.string(), zod.null()]),
 	username: zod.union([zod.string(), zod.null()]),
+	workspace: zod.object({
+		id: zod.int(),
+		is_personal: zod.boolean(),
+		name: zod.string(),
+		role: zod.string(),
+	}),
 });
+
+/**
+ * Act in another workspace I am a member of; any other id is not found.
+ * @summary Switch Workspace
+ */
+export const AuthSwitchWorkspaceHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const AuthSwitchWorkspaceBody = zod.object({
+	workspace_id: zod.int(),
+});
+
+export const AuthSwitchWorkspaceResponse = zod.object({
+	has_password: zod.boolean(),
+	id: zod.int(),
+	name: zod.string(),
+	role: zod.string(),
+	tg_username: zod.union([zod.string(), zod.null()]),
+	username: zod.union([zod.string(), zod.null()]),
+	workspace: zod.object({
+		id: zod.int(),
+		is_personal: zod.boolean(),
+		name: zod.string(),
+		role: zod.string(),
+	}),
+});
+
+/**
+ * The workspaces I belong to, my own first, with my role in each.
+ * @summary Workspaces
+ */
+export const AuthWorkspacesHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const AuthWorkspacesResponseItem = zod.object({
+	id: zod.int(),
+	is_personal: zod.boolean(),
+	name: zod.string(),
+	role: zod.string(),
+});
+export const AuthWorkspacesResponse = zod.array(AuthWorkspacesResponseItem);

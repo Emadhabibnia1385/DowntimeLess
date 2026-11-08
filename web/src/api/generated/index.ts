@@ -4,6 +4,7 @@ export * from "./categories/categories";
 export * from "./issues/issues";
 export * from "./keys/keys";
 export * from "./links/links";
+export * from "./members/members";
 export * from "./meta/meta";
 export * from "./overview/overview";
 export * from "./reports/reports";

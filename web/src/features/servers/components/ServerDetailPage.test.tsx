@@ -95,6 +95,7 @@ const user = {
 	username: null,
 	role: "owner",
 	has_password: false,
+	workspace: { id: 1, name: "فضای کار اصلی", role: "owner", is_personal: true },
 	tg_username: null,
 };
 
@@ -108,12 +109,13 @@ const oneCert = {
 	checked_at: NOW,
 };
 let certRows: unknown[] = [oneCert];
+let currentRole = "owner";
 
 function answer(url: string, data: ServerOut): Response {
 	const path = url.replace(/^.*\/api\/v1/, "").replace(/\?.*$/, "");
 	const body: unknown =
 		path === "/auth/me"
-			? user
+			? { ...user, role: currentRole, workspace: { ...user.workspace, role: currentRole } }
 			: path === "/servers/1"
 				? data
 				: path === "/traffic/summary"
@@ -152,6 +154,7 @@ describe("ServerDetailPage", () => {
 	afterEach(() => {
 		vi.unstubAllGlobals();
 		certRows = [oneCert];
+		currentRole = "owner";
 	});
 
 	it("names the server with its flag, status, role and category", async () => {
@@ -233,5 +236,22 @@ describe("ServerDetailPage", () => {
 		await userEvent.click(screen.getByRole("button", { name: "صفحه بعد" }));
 		expect(await screen.findByText("c05.example.com")).toBeTruthy();
 		expect(screen.queryByText("c00.example.com")).toBeNull();
+	});
+
+	it.each([
+		["viewer", [], ["پینگ", "پردازش‌ها", "به‌روزرسانی امن", "ریبوت سرور"]],
+		[
+			"operator",
+			["پینگ", "پورت TCP", "تست سرعت", "پردازش‌ها", "لاگ سرویس"],
+			["به‌روزرسانی امن", "ریستارت سرویس", "ریبوت سرور"],
+		],
+		["admin", ["پینگ", "پردازش‌ها", "به‌روزرسانی امن", "ریستارت سرویس", "ریبوت سرور"], []],
+	])("shows a %s only the operations that role may run", async (role, shown, hidden) => {
+		currentRole = role;
+		await open(server());
+		const ops = await screen.findByRole("region", { name: "عملیات" });
+		for (const name of shown) expect(within(ops).getByRole("button", { name })).toBeTruthy();
+		for (const name of hidden) expect(within(ops).queryByRole("button", { name })).toBeNull();
+		expect(within(ops).queryByText("ناحیه خطر") === null).toBe(role !== "admin");
 	});
 });

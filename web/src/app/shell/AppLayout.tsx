@@ -8,6 +8,7 @@ import { Brand } from "./Brand";
 import { isCurrent, NAV } from "./nav";
 import { SidebarAccount } from "./SidebarAccount";
 import { TopClock } from "./TopClock";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 function Shell() {
 	const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -24,7 +25,12 @@ function Shell() {
 				isCurrent: isCurrent(item, pathname),
 			}))}
 			banner={<OfflineBanner />}
-			topbar={<TopClock />}
+			topbar={
+				<>
+					<TopClock />
+					<WorkspaceSwitcher />
+				</>
+			}
 			sidebarFooter={<SidebarAccount />}
 		>
 			<div className="flex min-h-full flex-col">

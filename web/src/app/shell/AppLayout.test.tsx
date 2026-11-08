@@ -21,6 +21,7 @@ function signedInRouter(path: string) {
 					username: "omid",
 					tg_username: null,
 					has_password: true,
+					workspace: { id: 1, name: "فضای کار اصلی", role: "owner", is_personal: true },
 				});
 			return json([]);
 		}),
@@ -45,7 +46,7 @@ describe("the signed-in shell", () => {
 
 	it("puts the signed-in name, theme toggle and logout at the bottom of the sidebar", async () => {
 		signedInRouter("/account");
-		const sidebar = (await screen.findAllByText("امید"))[0]?.parentElement;
+		const sidebar = (await screen.findAllByText("امید"))[0]?.closest("div");
 		if (!sidebar) throw new Error("no account row");
 		expect(within(sidebar).getByText("امید")).toBeTruthy();
 		expect(within(sidebar).getByRole("button", { name: "خروج" })).toBeTruthy();

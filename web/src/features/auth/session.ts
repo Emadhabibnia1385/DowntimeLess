@@ -1,24 +1,44 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { getAuthMeQueryKey, useAuthLogout, useAuthMe } from "@/api/generated/auth/auth";
-import type { UserOut } from "@/api/generated/model";
+import type { UserOut, WorkspaceOut } from "@/api/generated/model";
 
-/** Who is signed in; a 401 here means nobody. The answer is kept until a sign-out. */
+/** Who is signed in; a 401 here means nobody. The answer is kept until a sign-out or a switch. */
 export function useMe() {
 	return useAuthMe({ query: { retry: false, staleTime: Number.POSITIVE_INFINITY } });
 }
 
-export type Role = "owner" | "admin" | "viewer";
+export type Role = "owner" | "admin" | "operator" | "viewer";
 
-/** The signed-in person's role; only called under the auth gate, so `me` is there. */
-export function useRole(): Role {
-	const role = useMe().data?.role;
-	return role === "owner" || role === "admin" ? role : "viewer";
+const RANK: Record<Role, number> = { viewer: 1, operator: 2, admin: 3, owner: 4 };
+
+export function asRole(role: string | undefined): Role {
+	return role === "owner" || role === "admin" || role === "operator" ? role : "viewer";
 }
 
-/** Whether the person may change things (admins and the owner; a viewer only looks). */
+/** My role in the active workspace; only called under the auth gate, so `me` is there. */
+export function useRole(): Role {
+	return asRole(useMe().data?.role);
+}
+
+/** Whether my role in this workspace reaches `least` (the server checks the same ranks). */
+export function useHasRole(least: Role): boolean {
+	return RANK[useRole()] >= RANK[least];
+}
+
+/** Admins and the owner change things; operators and viewers do not. */
 export function useCanManage(): boolean {
-	return useRole() !== "viewer";
+	return useHasRole("admin");
+}
+
+/** Operators and up run the safe checks and diagnostics. */
+export function useCanCheck(): boolean {
+	return useHasRole("operator");
+}
+
+/** The workspace this session acts in. */
+export function useWorkspace(): WorkspaceOut | undefined {
+	return useMe().data?.workspace;
 }
 
 /** Remembers the user a sign-in returned so the gate lets them through at once. */

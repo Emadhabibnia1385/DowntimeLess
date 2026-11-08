@@ -75,6 +75,7 @@ export const SslDeleteDomainHeader = zod.object({
 export const SslDeleteDomainResponse = zod.void();
 
 /**
+ * Probe one domain again now; a read-only check, so an operator may run it.
  * @summary Check Domain
  */
 export const SslCheckDomainParams = zod.object({

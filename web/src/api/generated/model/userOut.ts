@@ -4,6 +4,7 @@
  * DowntimeLess
  * OpenAPI spec version: 0.1.0
  */
+import type { WorkspaceOut } from "./workspaceOut";
 
 export interface UserOut {
 	has_password: boolean;
@@ -12,4 +13,5 @@ export interface UserOut {
 	role: string;
 	tg_username: string | null;
 	username: string | null;
+	workspace: WorkspaceOut;
 }

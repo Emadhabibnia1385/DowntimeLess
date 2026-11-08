@@ -235,6 +235,7 @@ export const getSslCheckDomainUrl = (domainId: number) => {
 };
 
 /**
+ * Probe one domain again now; a read-only check, so an operator may run it.
  * @summary Check Domain
  */
 export const sslCheckDomain = async (

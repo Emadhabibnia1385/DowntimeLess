@@ -9,13 +9,21 @@ export function SidebarAccount() {
 	const me = useMe();
 	const { signOut, isPending } = useSignOut();
 	const name = me.data?.name ?? t.shell.account;
+	const workspace = me.data?.workspace?.name;
 	return (
 		<div className="flex flex-col gap-4">
 			<InstallButton />
 			<div className="flex items-center gap-2">
 				<ThemeToggle lightLabel={t.theme.light} darkLabel={t.theme.dark} />
-				<span className="min-w-0 flex-1 truncate text-center text-sm font-medium" title={name}>
-					{name}
+				<span className="flex min-w-0 flex-1 flex-col items-center leading-tight">
+					<span className="max-w-full truncate text-sm font-medium" title={name}>
+						{name}
+					</span>
+					{workspace ? (
+						<span className="max-w-full truncate text-xs text-muted" title={workspace}>
+							{workspace}
+						</span>
+					) : null}
 				</span>
 				<Button
 					isIconOnly

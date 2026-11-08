@@ -1,5 +1,5 @@
 import { PageHeader, SectionCard } from "@nyxon/nasim";
-import { useCanManage } from "@/features/auth";
+import { useCanCheck, useCanManage } from "@/features/auth";
 import { Loadable } from "@/shared/Loadable";
 import { useDocumentTitle } from "@/shared/useDocumentTitle";
 import { t } from "@/strings";
@@ -30,6 +30,7 @@ export function ServerDetailPage({
 }) {
 	const server = useServer(serverId);
 	const canManage = useCanManage();
+	const canCheck = useCanCheck();
 	useDocumentTitle(server.data ? displayName(server.data) : t.servers.title);
 	return (
 		<Loadable query={server}>
@@ -54,7 +55,7 @@ export function ServerDetailPage({
 							<CertsCard serverId={data.id} />
 						</div>
 						<div className="min-w-0 lg:order-1">
-							<OperationsCard server={data} canManage={canManage} />
+							<OperationsCard server={data} canManage={canManage} canCheck={canCheck} />
 						</div>
 					</div>
 					<SectionCard title={t.server.recentJobs}>

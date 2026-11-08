@@ -24,6 +24,7 @@ export const KeysListResponseItem = zod.object({
 export const KeysListResponse = zod.array(KeysListResponseItem);
 
 /**
+ * A key that acts only inside the current workspace.
  * @summary Create Key
  */
 export const KeysCreateHeader = zod.object({

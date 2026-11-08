@@ -34,16 +34,24 @@ const INFO_TOOLS: { kind: string; label: string; icon: ReactNode }[] = [
 	{ kind: "disk_usage", label: t.server.toolDisk, icon: <TableIcon aria-hidden /> },
 ];
 
-// Checks, maintenance and a separate danger zone in one block, then the last jobs.
-export function OperationsCard({ server, canManage }: { server: ServerOut; canManage: boolean }) {
+// Checks and diagnostics (operators and up), then maintenance and the danger zone (admins and up).
+export function OperationsCard({
+	server,
+	canManage,
+	canCheck,
+}: {
+	server: ServerOut;
+	canManage: boolean;
+	canCheck: boolean;
+}) {
 	const queue = useQueueJobs(server.id);
 	const [check, setCheck] = useState<"ping" | "tcp_check" | null>(null);
 	const [tool, setTool] = useState<ToolKind | null>(null);
 	const [confirming, setConfirming] = useState<Mutating | null>(null);
 	return (
-		<SectionCard title={t.server.ops} description={canManage ? t.server.opsHint : undefined}>
+		<SectionCard title={t.server.ops} description={canCheck ? t.server.opsHint : undefined}>
 			<div className="flex flex-col gap-5">
-				{canManage ? (
+				{canCheck ? (
 					<>
 						<Group title={t.server.groupChecks}>
 							<Button size="sm" variant="secondary" onPress={() => setCheck("ping")}>
@@ -99,6 +107,10 @@ export function OperationsCard({ server, canManage }: { server: ServerOut; canMa
 								{t.server.toolJournal}
 							</Button>
 						</Group>
+					</>
+				) : null}
+				{canManage ? (
+					<>
 						<Group title={t.server.groupMaintenance}>
 							<Button size="sm" variant="outline" onPress={() => setConfirming("apt_upgrade_safe")}>
 								<WrenchIcon aria-hidden />

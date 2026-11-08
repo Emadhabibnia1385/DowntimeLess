@@ -536,7 +536,7 @@ export const getOverviewSnapshotUrl = () => {
 };
 
 /**
- * Everything an AI agent needs in one secret-free JSON document.
+ * Everything an AI agent needs about the current workspace in one secret-free JSON document.
  * @summary Snapshot
  */
 export const overviewSnapshot = async (
