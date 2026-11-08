@@ -404,6 +404,7 @@ export const fa = {
 		jobsEmpty: "هنوز عملیاتی ثبت نشده.",
 		jobsTable: "آخرین عملیات این سرور",
 		jobColKind: "عملیات",
+		jobColArgs: "جزئیات",
 		jobColStatus: "وضعیت",
 		jobColWhen: "زمان",
 		jobColResult: "نتیجه",

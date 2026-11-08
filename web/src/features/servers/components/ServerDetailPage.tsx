@@ -12,6 +12,7 @@ import { HistoryCard } from "./HistoryCard";
 import { InstallCommand } from "./InstallCommand";
 import { LiveTiles } from "./LiveTiles";
 import { OperationsCard } from "./OperationsCard";
+import { RecentJobs } from "./RecentJobs";
 import { RelayPingCard } from "./RelayPingCard";
 import { ServerActions } from "./ServerActions";
 import { ServerBadges } from "./ServerBadges";
@@ -47,23 +48,24 @@ export function ServerDetailPage({
 						<LiveTiles server={data} />
 					)}
 					<div className="grid items-start gap-6 lg:grid-cols-2">
-						<div className="min-w-0 lg:order-2">
+						<div className="flex min-w-0 flex-col gap-6 lg:order-2">
 							<ServerInfo server={data} />
+							<CertsCard serverId={data.id} />
 						</div>
 						<div className="min-w-0 lg:order-1">
 							<OperationsCard server={data} canManage={canManage} />
 						</div>
 					</div>
+					<SectionCard title={t.server.recentJobs}>
+						<RecentJobs serverId={data.id} />
+					</SectionCard>
 					<HistoryCard
 						serverId={data.id}
 						range={range}
 						onRangeChange={onRangeChange}
 						cores={data.system?.cpu_cores ?? data.latest.cpu_cores}
 					/>
-					<div className="grid items-start gap-6 md:grid-cols-2">
-						<CertsCard serverId={data.id} />
-						{data.role === "relay" ? <RelayPingCard serverId={data.id} /> : null}
-					</div>
+					{data.role === "relay" ? <RelayPingCard serverId={data.id} /> : null}
 				</div>
 			)}
 		</Loadable>

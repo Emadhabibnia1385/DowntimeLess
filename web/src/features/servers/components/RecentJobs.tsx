@@ -5,7 +5,7 @@ import { formatRelativeTime, t } from "@/strings";
 import { useServerJobs } from "../api";
 import { jobOutput, jobResultText } from "../lib/jobs";
 
-const MAX_JOBS = 8;
+const MAX_JOBS = 10;
 
 const kindLabel = (kind: string) =>
 	(t.server.jobKinds as Record<string, string | undefined>)[kind] ?? kind;
@@ -20,6 +20,14 @@ const TONES: Record<string, "success" | "danger" | "neutral" | "info"> = {
 	sent: "info",
 };
 
+// The values a job was given (a host, a port, a unit), short, or a dash when it had none.
+const argsText = (args: JobOut["args"]) => {
+	const values = Object.values(args ?? {})
+		.filter((value) => typeof value === "string" || typeof value === "number")
+		.map(String);
+	return values.length > 0 ? values.join(" · ") : t.common.none;
+};
+
 // The last few jobs on this server as a table: what, how it went, when, and the short result.
 export function RecentJobs({ serverId }: { serverId: number }) {
 	const jobs = useServerJobs(serverId);
@@ -29,15 +37,15 @@ export function RecentJobs({ serverId }: { serverId: number }) {
 		.slice(0, MAX_JOBS);
 	return (
 		<div className="flex flex-col gap-2">
-			<h3 className="text-sm font-semibold">{t.server.recentJobs}</h3>
 			{recent.length === 0 ? (
 				<p className="text-sm text-muted">{jobs.isPending ? "" : t.server.jobsEmpty}</p>
 			) : (
 				<StaticTable
 					caption={t.server.jobsTable}
-					className="min-w-[28rem]"
+					className="min-w-[36rem]"
 					columns={[
 						t.server.jobColKind,
+						t.server.jobColArgs,
 						t.server.jobColStatus,
 						t.server.jobColWhen,
 						t.server.jobColResult,
@@ -46,6 +54,9 @@ export function RecentJobs({ serverId }: { serverId: number }) {
 						id: String(job.id),
 						cells: [
 							kindLabel(job.kind),
+							<span key="args" dir="ltr" className="block text-start font-mono text-xs text-muted">
+								{argsText(job.args)}
+							</span>,
 							<StatusChip
 								key="status"
 								tone={TONES[job.status] ?? "neutral"}

@@ -16,7 +16,6 @@ import { useQueueJobs } from "../api";
 import { SPEEDTEST_DOWN_URL, SPEEDTEST_UP_URL } from "../lib/jobs";
 import { CheckDialog } from "./CheckDialog";
 import { JobConfirm, type Mutating } from "./JobConfirm";
-import { RecentJobs } from "./RecentJobs";
 import { ToolDialog, type ToolKind } from "./ToolDialog";
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
@@ -131,7 +130,6 @@ export function OperationsCard({ server, canManage }: { server: ServerOut; canMa
 						</div>
 					</>
 				) : null}
-				<RecentJobs serverId={server.id} />
 			</div>
 			{check ? (
 				<CheckDialog
