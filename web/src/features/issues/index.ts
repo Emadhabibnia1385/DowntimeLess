@@ -1,6 +1,7 @@
-export { IssueList } from "./components/IssueList";
 export { IssuesPage } from "./components/IssuesPage";
-export { useIssues } from "./api";
+export { ServerLabel } from "./components/ServerLabel";
+export { useHistory, useIssues } from "./api";
+export { issueLabel, severityTone } from "./lib/history";
 export {
 	HISTORY_RANGES,
 	type HistoryRange,

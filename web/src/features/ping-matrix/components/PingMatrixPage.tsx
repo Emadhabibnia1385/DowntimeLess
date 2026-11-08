@@ -1,13 +1,13 @@
 import { EmptyState, PageHeader, StaticTable } from "@nyxon/nasim";
 import { Link } from "@tanstack/react-router";
 import type { PingCell } from "@/api/generated/model";
-import { useOverviewPingMatrix } from "@/api/generated/overview/overview";
 import { useServers } from "@/features/servers";
 import { useThresholds } from "@/features/settings";
 import { IpText } from "@/shared/IpText";
 import { Loadable } from "@/shared/Loadable";
 import { useDocumentTitle } from "@/shared/useDocumentTitle";
 import { flagOf, formatMs, formatPercent, t } from "@/strings";
+import { usePingMatrix } from "../api";
 import { buildMatrix, healthOf, numberOrNull, type Thresholds } from "../lib/matrix";
 import { HealthChip } from "./HealthChip";
 
@@ -30,7 +30,7 @@ function Cell({ cell, limits }: { cell: PingCell | undefined; limits: Thresholds
 
 export function PingMatrixPage() {
 	useDocumentTitle(t.pingMatrix.title);
-	const matrix = useOverviewPingMatrix({ query: { refetchInterval: 30_000 } });
+	const matrix = usePingMatrix();
 	const limits = useThresholds() as Thresholds;
 	const servers = useServers();
 	const countryOf = new Map((servers.data ?? []).map((server) => [server.id, server.country]));
