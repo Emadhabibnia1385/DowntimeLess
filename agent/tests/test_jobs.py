@@ -2,6 +2,7 @@ import os
 import socket
 import stat
 import time
+import types
 
 import pytest
 
@@ -48,7 +49,7 @@ class Recorder:
 
 def test_whitelist_is_closed():
     assert set(agent.JOBS) == {"ping", "tcp_check", "speedtest_down", "speedtest_up",
-                               "apt_upgrade_safe", "reboot", "self_update"}
+                               "apt_upgrade_safe", "reboot", "self_update", "cert_renew", "cert_delete"}
 
 
 @pytest.mark.parametrize("kind", ["rm_rf", "shell", "", None, "PING", "ping ", "../reboot"])
@@ -226,3 +227,45 @@ def test_bad_ping_target_never_reaches_ping(monkeypatch):
         raise AssertionError("ping must not run")
     monkeypatch.setattr(agent.subprocess, "run", boom)
     assert agent.check_target({"target": "--help"}) == {"target": "--help", "loss_pct": 100.0, "rtt_ms": None}
+
+
+class CertRecorder:
+    def __init__(self, returncode=0):
+        self.calls, self.returncode = [], returncode
+
+    def __call__(self, argv, **kw):
+        self.calls.append(argv)
+        return types.SimpleNamespace(returncode=self.returncode, stdout="Congratulations", stderr="")
+
+
+@pytest.mark.parametrize("kind,verb", [("cert_renew", "renew"), ("cert_delete", "delete")])
+def test_certificate_jobs_call_certbot_for_exactly_that_name(kind, verb, monkeypatch):
+    rec = CertRecorder()
+    monkeypatch.setattr(agent.subprocess, "run", rec)
+    st = state("safe")
+    res = agent.run_job(job(kind, {"name": "a.example.com"}), st)
+    assert res["status"] == "ok" and rec.calls == [["certbot", verb, "--cert-name", "a.example.com", "--non-interactive"]]
+    assert st["ssl"] == (0, None)  # the next report rescans
+
+
+@pytest.mark.parametrize("bad", ["", "../etc/passwd", "-rf", "a b", "a;ls", "$(id)", "x" * 300, None])
+def test_certificate_jobs_refuse_unsafe_names(bad, monkeypatch):
+    rec = CertRecorder()
+    monkeypatch.setattr(agent.subprocess, "run", rec)
+    res = agent.run_job(job("cert_delete", {"name": bad}), state("full"))
+    assert res["status"] == "error" and rec.calls == []
+
+
+@pytest.mark.parametrize("kind", ["cert_renew", "cert_delete"])
+@pytest.mark.parametrize("permission", ["none", "read", None])
+def test_certificate_jobs_need_safe_or_full(kind, permission, monkeypatch):
+    rec = CertRecorder()
+    monkeypatch.setattr(agent.subprocess, "run", rec)
+    assert agent.run_job(job(kind, {"name": "a.example.com"}), state(permission))["status"] == "rejected"
+    assert rec.calls == []
+
+
+def test_a_failing_certbot_is_an_error_with_its_output(monkeypatch):
+    monkeypatch.setattr(agent.subprocess, "run", CertRecorder(returncode=1))
+    res = agent.run_job(job("cert_renew", {"name": "a.example.com"}), state("safe"))
+    assert res["status"] == "error" and "Congratulations" in res["error"]

@@ -176,3 +176,30 @@ def test_geo_urls_name_the_address_or_the_caller():
     ipinfo, ipwho = agent.GEO_URLS
     assert (ipinfo(""), ipinfo("1.2.3.4")) == ("https://ipinfo.io/json", "https://ipinfo.io/1.2.3.4/json")
     assert (ipwho(""), ipwho("1.2.3.4")) == ("https://ipwho.is/", "https://ipwho.is/1.2.3.4")
+
+
+NGINX = """
+server { listen 80; server_name app.example.com www.example.com; }
+server {
+    listen 443 ssl;
+    server_name app.example.com *.wild.example.com ~^re.*$ _ localhost 10.0.0.1 Panel.Example.org;
+}
+server { listen [::]:443 ssl; server_name second.example.net; }
+server { server_name no-listen.example.com; ssl_certificate /x.pem; }
+"""
+
+
+def test_nginx_domains_are_the_public_names_of_tls_blocks_only():
+    assert agent.nginx_domains(NGINX) == ["app.example.com", "no-listen.example.com", "panel.example.org", "second.example.net"]
+    assert agent.nginx_domains("") == []
+
+
+def test_backup_folders_are_skipped_by_the_scan(monkeypatch, tmp_path):
+    for name in ("live-a.example.com", "a.example.com.bak-20261103"):
+        d = tmp_path / name
+        d.mkdir()
+        (d / "cert.pem").write_text("x")
+    monkeypatch.setattr(agent, "CERT_GLOBS", (str(tmp_path / "*" / "cert.pem"),))
+    monkeypatch.setattr(agent, "renew_status", lambda: {"certbot_installed": True})
+    monkeypatch.setattr(agent, "run_text", lambda argv, timeout=10: "notAfter=Feb  4 12:33:37 2027 GMT\nDNS:x.example.com\n" if argv[0] == "openssl" else "")
+    assert [c["name"] for c in agent.ssl_report()["certs"]] == ["live-a.example.com"]

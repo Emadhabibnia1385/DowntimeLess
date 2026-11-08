@@ -1,5 +1,6 @@
 import ipaddress
 import json
+import re
 import socket
 import sqlite3
 import ssl
@@ -10,6 +11,35 @@ from ..servers.service import status_of
 from ..settings.router import thresholds
 
 RECHECK_S = 6 * 3600
+STALE_AUTO_S = 7 * 86400
+# a folder like "example.com.bak-20261103" is a backup of a certificate, not a certificate
+BACKUP_RE = re.compile(r"\.bak|\.old$|\.orig$|backup", re.I)
+HOST_RE = re.compile(r"^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
+MAX_NEW_PER_REPORT = 20
+
+
+def adopt_domains(db: sqlite3.Connection, server_id: int, names: List[Any]) -> None:
+    """Domains an agent found in its web server's config join the list; ones seen again are kept fresh."""
+    now, added = int(time.time()), 0
+    for raw in sorted({str(n).lower().strip() for n in names})[:200]:
+        if not HOST_RE.match(raw):
+            continue
+        row = db.execute("SELECT id, source FROM domains WHERE host=? AND port=443", (raw,)).fetchone()
+        if row:
+            if row["source"] == "auto":
+                db.execute("UPDATE domains SET seen_at=?, server_id=? WHERE id=?", (now, server_id, row["id"]))
+            continue
+        if added >= MAX_NEW_PER_REPORT or not is_public_host(raw):  # a name that does not resolve has nothing to probe
+            continue
+        db.execute(
+            "INSERT INTO domains (host, port, note, source, server_id, seen_at, created_at) VALUES (?,?,?,?,?,?,?)",
+            (raw, 443, "", "auto", server_id, now, now),
+        )
+        added += 1
+
+
+def drop_stale_auto(db: sqlite3.Connection) -> None:
+    db.execute("DELETE FROM domains WHERE source='auto' AND seen_at<?", (int(time.time()) - STALE_AUTO_S,))
 
 
 def is_public_host(host: str) -> bool:
@@ -81,22 +111,36 @@ def rows(db: sqlite3.Connection) -> List[Dict[str, Any]]:
             continue
         renew, stale = ssl_rep.get("renew") or {}, status_of(s) == "offline"
         for c in ssl_rep.get("certs") or []:
+            if BACKUP_RE.search(c["name"]):
+                continue
             days = int((c["not_after"] - now) // 86400)
+            certbot = c.get("source", "certbot") != "acme.sh"
             out.append({
                 "key": "s%d:%s" % (s["id"], c["name"]), "kind": "file", "source": c.get("source", "certbot"),
                 "server_id": s["id"], "server_name": s["alias"] or s["name"], "name": c["name"], "domains": c.get("domains") or [c["name"]],
                 "not_after": c["not_after"], "days_left": days, "issuer": None, "error": None,
                 "auto_renew": _auto_renew(c, renew), "renew_failed": bool(renew.get("certbot_last_run_failed")) and c.get("source") != "acme.sh",
                 "level": level(days, None, th), "checked_at": s["last_seen"], "stale": stale,
+                "auto": False, "can_renew": certbot, "can_delete": certbot,
             })
-    for d in db.execute("SELECT * FROM domains ORDER BY host"):
+    probes = db.execute(
+        "SELECT d.*, s.name AS sname, s.alias AS salias FROM domains d LEFT JOIN servers s ON s.id=d.server_id "
+        "WHERE d.ignored=0 ORDER BY d.host"
+    )
+    for d in probes:
         days = int((d["not_after"] - now) // 86400) if d["not_after"] else None
+        auto = d["source"] == "auto"
+        lvl = level(days, d["error"], th) if d["last_checked"] else "ok"
+        if auto and d["error"]:
+            lvl = "warning"  # a discovered name that does not answer on 443 is not necessarily broken
         out.append({
-            "key": "d%d" % d["id"], "kind": "probe", "source": "probe", "server_id": None, "server_name": None,
+            "key": "d%d" % d["id"], "kind": "probe", "source": "probe", "server_id": d["server_id"] if auto else None,
+            "server_name": (d["salias"] or d["sname"]) if auto else None,
             "name": d["host"] if d["port"] == 443 else "%s:%d" % (d["host"], d["port"]), "domains": [d["host"]],
             "not_after": d["not_after"], "days_left": days, "issuer": d["issuer"], "error": d["error"],
-            "auto_renew": "unknown", "renew_failed": False, "level": level(days, d["error"], th) if d["last_checked"] else "ok",
+            "auto_renew": "unknown", "renew_failed": False, "level": lvl,
             "checked_at": d["last_checked"], "stale": False, "note": d["note"], "id": d["id"],
+            "auto": auto, "can_renew": False, "can_delete": True,
         })
     order = {"critical": 0, "warning": 1, "ok": 2}
     return sorted(out, key=lambda r: (order[r["level"]], r["days_left"] if r["days_left"] is not None else -1))
@@ -107,7 +151,7 @@ def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
     off: Dict[int, List[Dict[str, Any]]] = {}
     failed: Dict[int, Dict[str, Any]] = {}
     for r in rows(db):
-        if r["stale"]:
+        if r["stale"] or (r.get("auto") and r["error"]):
             continue
         base = {"server_id": r["server_id"], "server_name": r["server_name"] or "SSL"}
         if r["level"] != "ok":

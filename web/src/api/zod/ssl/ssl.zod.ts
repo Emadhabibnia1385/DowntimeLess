@@ -33,8 +33,15 @@ export const SslAddDomainBody = zod.object({
 	port: zod.int().min(1).max(sslAddDomainBodyPortMax).default(sslAddDomainBodyPortDefault),
 });
 
+export const sslAddDomainResponseAutoDefault = false;
+export const sslAddDomainResponseCanDeleteDefault = false;
+export const sslAddDomainResponseCanRenewDefault = false;
+
 export const SslAddDomainResponse = zod.object({
+	auto: zod.boolean().default(sslAddDomainResponseAutoDefault),
 	auto_renew: zod.string(),
+	can_delete: zod.boolean().default(sslAddDomainResponseCanDeleteDefault),
+	can_renew: zod.boolean().default(sslAddDomainResponseCanRenewDefault),
 	checked_at: zod.union([zod.int(), zod.null()]),
 	days_left: zod.union([zod.int(), zod.null()]),
 	domains: zod.array(zod.string()),
@@ -78,8 +85,15 @@ export const SslCheckDomainHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const sslCheckDomainResponseAutoDefault = false;
+export const sslCheckDomainResponseCanDeleteDefault = false;
+export const sslCheckDomainResponseCanRenewDefault = false;
+
 export const SslCheckDomainResponse = zod.object({
+	auto: zod.boolean().default(sslCheckDomainResponseAutoDefault),
 	auto_renew: zod.string(),
+	can_delete: zod.boolean().default(sslCheckDomainResponseCanDeleteDefault),
+	can_renew: zod.boolean().default(sslCheckDomainResponseCanRenewDefault),
 	checked_at: zod.union([zod.int(), zod.null()]),
 	days_left: zod.union([zod.int(), zod.null()]),
 	domains: zod.array(zod.string()),
@@ -106,8 +120,15 @@ export const SslListHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const sslListResponseAutoDefault = false;
+export const sslListResponseCanDeleteDefault = false;
+export const sslListResponseCanRenewDefault = false;
+
 export const SslListResponseItem = zod.object({
+	auto: zod.boolean().default(sslListResponseAutoDefault),
 	auto_renew: zod.string(),
+	can_delete: zod.boolean().default(sslListResponseCanDeleteDefault),
+	can_renew: zod.boolean().default(sslListResponseCanRenewDefault),
 	checked_at: zod.union([zod.int(), zod.null()]),
 	days_left: zod.union([zod.int(), zod.null()]),
 	domains: zod.array(zod.string()),

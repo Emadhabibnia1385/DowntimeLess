@@ -1,0 +1,1 @@
+import{t as e}from"./issues-CbS3WTDN.js";var t=e;export{t as component};

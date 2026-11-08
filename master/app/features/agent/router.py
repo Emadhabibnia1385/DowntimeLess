@@ -8,6 +8,7 @@ from ...db import get_db
 from ...errors import DLError
 from ...security import digest, new_token
 from ...settings import get_settings
+from ..ssl.service import adopt_domains
 from .schemas import EnrollRequest, EnrollResult, Report, ReportResult
 
 router = APIRouter(prefix="/agent/v1", tags=["agent"])
@@ -52,6 +53,9 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
         "INSERT INTO metrics (server_id, ts, cpu, steal, ram_pct, disk_pct, rx_bps, tx_bps, rx_delta, tx_delta, retrans, conntrack) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (sid, now, body.cpu_pct, body.steal_pct, ram_pct, disk_pct, net.get("rx_bps"), net.get("tx_bps"), rx_d, tx_d, body.tcp_retrans_pct, body.conntrack_pct),
     )
+    found = ((body.model_extra or {}).get("ssl") or {}).get("domains")
+    if isinstance(found, list):
+        adopt_domains(db, sid, found)
     for p in body.ping:
         if "target" in p:
             db.execute("INSERT INTO pings (server_id, ts, target, loss, rtt) VALUES (?,?,?,?,?)", (sid, now, str(p["target"]), p.get("loss_pct"), p.get("rtt_ms")))

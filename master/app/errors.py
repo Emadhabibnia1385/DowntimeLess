@@ -19,6 +19,7 @@ REGISTRY: Dict[str, Tuple[int, str]] = {
     "category.exists": (409, "دسته‌بندی‌ای با این نام قبلاً ساخته شده است."),
     "category.invalid": (422, "نام دسته‌بندی را وارد کنید."),
     "job.kind_unknown": (422, "این عمل مجاز نیست."),
+    "job.args_invalid": (422, "ورودی این عمل نامعتبر است."),
     "job.permission": (403, "سطح دسترسی این سرور اجازهٔ این عمل را نمی‌دهد."),
     "agent.invalid": (401, "کلید agent معتبر نیست."),
     "agent.enroll_invalid": (401, "توکن نصب معتبر نیست یا قبلاً استفاده شده است."),

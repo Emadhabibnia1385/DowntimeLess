@@ -24,6 +24,7 @@ def sweep(tg: Telegram) -> None:
                 db.execute("UPDATE servers SET offline_notified=0 WHERE id=?", (s["id"],))
                 notify_admins(tg, "🟢 <b>%s</b> دوباره آنلاین شد." % label)
         ssl_svc.probe_due(db)
+        ssl_svc.drop_stale_auto(db)
         _ssl_alerts(db, tg)
         cut = int(time.time())
         db.execute("DELETE FROM metrics WHERE ts<?", (cut - 90 * 86400,))

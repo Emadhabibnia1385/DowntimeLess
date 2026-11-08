@@ -6,7 +6,10 @@
  */
 
 export interface SslRow {
+	auto?: boolean;
 	auto_renew: string;
+	can_delete?: boolean;
+	can_renew?: boolean;
 	checked_at: number | null;
 	days_left: number | null;
 	domains: string[];

@@ -40,7 +40,10 @@ The agent only makes outbound HTTPS calls to the master, so no SSH key or root c
 - The agent exchanges the enroll token for a long-lived agent key (stored 0600 in `/etc/downtimeless/agent.json`).
 - Every 30 s: `POST /api/agent/v1/report` with metrics and results of the last jobs.
   The response carries the next `ping_targets` and queued `jobs`.
-- Jobs are a closed whitelist: `ping`, `tcp_check`, `speedtest_down`, `speedtest_up`, `apt_upgrade_safe`, `reboot`, `self_update`.
+- Jobs are a closed whitelist: `ping`, `tcp_check`, `speedtest_down`, `speedtest_up`, `apt_upgrade_safe`, `reboot`, `self_update`,
+  `cert_renew`, `cert_delete` (certbot only, the certificate name is validated by both sides).
+- The agent also reports the domains its nginx answers for on TLS (`ssl.domains`); the master adds them to the SSL list as
+  `auto` domains, probes them from outside, drops them a week after they vanish, and never re-adds one the owner removed.
   Mutating jobs (`apt_upgrade_safe`, `reboot`) run only if the server's permission level is `safe`/`full`, and are always
   created by a human from the panel.
 

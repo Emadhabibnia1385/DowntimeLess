@@ -32,6 +32,9 @@ class SslRow(BaseModel):
     stale: bool
     note: Optional[str] = None
     id: Optional[int] = None
+    auto: bool = False
+    can_renew: bool = False
+    can_delete: bool = False
 
 
 class DomainCreate(BaseModel):
@@ -68,5 +71,10 @@ def check_domain(domain_id: int, _: Actor = Depends(require("admin")), db: sqlit
 
 @router.delete("/domains/{domain_id}", status_code=204, operation_id="ssl_delete_domain")
 def delete_domain(domain_id: int, _: Actor = Depends(require("admin")), db: sqlite3.Connection = Depends(get_db)) -> None:
-    if not db.execute("DELETE FROM domains WHERE id=?", (domain_id,)).rowcount:
+    row = db.execute("SELECT source FROM domains WHERE id=?", (domain_id,)).fetchone()
+    if not row:
         raise DLError("domain.not_found")
+    if row["source"] == "auto":  # found by an agent: hide it so the next report does not bring it back
+        db.execute("UPDATE domains SET ignored=1 WHERE id=?", (domain_id,))
+    else:
+        db.execute("DELETE FROM domains WHERE id=?", (domain_id,))

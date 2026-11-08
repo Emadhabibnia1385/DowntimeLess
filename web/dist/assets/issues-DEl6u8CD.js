@@ -1,1 +1,0 @@
-import{t as e}from"./issues-C0Ka0Y-m.js";var t=e;export{t as component};

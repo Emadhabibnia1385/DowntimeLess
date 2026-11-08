@@ -1,1 +1,0 @@
-import{tr as e,wr as t}from"./useDocumentTitle-mvwqZiux.js";import{t as n}from"./auth-Bw92oOw8.js";import{n as r}from"./index-C8_vTZ0K.js";var i=e(),a=t();function o(){let e=(0,i.c)(2),{redirect:t}=r.useSearch(),o;return e[0]===t?o=e[1]:(o=(0,a.jsx)(n,{redirect:t}),e[0]=t,e[1]=o),o}export{o as component};

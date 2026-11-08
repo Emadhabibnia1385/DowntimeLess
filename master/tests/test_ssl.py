@@ -68,3 +68,92 @@ def test_renewal_problems_are_one_issue_per_server_not_one_per_certificate(owner
     off = next(i for i in owner.get("/api/v1/issues").json() if i["code"] == "ssl_auto_renew_off")
     # the 20-day certificate already has its own expiry warning, so only the other two count here
     assert off["evidence"] == {"certs": 2, "days_left": 30}
+
+
+def _renew(**over):
+    r = {"certbot_installed": True, "certbot_timer_enabled": True, "certbot_timer_active": True, "certbot_last_run_failed": False}
+    r.update(over)
+    return r
+
+
+def test_backup_folders_are_not_certificates(owner):
+    sid, key = make_server(owner)
+    report(owner, key, ssl={"certs": [cert("a.example.com", 60), cert("sub.example.com.bak-20261103", 30, "acme.sh")], "renew": _renew()})
+    assert [r["name"] for r in owner.get("/api/v1/ssl").json()] == ["a.example.com"]
+
+
+def test_action_flags_follow_the_tool_that_made_the_certificate(owner):
+    sid, key = make_server(owner)
+    report(owner, key, ssl={"certs": [cert("a.example.com", 60), cert("b.example.com", 60, "acme.sh")], "renew": _renew(acme_sh_cron=True)})
+    rows = {r["name"]: r for r in owner.get("/api/v1/ssl").json()}
+    assert (rows["a.example.com"]["can_renew"], rows["a.example.com"]["can_delete"]) == (True, True)
+    assert (rows["b.example.com"]["can_renew"], rows["b.example.com"]["can_delete"]) == (False, False)
+
+
+def test_domains_found_by_an_agent_join_the_list_once(owner, monkeypatch):
+    monkeypatch.setattr(ssl_svc, "is_public_host", lambda h: True)
+    monkeypatch.setattr(ssl_svc, "probe", lambda h, p: {"not_after": int(time.time()) + 50 * DAY, "issuer": "LE", "error": None})
+    sid, key = make_server(owner, "web", "panel")
+    body = {"certs": [], "renew": _renew(), "domains": ["App.Example.com", "app.example.com", "localhost", "-bad.com", "10.0.0.1", "panel.example.org"]}
+    report(owner, key, ssl=body)
+    report(owner, key, ssl=body)
+    rows = owner.get("/api/v1/ssl").json()
+    assert sorted(r["name"] for r in rows) == ["app.example.com", "panel.example.org"]
+    assert all(r["auto"] and r["server_name"] == "web" for r in rows)
+
+
+def test_a_found_domain_with_no_dns_is_not_added(owner, monkeypatch):
+    monkeypatch.setattr(ssl_svc, "is_public_host", lambda h: False)
+    sid, key = make_server(owner)
+    report(owner, key, ssl={"certs": [], "renew": _renew(), "domains": ["gone.example.com"]})
+    assert owner.get("/api/v1/ssl").json() == []
+
+
+def test_removing_a_found_domain_hides_it_for_good_but_a_manual_one_is_deleted(owner, monkeypatch):
+    monkeypatch.setattr(ssl_svc, "is_public_host", lambda h: True)
+    monkeypatch.setattr(ssl_svc, "probe", lambda h, p: {"not_after": int(time.time()) + 50 * DAY, "issuer": None, "error": None})
+    sid, key = make_server(owner)
+    body = {"certs": [], "renew": _renew(), "domains": ["auto.example.com"]}
+    report(owner, key, ssl=body)
+    auto_id = owner.get("/api/v1/ssl").json()[0]["id"]
+    assert owner.delete("/api/v1/domains/%d" % auto_id).status_code == 204
+    report(owner, key, ssl=body)
+    assert owner.get("/api/v1/ssl").json() == []
+    manual = owner.post("/api/v1/domains", json={"host": "manual.example.com"}).json()["id"]
+    assert owner.delete("/api/v1/domains/%d" % manual).status_code == 204
+    assert connect().execute("SELECT COUNT(*) FROM domains WHERE host='manual.example.com'").fetchone()[0] == 0
+
+
+def test_found_domains_that_vanish_from_the_server_are_dropped_after_a_week(owner, monkeypatch):
+    monkeypatch.setattr(ssl_svc, "is_public_host", lambda h: True)
+    monkeypatch.setattr(ssl_svc, "probe", lambda h, p: {"not_after": None, "issuer": None, "error": "x"})
+    sid, key = make_server(owner)
+    report(owner, key, ssl={"certs": [], "renew": _renew(), "domains": ["old.example.com"]})
+    db = connect()
+    db.execute("UPDATE domains SET seen_at=?", (int(time.time()) - 8 * DAY,))
+    ssl_svc.drop_stale_auto(db)
+    assert db.execute("SELECT COUNT(*) FROM domains").fetchone()[0] == 0
+    db.close()
+
+
+def test_a_found_domain_that_does_not_answer_is_a_warning_row_but_not_an_issue(owner, monkeypatch):
+    monkeypatch.setattr(ssl_svc, "is_public_host", lambda h: True)
+    monkeypatch.setattr(ssl_svc, "probe", lambda h, p: {"not_after": None, "issuer": None, "error": "اتصال ممکن نشد"})
+    sid, key = make_server(owner)
+    report(owner, key, ssl={"certs": [], "renew": _renew(), "domains": ["quiet.example.com"]})
+    db = connect()
+    ssl_svc.probe_due(db)  # the monitor loop does this within seconds
+    db.close()
+    assert owner.get("/api/v1/ssl").json()[0]["level"] == "warning"
+    assert [i for i in owner.get("/api/v1/issues").json() if i["code"].startswith("ssl")] == []
+
+
+def test_certificate_jobs_need_a_permission_level_a_human_and_a_safe_name(owner):
+    sid, key = make_server(owner)
+    jobs = "/api/v1/servers/%d/jobs" % sid
+    assert owner.post(jobs, json={"kind": "cert_renew", "args": {"name": "a.example.com"}}).json()["code"] == "job.permission"
+    owner.patch("/api/v1/servers/%d" % sid, json={"permission": "safe"})
+    for bad in ("", "../etc", "-rf", "a b", "a;ls", "x" * 300):
+        assert owner.post(jobs, json={"kind": "cert_delete", "args": {"name": bad}}).json()["code"] == "job.args_invalid"
+    assert owner.post(jobs, json={"kind": "cert_renew", "args": {"name": "a.example.com"}}).status_code == 201
+    assert owner.post(jobs, json={"kind": "cert_delete", "args": {"name": "a.example.com"}}).status_code == 201

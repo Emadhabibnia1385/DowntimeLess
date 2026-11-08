@@ -9,7 +9,8 @@ from ...settings import get_settings
 RANGES = {"1h": (3600, 30), "24h": (86400, 300), "7d": (7 * 86400, 1800), "30d": (30 * 86400, 7200)}
 # read-only kinds any admin may queue; the rest also need the server permission level
 SAFE_KINDS = {"ping", "tcp_check", "speedtest_down", "speedtest_up"}
-MUTATING_KINDS = {"apt_upgrade_safe", "reboot", "self_update"}
+MUTATING_KINDS = {"apt_upgrade_safe", "reboot", "self_update", "cert_renew", "cert_delete"}
+CERT_KINDS = {"cert_renew", "cert_delete"}
 # the agent replacing its own file from this master changes nothing else on the server
 ANY_LEVEL_KINDS = {"self_update"}
 

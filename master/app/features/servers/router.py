@@ -1,4 +1,5 @@
 import json
+import re
 import sqlite3
 import time
 from typing import List
@@ -112,6 +113,8 @@ def create_job(server_id: int, body: JobCreate, actor: Actor = Depends(require("
     server = _row(db, server_id)
     if body.kind not in svc.SAFE_KINDS | svc.MUTATING_KINDS:
         raise DLError("job.kind_unknown")
+    if body.kind in svc.CERT_KINDS and not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$", str(body.args.get("name", ""))):
+        raise DLError("job.args_invalid")
     if body.kind in svc.MUTATING_KINDS:
         too_low = server["permission"] == "read" and body.kind not in svc.ANY_LEVEL_KINDS
         if too_low or actor.via == "key":

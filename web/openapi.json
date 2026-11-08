@@ -1430,9 +1430,24 @@
       },
       "SslRow": {
         "properties": {
+          "auto": {
+            "default": false,
+            "title": "Auto",
+            "type": "boolean"
+          },
           "auto_renew": {
             "title": "Auto Renew",
             "type": "string"
+          },
+          "can_delete": {
+            "default": false,
+            "title": "Can Delete",
+            "type": "boolean"
+          },
+          "can_renew": {
+            "default": false,
+            "title": "Can Renew",
+            "type": "boolean"
           },
           "checked_at": {
             "anyOf": [

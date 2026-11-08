@@ -19,7 +19,7 @@ import time
 import urllib.parse
 import urllib.request
 
-VERSION = "0.2.4"
+VERSION = "0.2.5"
 UA = "DowntimeLess-Agent/" + VERSION
 SELF_PATH = os.path.realpath(__file__)
 # With no address they describe the caller's outbound address; with one, that address itself.
@@ -32,8 +32,12 @@ GEO_RETRY_S = 900
 SSL_TTL_S = 1800
 CERT_GLOBS = ("/etc/letsencrypt/live/*/cert.pem", "/root/.acme.sh/*/*.cer")
 ACME_SKIP = ("ca.cer", "fullchain.cer")
+# a folder like "example.com.bak-20261103" is a backup of a certificate, not one
+BACKUP_RE = re.compile(r"\.bak|\.old$|\.orig$|backup", re.I)
+CERT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$")
+DOMAIN_RE = re.compile(r"^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
 # self_update only swaps this file for the master's copy, so it needs no permission level (the master agrees)
-MUTATING = ("apt_upgrade_safe", "reboot")
+MUTATING = ("apt_upgrade_safe", "reboot", "cert_renew", "cert_delete")
 HOLD_PKGS = ("docker-ce", "docker-ce-cli", "containerd.io", "docker-compose-plugin", "docker-buildx-plugin")
 # Hold only what is not held already, and release only our own holds afterwards.
 APT_SCRIPT = """
@@ -473,20 +477,36 @@ def renew_status():
     }
 
 
+def nginx_domains(config):
+    """Public host names that a TLS server block of the nginx config answers for."""
+    names = set()
+    config = re.sub(r"(?m)#.*$", "", config)
+    for block in re.split(r"\bserver\s*\{", config)[1:]:
+        if not (re.search(r"\blisten\s+[^;]*\b443\b", block) or "ssl_certificate" in block):
+            continue
+        for line in re.findall(r"\bserver_name\s+([^;]+);", block):
+            for name in line.split():
+                name = name.lower().strip(".")
+                if DOMAIN_RE.match(name):
+                    names.add(name)
+    return sorted(names)
+
+
 def ssl_report(now=None):
     now = now or time.time()
     certs = []
     for pattern in CERT_GLOBS:
         for path in sorted(glob.glob(pattern)):
-            if os.path.basename(path) in ACME_SKIP:
+            if os.path.basename(path) in ACME_SKIP or BACKUP_RE.search(os.path.basename(os.path.dirname(path))):
                 continue
             c = read_cert(path, now)
             if c:
                 certs.append(c)
     renew = renew_status()
-    if not certs and not renew["certbot_installed"]:
+    domains = nginx_domains(run_text(["nginx", "-T"], timeout=15))
+    if not certs and not renew["certbot_installed"] and not domains:
         return None
-    return {"certs": certs, "renew": renew}
+    return {"certs": certs, "renew": renew, "domains": domains}
 
 
 def ssl_cached(state):
@@ -563,6 +583,27 @@ def job_apt_upgrade_safe(args, state):
     return {"unit": "dl-apt-upgrade", "started": True}
 
 
+def certbot_job(verb, args, state):
+    name = args.get("name")
+    if not isinstance(name, str) or not CERT_NAME_RE.match(name):
+        raise ValueError("bad certificate name")
+    r = subprocess.run(["certbot", verb, "--cert-name", name, "--non-interactive"],
+                       capture_output=True, text=True, timeout=300)
+    state["ssl"] = (0, None)  # rescan on the next report so the change shows at once
+    tail = (r.stdout + r.stderr).strip()[-400:]
+    if r.returncode != 0:
+        raise RuntimeError(tail or "certbot failed")
+    return {"name": name, "output": tail}
+
+
+def job_cert_renew(args, state):
+    return certbot_job("renew", args, state)
+
+
+def job_cert_delete(args, state):
+    return certbot_job("delete", args, state)
+
+
 def job_reboot(args, state):
     systemd_run(["systemd-run", "--on-active=5", "systemctl", "reboot"])
     state["flush"] = True  # report ok before the timer fires
@@ -598,6 +639,8 @@ JOBS = {
     "speedtest_up": job_speedtest_up,
     "apt_upgrade_safe": job_apt_upgrade_safe,
     "reboot": job_reboot,
+    "cert_renew": job_cert_renew,
+    "cert_delete": job_cert_delete,
     "self_update": job_self_update,
 }
 
