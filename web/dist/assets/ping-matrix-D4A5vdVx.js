@@ -1,1 +1,0 @@
-import{r as e}from"./servers-nsqbLyeV.js";var t=e;export{t as component};
