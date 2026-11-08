@@ -1,1 +1,0 @@
-import{t as e}from"./settings-B9jHvb2V.js";var t=e;export{t as component};

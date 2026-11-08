@@ -115,7 +115,7 @@ def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
             title = "گواهی %s %s: %s" % (r["name"], where, r["error"] or ("منقضی شده" if r["days_left"] < 0 else "%d روز تا انقضا" % r["days_left"]))
             hint = "تمدید را دستی اجرا کنید (certbot renew) و علت شکست را در journalctl -u certbot ببینید." if r["kind"] == "file" else "گواهی و تنظیم وب‌سرور دامنه را بررسی کنید."
             out.append({**base, "id": "ssl:%s" % r["key"], "code": "ssl_expiry", "severity": r["level"], "title": title, "suggestion": hint,
-                        "evidence": {"days_left": r["days_left"], "error": r["error"]}})
+                        "evidence": {"name": r["name"], "days_left": r["days_left"], "error": r["error"]}})
         elif r["kind"] == "file" and r["auto_renew"] == "off" and r["days_left"] is not None and r["days_left"] <= 45:
             off.setdefault(r["server_id"], []).append(r)
         if r["kind"] == "file" and r["renew_failed"]:

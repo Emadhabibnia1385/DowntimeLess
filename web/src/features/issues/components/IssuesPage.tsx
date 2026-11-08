@@ -3,7 +3,7 @@ import { Loadable } from "@/shared/Loadable";
 import { useDocumentTitle } from "@/shared/useDocumentTitle";
 import { t } from "@/strings";
 import { useIssues } from "../api";
-import { IssueList } from "./IssueList";
+import { IssueTable } from "./IssueTable";
 
 export function IssuesPage() {
 	useDocumentTitle(t.issues.title);
@@ -11,7 +11,7 @@ export function IssuesPage() {
 	return (
 		<div className="flex flex-col gap-6">
 			<PageHeader title={t.issues.title} description={t.issues.subtitle} />
-			<Loadable query={issues}>{(items) => <IssueList issues={items} />}</Loadable>
+			<Loadable query={issues}>{(items) => <IssueTable issues={items} />}</Loadable>
 		</div>
 	);
 }

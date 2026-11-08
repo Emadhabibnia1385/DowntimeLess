@@ -62,6 +62,7 @@ const usageCell = (usage: Usage | null): ReactNode =>
 
 const ALL = "all";
 const NONE = "none";
+const ROLE_ORDER = ["relay", "exit", "panel", "panel_only", "other"];
 
 export function ServersPage() {
 	useDocumentTitle(t.servers.title);
@@ -86,6 +87,15 @@ export function ServersPage() {
 		...(hasUncategorized && names.size > 0 ? [{ value: NONE, label: t.categories.none }] : []),
 	];
 	const fleet = options.some((option) => option.value === filter) ? filter : ALL;
+	const [roleChoice, setRoleChoice] = useState<string>(ALL);
+	const rolesPresent = ROLE_ORDER.filter((role) =>
+		(servers.data ?? []).some((server) => server.role === role),
+	);
+	const roleOptions = [
+		{ value: ALL, label: t.categories.filterAll },
+		...rolesPresent.map((role) => ({ value: role, label: roleLabel(role) })),
+	];
+	const role = roleOptions.some((option) => option.value === roleChoice) ? roleChoice : ALL;
 	const onSort = (key: SortKey, first: SortDirection) =>
 		setSort((current) => nextSort(current, key, first));
 	const rows = useMemo(
@@ -93,12 +103,13 @@ export function ServersPage() {
 			sortServers(
 				(servers.data ?? []).filter(
 					(server) =>
-						fleet === ALL ||
-						(fleet === NONE ? server.category_id == null : String(server.category_id) === fleet),
+						(role === ALL || server.role === role) &&
+						(fleet === ALL ||
+							(fleet === NONE ? server.category_id == null : String(server.category_id) === fleet)),
 				),
 				sort,
 			),
-		[servers.data, sort, fleet],
+		[servers.data, sort, fleet, role],
 	);
 	const head = (label: string, key: SortKey, first: SortDirection = "desc", unit?: string) => (
 		<SortHeader label={label} unit={unit} sortKey={key} first={first} sort={sort} onSort={onSort} />
@@ -187,12 +198,20 @@ export function ServersPage() {
 					) : undefined
 				}
 			/>
-			<FilterChips
-				label={t.categories.filterLabel}
-				value={fleet}
-				onChange={setFilter}
-				options={options}
-			/>
+			<div className="flex flex-wrap items-start gap-x-8 gap-y-3">
+				<FilterChips
+					label={t.categories.filterLabel}
+					value={fleet}
+					onChange={setFilter}
+					options={options}
+				/>
+				<FilterChips
+					label={t.servers.roleFilterLabel}
+					value={role}
+					onChange={setRoleChoice}
+					options={roleOptions}
+				/>
+			</div>
 			<DataTable
 				ariaLabel={t.servers.tableLabel}
 				columns={columns}
