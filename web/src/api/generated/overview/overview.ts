@@ -17,7 +17,15 @@ import type {
 	UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HTTPValidationError, Issue, Overview, OverviewSnapshot200, PingCell } from "../model";
+import type {
+	FleetHistory,
+	HTTPValidationError,
+	Issue,
+	Overview,
+	OverviewHistoryParams,
+	OverviewSnapshot200,
+	PingCell,
+} from "../model";
 
 import { apiFetch } from "../../transport";
 import type { ErrorType } from "../../transport";
@@ -260,6 +268,142 @@ export function useOverviewGet<
 	queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 	const queryOptions = useOverviewGetQueryOptions(options);
+
+	const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+		queryKey: DataTag<QueryKey, TData, TError>;
+	};
+
+	return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getOverviewHistoryUrl = (params?: OverviewHistoryParams) => {
+	const normalizedParams = new URLSearchParams();
+
+	Object.entries(params || {}).forEach(([key, value]) => {
+		if (value !== undefined) {
+			normalizedParams.append(key, value === null ? "null" : String(value));
+		}
+	});
+
+	const stringifiedParams = normalizedParams.toString();
+
+	return stringifiedParams.length > 0
+		? `/api/v1/overview/history?${stringifiedParams}`
+		: `/api/v1/overview/history`;
+};
+
+/**
+ * The whole fleet over time: traffic summed over every server, usage averaged, how many reported.
+ * @summary History
+ */
+export const overviewHistory = async (
+	params?: OverviewHistoryParams,
+	options?: Parameters<typeof apiFetch>[1],
+): Promise<FleetHistory> => {
+	return apiFetch<FleetHistory>(getOverviewHistoryUrl(params), {
+		...options,
+		method: "GET",
+	});
+};
+
+export const getOverviewHistoryQueryKey = (params?: OverviewHistoryParams) => {
+	return [`/api/v1/overview/history`, ...(params ? [params] : [])] as const;
+};
+
+export const useOverviewHistoryQueryOptions = <
+	TData = Awaited<ReturnType<typeof overviewHistory>>,
+	TError = ErrorType<HTTPValidationError>,
+>(
+	params?: OverviewHistoryParams,
+	options?: {
+		query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof overviewHistory>>, TError, TData>>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+) => {
+	const { query: queryOptions, request: requestOptions } = options ?? {};
+
+	const queryKey = queryOptions?.queryKey ?? getOverviewHistoryQueryKey(params);
+
+	const queryFn: QueryFunction<Awaited<ReturnType<typeof overviewHistory>>> = ({ signal }) =>
+		overviewHistory(params, { signal, ...requestOptions });
+
+	const customOptions = queryDefaults({ queryKey, queryFn, ...queryOptions });
+
+	return customOptions as UseQueryOptions<
+		Awaited<ReturnType<typeof overviewHistory>>,
+		TError,
+		TData
+	> & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type OverviewHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof overviewHistory>>>;
+export type OverviewHistoryQueryError = ErrorType<HTTPValidationError>;
+
+export function useOverviewHistory<
+	TData = Awaited<ReturnType<typeof overviewHistory>>,
+	TError = ErrorType<HTTPValidationError>,
+>(
+	params: undefined | OverviewHistoryParams,
+	options: {
+		query: Partial<UseQueryOptions<Awaited<ReturnType<typeof overviewHistory>>, TError, TData>> &
+			Pick<
+				DefinedInitialDataOptions<
+					Awaited<ReturnType<typeof overviewHistory>>,
+					TError,
+					Awaited<ReturnType<typeof overviewHistory>>
+				>,
+				"initialData"
+			>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useOverviewHistory<
+	TData = Awaited<ReturnType<typeof overviewHistory>>,
+	TError = ErrorType<HTTPValidationError>,
+>(
+	params?: OverviewHistoryParams,
+	options?: {
+		query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof overviewHistory>>, TError, TData>> &
+			Pick<
+				UndefinedInitialDataOptions<
+					Awaited<ReturnType<typeof overviewHistory>>,
+					TError,
+					Awaited<ReturnType<typeof overviewHistory>>
+				>,
+				"initialData"
+			>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useOverviewHistory<
+	TData = Awaited<ReturnType<typeof overviewHistory>>,
+	TError = ErrorType<HTTPValidationError>,
+>(
+	params?: OverviewHistoryParams,
+	options?: {
+		query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof overviewHistory>>, TError, TData>>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary History
+ */
+
+export function useOverviewHistory<
+	TData = Awaited<ReturnType<typeof overviewHistory>>,
+	TError = ErrorType<HTTPValidationError>,
+>(
+	params?: OverviewHistoryParams,
+	options?: {
+		query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof overviewHistory>>, TError, TData>>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+	const queryOptions = useOverviewHistoryQueryOptions(params, options);
 
 	const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
 		queryKey: DataTag<QueryKey, TData, TError>;

@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 from ...settings import get_settings
 
-RANGES = {"1h": (3600, 30), "24h": (86400, 300), "7d": (7 * 86400, 1800), "30d": (30 * 86400, 7200)}
+RANGES = {"1h": (3600, 30), "6h": (21600, 60), "24h": (86400, 300), "7d": (7 * 86400, 1800), "30d": (30 * 86400, 7200)}
 # read-only kinds any admin may queue; the rest also need the server permission level
 SAFE_KINDS = {"ping", "tcp_check", "speedtest_down", "speedtest_up"}
 MUTATING_KINDS = {"apt_upgrade_safe", "reboot", "self_update", "cert_renew", "cert_delete"}
@@ -39,7 +39,22 @@ def latest_of(row: sqlite3.Row) -> Dict[str, Any]:
         "ram_used_mb": round(total - avail, 1) if total and avail is not None else None,
         "disk_total_gb": dt, "disk_used_gb": du,
         "reboot_required": bool(rep.get("reboot_required")), "failed_units": rep.get("failed_units") or [],
+        "load5": rep.get("load5"), "load15": rep.get("load15"),
+        "swap_total_mb": rep.get("swap_total_mb"), "swap_used_mb": rep.get("swap_used_mb"),
+        "swap_pct": swap_pct(rep), "tcp_established": rep.get("tcp_established"),
     }
+
+
+def swap_pct(rep: Dict[str, Any]) -> Optional[float]:
+    total, used = rep.get("swap_total_mb"), rep.get("swap_used_mb")
+    return round(used * 100 / total, 1) if total and used is not None else None
+
+
+def system_of(row: sqlite3.Row) -> Dict[str, Any]:
+    """What the server is, from the agent's slow-changing facts."""
+    rep = json.loads(row["last_report"]) if row["last_report"] else {}
+    info = rep.get("info") or {}
+    return {k: info.get(k) for k in ("os", "kernel", "cpu_model", "cpu_cores", "boot_ts", "ipv6")}
 
 
 _agent_cache: Dict[str, Any] = {"mtime": None, "version": None}
@@ -88,6 +103,7 @@ def server_out(row: sqlite3.Row) -> Dict[str, Any]:
         "status": status_of(row),
         "agent_outdated": agent_outdated(row["agent_version"]),
         "latest": latest_of(row),
+        "system": system_of(row),
     }
 
 

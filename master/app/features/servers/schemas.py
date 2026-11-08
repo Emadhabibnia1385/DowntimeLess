@@ -24,6 +24,21 @@ class Latest(BaseModel):
     disk_used_gb: Optional[float] = None
     reboot_required: bool = False
     failed_units: List[str] = []
+    load5: Optional[float] = None
+    load15: Optional[float] = None
+    swap_total_mb: Optional[float] = None
+    swap_used_mb: Optional[float] = None
+    swap_pct: Optional[float] = None
+    tcp_established: Optional[int] = None
+
+
+class SystemInfo(BaseModel):
+    os: Optional[str] = None
+    kernel: Optional[str] = None
+    cpu_model: Optional[str] = None
+    cpu_cores: Optional[int] = None
+    boot_ts: Optional[int] = None
+    ipv6: Optional[str] = None
 
 
 class ServerOut(BaseModel):
@@ -43,6 +58,7 @@ class ServerOut(BaseModel):
     agent_version: Optional[str]
     agent_outdated: bool = False
     latest: Latest
+    system: SystemInfo = SystemInfo()
 
 
 class ServerCreate(BaseModel):
@@ -74,6 +90,12 @@ class MetricPoint(BaseModel):
     tx_bps: Optional[float]
     rx_bytes: int
     tx_bytes: int
+    steal: Optional[float] = None
+    load1: Optional[float] = None
+    swap_pct: Optional[float] = None
+    retrans: Optional[float] = None
+    conntrack: Optional[float] = None
+    conns: Optional[float] = None
 
 
 class MetricsOut(BaseModel):

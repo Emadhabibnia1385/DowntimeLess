@@ -9,6 +9,7 @@ import ipaddress
 import json
 import glob
 import os
+import platform
 import re
 import shutil
 import socket
@@ -19,7 +20,7 @@ import time
 import urllib.parse
 import urllib.request
 
-VERSION = "0.2.5"
+VERSION = "0.2.6"
 UA = "DowntimeLess-Agent/" + VERSION
 SELF_PATH = os.path.realpath(__file__)
 # With no address they describe the caller's outbound address; with one, that address itself.
@@ -103,6 +104,53 @@ def parse_meminfo(text):
     if "MemTotal" not in kb:
         return None
     return kb["MemTotal"] // 1024, kb.get("MemAvailable", kb.get("MemFree", 0)) // 1024
+
+
+def parse_swap(text):
+    kb = {}
+    for line in text.splitlines():
+        key, _, rest = line.partition(":")
+        parts = rest.split()
+        if parts and parts[0].isdigit():
+            kb[key] = int(parts[0])
+    if not kb.get("SwapTotal"):
+        return None
+    return kb["SwapTotal"] // 1024, (kb["SwapTotal"] - kb.get("SwapFree", 0)) // 1024
+
+
+def parse_os_release(text):
+    for line in text.splitlines():
+        if line.startswith("PRETTY_NAME="):
+            return line.split("=", 1)[1].strip().strip('"') or None
+    return None
+
+
+def parse_cpu_model(text):
+    m = re.search(r"(?m)^(?:model name|Model|Hardware)\s*:\s*(.+)$", text)
+    return re.sub(r"\s+", " ", m.group(1)).strip() if m else None
+
+
+def parse_loadavg(text):
+    try:
+        return tuple(float(x) for x in text.split()[:3]) if len(text.split()) >= 3 else None
+    except ValueError:
+        return None
+
+
+def parse_curr_estab(snmp_text):
+    """Established TCP connections: the CurrEstab column of the Tcp: lines of /proc/net/snmp."""
+    rows = [line.split() for line in snmp_text.splitlines() if line.startswith("Tcp:")]
+    if len(rows) < 2 or "CurrEstab" not in rows[0]:
+        return None
+    try:
+        return int(rows[1][rows[0].index("CurrEstab")])
+    except (IndexError, ValueError):
+        return None
+
+
+def parse_ipv6(text):
+    m = re.search(r"inet6\s+([0-9a-fA-F:]+)/\d+\s+scope global", text)
+    return m.group(1).lower() if m else None
 
 
 def parse_first_float(text):
@@ -403,6 +451,8 @@ def build_report(state):
     except OSError:
         pass
     uptime = parse_first_float(read("/proc/uptime"))
+    load = parse_loadavg(read("/proc/loadavg"))
+    swap = parse_swap(read("/proc/meminfo"))
     looked_up, geo = geo_cached(state)
     ip = own_ipv4(looked_up)
 
@@ -414,7 +464,11 @@ def build_report(state):
         "geo": geo,
         "uptime_s": int(uptime) if uptime is not None else None,
         "cpu_cores": os.cpu_count(),
-        "cpu_pct": cpu, "steal_pct": steal, "load1": parse_first_float(read("/proc/loadavg")),
+        "cpu_pct": cpu, "steal_pct": steal, "load1": load[0] if load else None,
+        "load5": load[1] if load else None, "load15": load[2] if load else None,
+        "swap_total_mb": swap[0] if swap else None, "swap_used_mb": swap[1] if swap else None,
+        "tcp_established": parse_curr_estab(read("/proc/net/snmp")),
+        "info": system_info(state, uptime),
         "ram_total_mb": mem[0] if mem else None, "ram_avail_mb": mem[1] if mem else None,
         "disk_total_gb": disk_total, "disk_used_gb": disk_used,
         "net": net,
@@ -426,6 +480,24 @@ def build_report(state):
         "ssl": ssl_cached(state),
         "ping": run_pings(state["ping_targets"]),
         "jobs_done": list(state["jobs_done"]),
+    }
+
+
+# ---- system info ----
+
+def system_info(state, uptime):
+    """What the server is: system, kernel, CPU model, boot time, IPv6 address (slow-changing, cached)."""
+    now = time.time()
+    if now - state.get("ipv6_at", 0) > 600:
+        state["ipv6"] = parse_ipv6(run_text(["ip", "-6", "-o", "addr", "show", "scope", "global"], timeout=5))
+        state["ipv6_at"] = now
+    return {
+        "os": parse_os_release(read("/etc/os-release")),
+        "kernel": platform.release() or None,
+        "cpu_model": parse_cpu_model(read("/proc/cpuinfo")),
+        "cpu_cores": os.cpu_count(),
+        "boot_ts": int(now - uptime) if uptime is not None else None,
+        "ipv6": state.get("ipv6"),
     }
 
 

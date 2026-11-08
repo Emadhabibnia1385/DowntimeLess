@@ -8,6 +8,7 @@ from ...db import get_db
 from ...errors import DLError
 from ...security import digest, new_token
 from ...settings import get_settings
+from ..servers.service import swap_pct
 from ..ssl.service import adopt_domains
 from .schemas import EnrollRequest, EnrollResult, Report, ReportResult
 
@@ -49,9 +50,11 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
         (now, body.model_dump_json(), rx, tx, body.agent_version, body.hostname, public_ip,
          geo.get("country"), geo.get("city"), geo.get("org"), sid),
     )
+    extra = body.model_extra or {}
     db.execute(
-        "INSERT INTO metrics (server_id, ts, cpu, steal, ram_pct, disk_pct, rx_bps, tx_bps, rx_delta, tx_delta, retrans, conntrack) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-        (sid, now, body.cpu_pct, body.steal_pct, ram_pct, disk_pct, net.get("rx_bps"), net.get("tx_bps"), rx_d, tx_d, body.tcp_retrans_pct, body.conntrack_pct),
+        "INSERT INTO metrics (server_id, ts, cpu, steal, ram_pct, disk_pct, rx_bps, tx_bps, rx_delta, tx_delta, retrans, conntrack, load1, swap_pct, conns) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (sid, now, body.cpu_pct, body.steal_pct, ram_pct, disk_pct, net.get("rx_bps"), net.get("tx_bps"), rx_d, tx_d, body.tcp_retrans_pct, body.conntrack_pct,
+         extra.get("load1"), swap_pct(extra), extra.get("tcp_established")),
     )
     found = ((body.model_extra or {}).get("ssl") or {}).get("domains")
     if isinstance(found, list):
@@ -72,7 +75,4 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
     jobs = [{"id": r["id"], "kind": r["kind"], "args": json.loads(r["args"])} for r in db.execute("SELECT * FROM jobs WHERE server_id=? AND status='queued' ORDER BY id", (sid,))]
     if jobs:
         db.execute("UPDATE jobs SET status='sent' WHERE server_id=? AND status='queued'", (sid,))
-    permission = server["permission"]
-    if jobs and all(j["kind"] == "self_update" for j in jobs) and permission == "read":
-        permission = "safe"  # agents before 0.2.3 still refuse self_update at 'read'; the master already allows it
-    return {"interval_s": get_settings().interval_s, "permission": permission, "ping_targets": targets, "jobs": jobs}
+    return {"interval_s": get_settings().interval_s, "permission": "full", "ping_targets": targets, "jobs": jobs}

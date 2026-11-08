@@ -48,14 +48,12 @@ def test_ping_matrix_and_loss_issue(owner):
     assert cell["from_name"] == "a" and cell["to_name"] == "b"
 
 
-def test_mutating_job_needs_permission_and_a_human(owner):
+def test_a_signed_in_human_may_queue_any_job_on_any_server_and_it_is_delivered_once(owner):
     sid, key = make_server(owner)
-    assert owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": "reboot"}).json()["code"] == "job.permission"
-    owner.patch("/api/v1/servers/%d" % sid, json={"permission": "safe"})
+    assert owner.get("/api/v1/servers/%d" % sid).json()["permission"] == "full"
     assert owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": "reboot"}).status_code == 201
     assert owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": "rm -rf"}).json()["code"] == "job.kind_unknown"
-    jobs = report(owner, key).json()["jobs"]
-    assert [j["kind"] for j in jobs] == ["reboot"]
+    assert [j["kind"] for j in report(owner, key).json()["jobs"]] == ["reboot"]
     assert report(owner, key).json()["jobs"] == []  # delivered once
 
 
@@ -69,12 +67,9 @@ def test_concurrent_requests_do_not_trip_sqlite_thread_check(owner):
     assert set(codes) == {200}
 
 
-def test_self_update_is_allowed_at_read_level_but_other_changes_are_not(owner):
-    sid, _ = make_server(owner)
-    ok = owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": "self_update"})
-    assert ok.status_code == 201
-    denied = owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": "reboot"})
-    assert denied.json()["code"] == "job.permission"
+def test_every_server_tells_its_agent_it_has_full_permission(owner):
+    sid, key = make_server(owner)
+    assert report(owner, key).json()["permission"] == "full"
 
 
 def test_agent_outdated_follows_the_served_agent_version(owner):
@@ -155,19 +150,6 @@ def test_only_iran_relays_measure_and_only_towards_foreign_servers(owner):
     assert [i for i in owner.get("/api/v1/issues").json() if i["code"].startswith("ping:")] == []
 
 
-def test_old_agents_may_run_self_update_at_read_but_nothing_else(owner):
-    sid, key = make_server(owner)
-    assert owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": "self_update"}).status_code == 201
-    res = report(owner, key).json()
-    assert [j["kind"] for j in res["jobs"]] == ["self_update"] and res["permission"] == "safe"
-    # the stored level is untouched, and a batch with any other kind keeps it
-    assert owner.get("/api/v1/servers/%d" % sid).json()["permission"] == "read"
-    owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": "self_update"})
-    owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": "ping", "args": {"target": "127.0.0.1"}})
-    mixed = report(owner, key).json()
-    assert len(mixed["jobs"]) == 2 and mixed["permission"] == "read"
-    assert report(owner, key).json()["permission"] == "read"
-
 
 def _fleet_with_relays(owner, losses):
     """Foreign exit 'nl-1' and one relay per entry of `losses`, each reporting that loss to it."""
@@ -207,3 +189,38 @@ def test_a_single_relay_cannot_confirm_so_the_issue_is_only_info(owner, monkeypa
     _fleet_with_relays(owner, [100])
     (issue,) = _ping_issues(owner)
     assert issue["severity"] == "info" and "تأیید نشده" in issue["title"]
+
+
+def test_system_facts_and_extra_levels_reach_the_server_record(owner):
+    sid, key = make_server(owner)
+    report(owner, key, load1=0.5, load5=0.4, load15=0.3, swap_total_mb=2048, swap_used_mb=512, tcp_established=87,
+           info={"os": "Ubuntu 24.04 LTS", "kernel": "6.8.0", "cpu_model": "Xeon", "cpu_cores": 4, "boot_ts": 1790000000, "ipv6": "2001:db8::1"})
+    s = owner.get("/api/v1/servers/%d" % sid).json()
+    assert s["system"] == {"os": "Ubuntu 24.04 LTS", "kernel": "6.8.0", "cpu_model": "Xeon", "cpu_cores": 4, "boot_ts": 1790000000, "ipv6": "2001:db8::1"}
+    assert (s["latest"]["load5"], s["latest"]["swap_pct"], s["latest"]["tcp_established"]) == (0.4, 25.0, 87)
+
+
+def test_an_old_agent_without_system_facts_gives_empty_ones(owner):
+    sid, key = make_server(owner)
+    report(owner, key)
+    assert owner.get("/api/v1/servers/%d" % sid).json()["system"]["os"] is None
+
+
+def test_history_carries_load_steal_swap_and_connections_and_serves_six_hours(owner):
+    sid, key = make_server(owner)
+    report(owner, key, steal_pct=3.0, load1=1.5, swap_total_mb=1000, swap_used_mb=100, tcp_established=40, tcp_retrans_pct=0.5, conntrack_pct=2.0)
+    m = owner.get("/api/v1/servers/%d/metrics?range=6h" % sid).json()
+    assert m["range"] == "6h"
+    p = m["points"][-1]
+    assert (p["steal"], p["load1"], p["swap_pct"], p["conns"], p["retrans"], p["conntrack"]) == (3.0, 1.5, 10.0, 40, 0.5, 2.0)
+
+
+def test_fleet_history_sums_traffic_of_every_server_and_counts_who_reported(owner):
+    a, ka = make_server(owner, "a", "exit")
+    b, kb = make_server(owner, "b", "exit")
+    for key in (ka, kb):
+        report(owner, key, net={"iface": "eth0", "rx_bytes": 1000, "tx_bytes": 2000, "rx_bps": 1, "tx_bps": 1})
+        report(owner, key, net={"iface": "eth0", "rx_bytes": 1600, "tx_bytes": 2300, "rx_bps": 1, "tx_bps": 1})
+    h = owner.get("/api/v1/overview/history?range=1h").json()
+    assert (h["rx_total"], h["tx_total"]) == (1200, 600)
+    assert h["points"][-1]["servers"] == 2

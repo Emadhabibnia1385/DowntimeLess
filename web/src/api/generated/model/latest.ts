@@ -14,12 +14,18 @@ export interface Latest {
 	disk_used_gb?: number | null;
 	failed_units?: string[];
 	load1?: number | null;
+	load15?: number | null;
+	load5?: number | null;
 	ram_pct?: number | null;
 	ram_total_mb?: number | null;
 	ram_used_mb?: number | null;
 	reboot_required?: boolean;
 	rx_bps?: number | null;
 	steal_pct?: number | null;
+	swap_pct?: number | null;
+	swap_total_mb?: number | null;
+	swap_used_mb?: number | null;
+	tcp_established?: number | null;
 	tcp_retrans_pct?: number | null;
 	tx_bps?: number | null;
 	uptime_s?: number | null;

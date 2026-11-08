@@ -44,6 +44,37 @@ export const OverviewGetResponse = zod.object({
 });
 
 /**
+ * The whole fleet over time: traffic summed over every server, usage averaged, how many reported.
+ * @summary History
+ */
+export const overviewHistoryQueryRangeDefault = `24h`;
+
+export const OverviewHistoryQueryParams = zod.object({
+	range: zod.string().default(overviewHistoryQueryRangeDefault),
+});
+
+export const OverviewHistoryHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const OverviewHistoryResponse = zod.object({
+	points: zod.array(
+		zod.object({
+			cpu: zod.union([zod.number(), zod.null()]),
+			disk_pct: zod.union([zod.number(), zod.null()]),
+			ram_pct: zod.union([zod.number(), zod.null()]),
+			rx_bytes: zod.int(),
+			servers: zod.int(),
+			ts: zod.int(),
+			tx_bytes: zod.int(),
+		}),
+	),
+	range: zod.string(),
+	rx_total: zod.int(),
+	tx_total: zod.int(),
+});
+
+/**
  * @summary Ping Matrix
  */
 export const OverviewPingMatrixHeader = zod.object({

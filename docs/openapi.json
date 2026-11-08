@@ -102,6 +102,101 @@
         "title": "EnrollResult",
         "type": "object"
       },
+      "FleetHistory": {
+        "properties": {
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/FleetPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "range": {
+            "title": "Range",
+            "type": "string"
+          },
+          "rx_total": {
+            "title": "Rx Total",
+            "type": "integer"
+          },
+          "tx_total": {
+            "title": "Tx Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "range",
+          "points",
+          "rx_total",
+          "tx_total"
+        ],
+        "title": "FleetHistory",
+        "type": "object"
+      },
+      "FleetPoint": {
+        "properties": {
+          "cpu": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu"
+          },
+          "disk_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Pct"
+          },
+          "ram_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ram Pct"
+          },
+          "rx_bytes": {
+            "title": "Rx Bytes",
+            "type": "integer"
+          },
+          "servers": {
+            "title": "Servers",
+            "type": "integer"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          },
+          "tx_bytes": {
+            "title": "Tx Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ts",
+          "rx_bytes",
+          "tx_bytes",
+          "cpu",
+          "ram_pct",
+          "disk_pct",
+          "servers"
+        ],
+        "title": "FleetPoint",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -536,6 +631,28 @@
             ],
             "title": "Load1"
           },
+          "load15": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Load15"
+          },
+          "load5": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Load5"
+          },
           "ram_pct": {
             "anyOf": [
               {
@@ -595,6 +712,50 @@
               }
             ],
             "title": "Steal Pct"
+          },
+          "swap_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Swap Pct"
+          },
+          "swap_total_mb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Swap Total Mb"
+          },
+          "swap_used_mb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Swap Used Mb"
+          },
+          "tcp_established": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tcp Established"
           },
           "tcp_retrans_pct": {
             "anyOf": [
@@ -657,6 +818,28 @@
       },
       "MetricPoint": {
         "properties": {
+          "conns": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conns"
+          },
+          "conntrack": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conntrack"
+          },
           "cpu": {
             "anyOf": [
               {
@@ -679,6 +862,17 @@
             ],
             "title": "Disk Pct"
           },
+          "load1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Load1"
+          },
           "ram_pct": {
             "anyOf": [
               {
@@ -689,6 +883,17 @@
               }
             ],
             "title": "Ram Pct"
+          },
+          "retrans": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrans"
           },
           "rx_bps": {
             "anyOf": [
@@ -704,6 +909,28 @@
           "rx_bytes": {
             "title": "Rx Bytes",
             "type": "integer"
+          },
+          "steal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steal"
+          },
+          "swap_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Swap Pct"
           },
           "ts": {
             "title": "Ts",
@@ -1341,6 +1568,10 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "system": {
+            "$ref": "#/components/schemas/SystemInfo",
+            "default": {}
           }
         },
         "required": [
@@ -1631,6 +1862,78 @@
           "expires_in"
         ],
         "title": "StartResult",
+        "type": "object"
+      },
+      "SystemInfo": {
+        "properties": {
+          "boot_ts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Boot Ts"
+          },
+          "cpu_cores": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Cores"
+          },
+          "cpu_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Model"
+          },
+          "ipv6": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ipv6"
+          },
+          "kernel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kernel"
+          },
+          "os": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Os"
+          }
+        },
+        "title": "SystemInfo",
         "type": "object"
       },
       "UserOut": {
@@ -2778,6 +3081,66 @@
           }
         },
         "summary": "Overview",
+        "tags": [
+          "overview"
+        ]
+      }
+    },
+    "/api/v1/overview/history": {
+      "get": {
+        "description": "The whole fleet over time: traffic summed over every server, usage averaged, how many reported.",
+        "operationId": "overview_history",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "range",
+            "required": false,
+            "schema": {
+              "default": "24h",
+              "title": "Range",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FleetHistory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "History",
         "tags": [
           "overview"
         ]

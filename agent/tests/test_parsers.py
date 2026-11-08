@@ -203,3 +203,29 @@ def test_backup_folders_are_skipped_by_the_scan(monkeypatch, tmp_path):
     monkeypatch.setattr(agent, "renew_status", lambda: {"certbot_installed": True})
     monkeypatch.setattr(agent, "run_text", lambda argv, timeout=10: "notAfter=Feb  4 12:33:37 2027 GMT\nDNS:x.example.com\n" if argv[0] == "openssl" else "")
     assert [c["name"] for c in agent.ssl_report()["certs"]] == ["live-a.example.com"]
+
+
+def test_system_facts_from_proc_and_os_files():
+    assert agent.parse_os_release('NAME="Ubuntu"\nPRETTY_NAME="Ubuntu 24.04.4 LTS"\nID=ubuntu\n') == "Ubuntu 24.04.4 LTS"
+    assert agent.parse_os_release("") is None
+    assert agent.parse_cpu_model("processor : 0\nmodel name\t: Intel(R)  Xeon(R) CPU E5-2680 v4 @ 2.40GHz\n") == "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz"
+    assert agent.parse_cpu_model("Hardware\t: BCM2835\n") == "BCM2835"
+    assert agent.parse_loadavg("0.52 0.40 0.35 2/512 12345\n") == (0.52, 0.40, 0.35)
+    assert agent.parse_loadavg("garbage") is None
+    assert agent.parse_swap("SwapTotal: 2097152 kB\nSwapFree: 1048576 kB\n") == (2048, 1024)
+    assert agent.parse_swap("SwapTotal: 0 kB\nSwapFree: 0 kB\n") is None
+    snmp = "Tcp: RtoAlgorithm RtoMin CurrEstab InSegs\nTcp: 1 200 87 5000\n"
+    assert agent.parse_curr_estab(snmp) == 87
+    assert agent.parse_curr_estab("") is None
+    out = "2: eth0    inet6 2a01:4f8:1c1b::1/64 scope global \\       valid_lft forever\n"
+    assert agent.parse_ipv6(out) == "2a01:4f8:1c1b::1"
+    assert agent.parse_ipv6("") is None
+
+
+def test_system_info_caches_the_ipv6_lookup(monkeypatch):
+    calls = []
+    monkeypatch.setattr(agent, "run_text", lambda argv, timeout=10: calls.append(argv) or "2: eth0 inet6 2001:db8::5/64 scope global")
+    state = agent.new_state({"master": "http://x", "agent_key": "k"})
+    first = agent.system_info(state, 3600.0)
+    agent.system_info(state, 3601.0)
+    assert len(calls) == 1 and first["ipv6"] == "2001:db8::5" and first["boot_ts"] > 0

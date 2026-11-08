@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from ...db import get_db
 from ...deps import Actor, require
-from ..servers.service import server_out
+from ..servers.service import RANGES, server_out
 from . import service as svc
 
 router = APIRouter(tags=["overview"])
@@ -57,6 +57,36 @@ def overview(_: Actor = Depends(require("viewer")), db: sqlite3.Connection = Dep
         "issues_warning": sum(1 for i in found if i["severity"] == "warning"),
         "rx_bytes_24h": t["rx_bytes"], "tx_bytes_24h": t["tx_bytes"],
     }
+
+
+class FleetPoint(BaseModel):
+    ts: int
+    rx_bytes: int
+    tx_bytes: int
+    cpu: Optional[float]
+    ram_pct: Optional[float]
+    disk_pct: Optional[float]
+    servers: int
+
+
+class FleetHistory(BaseModel):
+    range: str
+    points: List[FleetPoint]
+    rx_total: int
+    tx_total: int
+
+
+@router.get("/overview/history", response_model=FleetHistory, operation_id="overview_history")
+def history(range: str = "24h", _: Actor = Depends(require("viewer")), db: sqlite3.Connection = Depends(get_db)):
+    """The whole fleet over time: traffic summed over every server, usage averaged, how many reported."""
+    span, bucket = RANGES.get(range, RANGES["24h"])
+    rows = db.execute(
+        "SELECT (ts/?)*? AS t, SUM(rx_delta) rx, SUM(tx_delta) tx, AVG(cpu) cpu, AVG(ram_pct) ram, AVG(disk_pct) disk, "
+        "COUNT(DISTINCT server_id) n FROM metrics WHERE ts>=? GROUP BY t ORDER BY t",
+        (bucket, bucket, int(time.time()) - span),
+    ).fetchall()
+    pts = [{"ts": r["t"], "rx_bytes": r["rx"], "tx_bytes": r["tx"], "cpu": r["cpu"], "ram_pct": r["ram"], "disk_pct": r["disk"], "servers": r["n"]} for r in rows]
+    return {"range": range, "points": pts, "rx_total": sum(p["rx_bytes"] for p in pts), "tx_total": sum(p["tx_bytes"] for p in pts)}
 
 
 @router.get("/issues", response_model=List[Issue], operation_id="overview_issues")

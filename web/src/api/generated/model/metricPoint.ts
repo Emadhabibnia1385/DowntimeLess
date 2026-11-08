@@ -6,11 +6,17 @@
  */
 
 export interface MetricPoint {
+	conns?: number | null;
+	conntrack?: number | null;
 	cpu: number | null;
 	disk_pct: number | null;
+	load1?: number | null;
 	ram_pct: number | null;
+	retrans?: number | null;
 	rx_bps: number | null;
 	rx_bytes: number;
+	steal?: number | null;
+	swap_pct?: number | null;
 	ts: number;
 	tx_bps: number | null;
 	tx_bytes: number;

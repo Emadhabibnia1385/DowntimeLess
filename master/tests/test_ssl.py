@@ -148,12 +148,14 @@ def test_a_found_domain_that_does_not_answer_is_a_warning_row_but_not_an_issue(o
     assert [i for i in owner.get("/api/v1/issues").json() if i["code"].startswith("ssl")] == []
 
 
-def test_certificate_jobs_need_a_permission_level_a_human_and_a_safe_name(owner):
+def test_certificate_jobs_need_a_human_and_a_safe_name(owner):
     sid, key = make_server(owner)
     jobs = "/api/v1/servers/%d/jobs" % sid
-    assert owner.post(jobs, json={"kind": "cert_renew", "args": {"name": "a.example.com"}}).json()["code"] == "job.permission"
-    owner.patch("/api/v1/servers/%d" % sid, json={"permission": "safe"})
     for bad in ("", "../etc", "-rf", "a b", "a;ls", "x" * 300):
         assert owner.post(jobs, json={"kind": "cert_delete", "args": {"name": bad}}).json()["code"] == "job.args_invalid"
     assert owner.post(jobs, json={"kind": "cert_renew", "args": {"name": "a.example.com"}}).status_code == 201
     assert owner.post(jobs, json={"kind": "cert_delete", "args": {"name": "a.example.com"}}).status_code == 201
+    token = owner.post("/api/v1/keys", json={"name": "ai", "scope": "operate"}).json()["token"]
+    owner.post("/api/v1/auth/logout")
+    refused = owner.post(jobs, json={"kind": "cert_renew", "args": {"name": "a.example.com"}}, headers={"Authorization": "Bearer " + token})
+    assert refused.json()["code"] == "job.permission"

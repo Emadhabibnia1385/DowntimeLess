@@ -16,6 +16,7 @@ export const ServersListHeader = zod.object({
 export const serversListResponseAgentOutdatedDefault = false;
 export const serversListResponseLatestFailedUnitsDefault = [];
 export const serversListResponseLatestRebootRequiredDefault = false;
+export const serversListResponseSystemDefault = {};
 
 export const ServersListResponseItem = zod.object({
 	agent_outdated: zod.boolean().default(serversListResponseAgentOutdatedDefault),
@@ -36,12 +37,18 @@ export const ServersListResponseItem = zod.object({
 		disk_used_gb: zod.union([zod.number(), zod.null()]).optional(),
 		failed_units: zod.array(zod.string()).default(serversListResponseLatestFailedUnitsDefault),
 		load1: zod.union([zod.number(), zod.null()]).optional(),
+		load15: zod.union([zod.number(), zod.null()]).optional(),
+		load5: zod.union([zod.number(), zod.null()]).optional(),
 		ram_pct: zod.union([zod.number(), zod.null()]).optional(),
 		ram_total_mb: zod.union([zod.number(), zod.null()]).optional(),
 		ram_used_mb: zod.union([zod.number(), zod.null()]).optional(),
 		reboot_required: zod.boolean().default(serversListResponseLatestRebootRequiredDefault),
 		rx_bps: zod.union([zod.number(), zod.null()]).optional(),
 		steal_pct: zod.union([zod.number(), zod.null()]).optional(),
+		swap_pct: zod.union([zod.number(), zod.null()]).optional(),
+		swap_total_mb: zod.union([zod.number(), zod.null()]).optional(),
+		swap_used_mb: zod.union([zod.number(), zod.null()]).optional(),
+		tcp_established: zod.union([zod.int(), zod.null()]).optional(),
 		tcp_retrans_pct: zod.union([zod.number(), zod.null()]).optional(),
 		tx_bps: zod.union([zod.number(), zod.null()]).optional(),
 		uptime_s: zod.union([zod.int(), zod.null()]).optional(),
@@ -52,6 +59,16 @@ export const ServersListResponseItem = zod.object({
 	public_ip: zod.union([zod.string(), zod.null()]),
 	role: zod.string(),
 	status: zod.string(),
+	system: zod
+		.object({
+			boot_ts: zod.union([zod.int(), zod.null()]).optional(),
+			cpu_cores: zod.union([zod.int(), zod.null()]).optional(),
+			cpu_model: zod.union([zod.string(), zod.null()]).optional(),
+			ipv6: zod.union([zod.string(), zod.null()]).optional(),
+			kernel: zod.union([zod.string(), zod.null()]).optional(),
+			os: zod.union([zod.string(), zod.null()]).optional(),
+		})
+		.default(serversListResponseSystemDefault),
 });
 export const ServersListResponse = zod.array(ServersListResponseItem);
 
@@ -80,6 +97,7 @@ export const ServersCreateBody = zod.object({
 export const serversCreateResponseServerAgentOutdatedDefault = false;
 export const serversCreateResponseServerLatestFailedUnitsDefault = [];
 export const serversCreateResponseServerLatestRebootRequiredDefault = false;
+export const serversCreateResponseServerSystemDefault = {};
 
 export const ServersCreateResponse = zod.object({
 	install_command: zod.string(),
@@ -104,6 +122,8 @@ export const ServersCreateResponse = zod.object({
 				.array(zod.string())
 				.default(serversCreateResponseServerLatestFailedUnitsDefault),
 			load1: zod.union([zod.number(), zod.null()]).optional(),
+			load15: zod.union([zod.number(), zod.null()]).optional(),
+			load5: zod.union([zod.number(), zod.null()]).optional(),
 			ram_pct: zod.union([zod.number(), zod.null()]).optional(),
 			ram_total_mb: zod.union([zod.number(), zod.null()]).optional(),
 			ram_used_mb: zod.union([zod.number(), zod.null()]).optional(),
@@ -112,6 +132,10 @@ export const ServersCreateResponse = zod.object({
 				.default(serversCreateResponseServerLatestRebootRequiredDefault),
 			rx_bps: zod.union([zod.number(), zod.null()]).optional(),
 			steal_pct: zod.union([zod.number(), zod.null()]).optional(),
+			swap_pct: zod.union([zod.number(), zod.null()]).optional(),
+			swap_total_mb: zod.union([zod.number(), zod.null()]).optional(),
+			swap_used_mb: zod.union([zod.number(), zod.null()]).optional(),
+			tcp_established: zod.union([zod.int(), zod.null()]).optional(),
 			tcp_retrans_pct: zod.union([zod.number(), zod.null()]).optional(),
 			tx_bps: zod.union([zod.number(), zod.null()]).optional(),
 			uptime_s: zod.union([zod.int(), zod.null()]).optional(),
@@ -122,6 +146,16 @@ export const ServersCreateResponse = zod.object({
 		public_ip: zod.union([zod.string(), zod.null()]),
 		role: zod.string(),
 		status: zod.string(),
+		system: zod
+			.object({
+				boot_ts: zod.union([zod.int(), zod.null()]).optional(),
+				cpu_cores: zod.union([zod.int(), zod.null()]).optional(),
+				cpu_model: zod.union([zod.string(), zod.null()]).optional(),
+				ipv6: zod.union([zod.string(), zod.null()]).optional(),
+				kernel: zod.union([zod.string(), zod.null()]).optional(),
+				os: zod.union([zod.string(), zod.null()]).optional(),
+			})
+			.default(serversCreateResponseServerSystemDefault),
 	}),
 });
 
@@ -152,6 +186,7 @@ export const ServersGetHeader = zod.object({
 export const serversGetResponseAgentOutdatedDefault = false;
 export const serversGetResponseLatestFailedUnitsDefault = [];
 export const serversGetResponseLatestRebootRequiredDefault = false;
+export const serversGetResponseSystemDefault = {};
 
 export const ServersGetResponse = zod.object({
 	agent_outdated: zod.boolean().default(serversGetResponseAgentOutdatedDefault),
@@ -172,12 +207,18 @@ export const ServersGetResponse = zod.object({
 		disk_used_gb: zod.union([zod.number(), zod.null()]).optional(),
 		failed_units: zod.array(zod.string()).default(serversGetResponseLatestFailedUnitsDefault),
 		load1: zod.union([zod.number(), zod.null()]).optional(),
+		load15: zod.union([zod.number(), zod.null()]).optional(),
+		load5: zod.union([zod.number(), zod.null()]).optional(),
 		ram_pct: zod.union([zod.number(), zod.null()]).optional(),
 		ram_total_mb: zod.union([zod.number(), zod.null()]).optional(),
 		ram_used_mb: zod.union([zod.number(), zod.null()]).optional(),
 		reboot_required: zod.boolean().default(serversGetResponseLatestRebootRequiredDefault),
 		rx_bps: zod.union([zod.number(), zod.null()]).optional(),
 		steal_pct: zod.union([zod.number(), zod.null()]).optional(),
+		swap_pct: zod.union([zod.number(), zod.null()]).optional(),
+		swap_total_mb: zod.union([zod.number(), zod.null()]).optional(),
+		swap_used_mb: zod.union([zod.number(), zod.null()]).optional(),
+		tcp_established: zod.union([zod.int(), zod.null()]).optional(),
 		tcp_retrans_pct: zod.union([zod.number(), zod.null()]).optional(),
 		tx_bps: zod.union([zod.number(), zod.null()]).optional(),
 		uptime_s: zod.union([zod.int(), zod.null()]).optional(),
@@ -188,6 +229,16 @@ export const ServersGetResponse = zod.object({
 	public_ip: zod.union([zod.string(), zod.null()]),
 	role: zod.string(),
 	status: zod.string(),
+	system: zod
+		.object({
+			boot_ts: zod.union([zod.int(), zod.null()]).optional(),
+			cpu_cores: zod.union([zod.int(), zod.null()]).optional(),
+			cpu_model: zod.union([zod.string(), zod.null()]).optional(),
+			ipv6: zod.union([zod.string(), zod.null()]).optional(),
+			kernel: zod.union([zod.string(), zod.null()]).optional(),
+			os: zod.union([zod.string(), zod.null()]).optional(),
+		})
+		.default(serversGetResponseSystemDefault),
 });
 
 /**
@@ -221,6 +272,7 @@ export const ServersUpdateBody = zod.object({
 export const serversUpdateResponseAgentOutdatedDefault = false;
 export const serversUpdateResponseLatestFailedUnitsDefault = [];
 export const serversUpdateResponseLatestRebootRequiredDefault = false;
+export const serversUpdateResponseSystemDefault = {};
 
 export const ServersUpdateResponse = zod.object({
 	agent_outdated: zod.boolean().default(serversUpdateResponseAgentOutdatedDefault),
@@ -241,12 +293,18 @@ export const ServersUpdateResponse = zod.object({
 		disk_used_gb: zod.union([zod.number(), zod.null()]).optional(),
 		failed_units: zod.array(zod.string()).default(serversUpdateResponseLatestFailedUnitsDefault),
 		load1: zod.union([zod.number(), zod.null()]).optional(),
+		load15: zod.union([zod.number(), zod.null()]).optional(),
+		load5: zod.union([zod.number(), zod.null()]).optional(),
 		ram_pct: zod.union([zod.number(), zod.null()]).optional(),
 		ram_total_mb: zod.union([zod.number(), zod.null()]).optional(),
 		ram_used_mb: zod.union([zod.number(), zod.null()]).optional(),
 		reboot_required: zod.boolean().default(serversUpdateResponseLatestRebootRequiredDefault),
 		rx_bps: zod.union([zod.number(), zod.null()]).optional(),
 		steal_pct: zod.union([zod.number(), zod.null()]).optional(),
+		swap_pct: zod.union([zod.number(), zod.null()]).optional(),
+		swap_total_mb: zod.union([zod.number(), zod.null()]).optional(),
+		swap_used_mb: zod.union([zod.number(), zod.null()]).optional(),
+		tcp_established: zod.union([zod.int(), zod.null()]).optional(),
 		tcp_retrans_pct: zod.union([zod.number(), zod.null()]).optional(),
 		tx_bps: zod.union([zod.number(), zod.null()]).optional(),
 		uptime_s: zod.union([zod.int(), zod.null()]).optional(),
@@ -257,6 +315,16 @@ export const ServersUpdateResponse = zod.object({
 	public_ip: zod.union([zod.string(), zod.null()]),
 	role: zod.string(),
 	status: zod.string(),
+	system: zod
+		.object({
+			boot_ts: zod.union([zod.int(), zod.null()]).optional(),
+			cpu_cores: zod.union([zod.int(), zod.null()]).optional(),
+			cpu_model: zod.union([zod.string(), zod.null()]).optional(),
+			ipv6: zod.union([zod.string(), zod.null()]).optional(),
+			kernel: zod.union([zod.string(), zod.null()]).optional(),
+			os: zod.union([zod.string(), zod.null()]).optional(),
+		})
+		.default(serversUpdateResponseSystemDefault),
 });
 
 /**
@@ -273,6 +341,7 @@ export const ServersNewEnrollTokenHeader = zod.object({
 export const serversNewEnrollTokenResponseServerAgentOutdatedDefault = false;
 export const serversNewEnrollTokenResponseServerLatestFailedUnitsDefault = [];
 export const serversNewEnrollTokenResponseServerLatestRebootRequiredDefault = false;
+export const serversNewEnrollTokenResponseServerSystemDefault = {};
 
 export const ServersNewEnrollTokenResponse = zod.object({
 	install_command: zod.string(),
@@ -297,6 +366,8 @@ export const ServersNewEnrollTokenResponse = zod.object({
 				.array(zod.string())
 				.default(serversNewEnrollTokenResponseServerLatestFailedUnitsDefault),
 			load1: zod.union([zod.number(), zod.null()]).optional(),
+			load15: zod.union([zod.number(), zod.null()]).optional(),
+			load5: zod.union([zod.number(), zod.null()]).optional(),
 			ram_pct: zod.union([zod.number(), zod.null()]).optional(),
 			ram_total_mb: zod.union([zod.number(), zod.null()]).optional(),
 			ram_used_mb: zod.union([zod.number(), zod.null()]).optional(),
@@ -305,6 +376,10 @@ export const ServersNewEnrollTokenResponse = zod.object({
 				.default(serversNewEnrollTokenResponseServerLatestRebootRequiredDefault),
 			rx_bps: zod.union([zod.number(), zod.null()]).optional(),
 			steal_pct: zod.union([zod.number(), zod.null()]).optional(),
+			swap_pct: zod.union([zod.number(), zod.null()]).optional(),
+			swap_total_mb: zod.union([zod.number(), zod.null()]).optional(),
+			swap_used_mb: zod.union([zod.number(), zod.null()]).optional(),
+			tcp_established: zod.union([zod.int(), zod.null()]).optional(),
 			tcp_retrans_pct: zod.union([zod.number(), zod.null()]).optional(),
 			tx_bps: zod.union([zod.number(), zod.null()]).optional(),
 			uptime_s: zod.union([zod.int(), zod.null()]).optional(),
@@ -315,6 +390,16 @@ export const ServersNewEnrollTokenResponse = zod.object({
 		public_ip: zod.union([zod.string(), zod.null()]),
 		role: zod.string(),
 		status: zod.string(),
+		system: zod
+			.object({
+				boot_ts: zod.union([zod.int(), zod.null()]).optional(),
+				cpu_cores: zod.union([zod.int(), zod.null()]).optional(),
+				cpu_model: zod.union([zod.string(), zod.null()]).optional(),
+				ipv6: zod.union([zod.string(), zod.null()]).optional(),
+				kernel: zod.union([zod.string(), zod.null()]).optional(),
+				os: zod.union([zod.string(), zod.null()]).optional(),
+			})
+			.default(serversNewEnrollTokenResponseServerSystemDefault),
 	}),
 });
 
@@ -390,11 +475,17 @@ export const ServersMetricsHeader = zod.object({
 export const ServersMetricsResponse = zod.object({
 	points: zod.array(
 		zod.object({
+			conns: zod.union([zod.number(), zod.null()]).optional(),
+			conntrack: zod.union([zod.number(), zod.null()]).optional(),
 			cpu: zod.union([zod.number(), zod.null()]),
 			disk_pct: zod.union([zod.number(), zod.null()]),
+			load1: zod.union([zod.number(), zod.null()]).optional(),
 			ram_pct: zod.union([zod.number(), zod.null()]),
+			retrans: zod.union([zod.number(), zod.null()]).optional(),
 			rx_bps: zod.union([zod.number(), zod.null()]),
 			rx_bytes: zod.int(),
+			steal: zod.union([zod.number(), zod.null()]).optional(),
+			swap_pct: zod.union([zod.number(), zod.null()]).optional(),
 			ts: zod.int(),
 			tx_bps: zod.union([zod.number(), zod.null()]),
 			tx_bytes: zod.int(),

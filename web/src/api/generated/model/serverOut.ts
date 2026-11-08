@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Latest } from "./latest";
+import type { SystemInfo } from "./systemInfo";
 
 export interface ServerOut {
 	agent_outdated?: boolean;
@@ -23,4 +24,5 @@ export interface ServerOut {
 	public_ip: string | null;
 	role: string;
 	status: string;
+	system?: SystemInfo;
 }

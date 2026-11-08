@@ -39,7 +39,7 @@ def create_server(body: ServerCreate, _: Actor = Depends(require("admin")), db: 
     token = new_token(24)
     cols = svc.role_columns(body.role)
     cur = db.execute(
-        "INSERT INTO servers (name, alias, role, panel_only, category_id, enroll_hash, created_at) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO servers (name, alias, role, panel_only, category_id, enroll_hash, created_at, permission) VALUES (?,?,?,?,?,?,?,'full')",
         (body.name, body.alias, cols["role"], cols["panel_only"], _category(db, body.category_id), digest(token), int(time.time())),
     )
     return {"server": svc.server_out(_row(db, cur.lastrowid)), "install_command": svc.install_command(token)}
@@ -84,11 +84,13 @@ def metrics(server_id: int, range: str = "24h", _: Actor = Depends(require("view
     since = int(time.time()) - span
     rows = db.execute(
         "SELECT (ts/?)*? AS t, AVG(cpu) cpu, AVG(ram_pct) ram, AVG(disk_pct) disk, AVG(rx_bps) rxb, AVG(tx_bps) txb, "
-        "SUM(rx_delta) rx, SUM(tx_delta) tx FROM metrics WHERE server_id=? AND ts>=? GROUP BY t ORDER BY t",
+        "SUM(rx_delta) rx, SUM(tx_delta) tx, AVG(steal) steal, AVG(load1) load1, AVG(swap_pct) swap, AVG(retrans) retrans, "
+        "AVG(conntrack) conntrack, AVG(conns) conns FROM metrics WHERE server_id=? AND ts>=? GROUP BY t ORDER BY t",
         (bucket, bucket, server_id, since),
     ).fetchall()
     pts = [
-        {"ts": r["t"], "cpu": r["cpu"], "ram_pct": r["ram"], "disk_pct": r["disk"], "rx_bps": r["rxb"], "tx_bps": r["txb"], "rx_bytes": r["rx"], "tx_bytes": r["tx"]}
+        {"ts": r["t"], "cpu": r["cpu"], "ram_pct": r["ram"], "disk_pct": r["disk"], "rx_bps": r["rxb"], "tx_bps": r["txb"], "rx_bytes": r["rx"], "tx_bytes": r["tx"],
+         "steal": r["steal"], "load1": r["load1"], "swap_pct": r["swap"], "retrans": r["retrans"], "conntrack": r["conntrack"], "conns": r["conns"]}
         for r in rows
     ]
     return {"range": range, "points": pts, "rx_total": sum(p["rx_bytes"] for p in pts), "tx_total": sum(p["tx_bytes"] for p in pts)}
@@ -116,8 +118,7 @@ def create_job(server_id: int, body: JobCreate, actor: Actor = Depends(require("
     if body.kind in svc.CERT_KINDS and not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$", str(body.args.get("name", ""))):
         raise DLError("job.args_invalid")
     if body.kind in svc.MUTATING_KINDS:
-        too_low = server["permission"] == "read" and body.kind not in svc.ANY_LEVEL_KINDS
-        if too_low or actor.via == "key":
+        if actor.via == "key":
             raise DLError("job.permission")  # changes to a server always come from a signed-in human
     cur = db.execute(
         "INSERT INTO jobs (server_id, kind, args, created_by, created_at) VALUES (?,?,?,?,?)",
