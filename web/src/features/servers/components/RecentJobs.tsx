@@ -1,4 +1,4 @@
-import { StatusChip } from "@nyxon/nasim";
+import { StaticTable, StatusChip } from "@nyxon/nasim";
 import { formatRelativeTime, t } from "@/strings";
 import { useServerJobs } from "../api";
 import { jobResultText } from "../lib/jobs";
@@ -18,7 +18,7 @@ const TONES: Record<string, "success" | "danger" | "neutral" | "info"> = {
 	sent: "info",
 };
 
-// The last few jobs on this server: what, how it went in a word, when, and the short result.
+// The last few jobs on this server as a table: what, how it went, when, and the short result.
 export function RecentJobs({ serverId }: { serverId: number }) {
 	const jobs = useServerJobs(serverId);
 	const recent = [...(jobs.data ?? [])]
@@ -30,27 +30,34 @@ export function RecentJobs({ serverId }: { serverId: number }) {
 			{recent.length === 0 ? (
 				<p className="text-sm text-muted">{jobs.isPending ? "" : t.server.jobsEmpty}</p>
 			) : (
-				<ul className="flex flex-col divide-y divide-separator">
-					{recent.map((job) => {
-						const result = jobResultText(job);
-						return (
-							<li key={job.id} className="flex items-center justify-between gap-3 py-2">
-								<div className="min-w-0">
-									<p className="text-sm font-medium">{kindLabel(job.kind)}</p>
-									<p className="truncate text-xs text-muted">
-										{formatRelativeTime(job.created_at)}
-										{result === t.common.none ? "" : ` · ${result}`}
-									</p>
-								</div>
-								<StatusChip
-									tone={TONES[job.status] ?? "neutral"}
-									label={statusLabel(job.status)}
-									size="sm"
-								/>
-							</li>
-						);
-					})}
-				</ul>
+				<StaticTable
+					caption={t.server.jobsTable}
+					className="min-w-[28rem]"
+					columns={[
+						t.server.jobColKind,
+						t.server.jobColStatus,
+						t.server.jobColWhen,
+						t.server.jobColResult,
+					]}
+					rows={recent.map((job) => ({
+						id: String(job.id),
+						cells: [
+							kindLabel(job.kind),
+							<StatusChip
+								key="status"
+								tone={TONES[job.status] ?? "neutral"}
+								label={statusLabel(job.status)}
+								size="sm"
+							/>,
+							<span key="when" className="whitespace-nowrap text-sm text-muted">
+								{formatRelativeTime(job.created_at)}
+							</span>,
+							<span key="result" className="text-sm">
+								{jobResultText(job)}
+							</span>,
+						],
+					}))}
+				/>
 			)}
 		</div>
 	);

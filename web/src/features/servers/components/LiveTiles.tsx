@@ -2,7 +2,7 @@ import { Notice, StatCard } from "@nyxon/nasim";
 import type { ReactNode } from "react";
 import type { ServerOut } from "@/api/generated/model";
 import { ArrowDownIcon, ArrowUpIcon } from "@/shared/icons";
-import { formatDecimal, formatDuration, t } from "@/strings";
+import { formatDecimal, formatDuration, formatPercent, t } from "@/strings";
 import { cpuUsage, diskUsage, ramUsage, type Usage } from "../lib/usage";
 
 const MEGA = 1_000_000;
@@ -46,15 +46,25 @@ export function LiveTiles({ server }: { server: ServerOut }) {
 	return (
 		<section aria-label={t.server.live} className="flex flex-col gap-3">
 			<Alerts latest={latest} />
-			<div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,1.6fr)_repeat(3,minmax(0,1fr))]">
+			<div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,1.6fr)_repeat(3,minmax(0,1fr))]">
 				<Tile label={t.server.liveCpu} usage={cpuUsage(latest)} />
+				<StatCard
+					className={TILE}
+					label={t.server.liveSteal}
+					value={latest.steal_pct == null ? t.common.none : formatPercent(latest.steal_pct)}
+					hint={t.server.liveStealHint}
+				/>
 				<Tile label={t.server.liveRam} usage={ramUsage(latest)} />
 				<Tile label={t.server.liveDisk} usage={diskUsage(latest)} />
 				<StatCard
 					className={TILE}
 					label={t.server.liveLoad}
 					value={one(load1)}
-					hint={t.server.liveLoadHint(one(load5), one(load15))}
+					hint={
+						load5 == null || load15 == null
+							? undefined
+							: t.server.liveLoadHint(one(load5), one(load15))
+					}
 				/>
 				<StatCard
 					className={TILE}

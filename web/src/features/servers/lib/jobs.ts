@@ -12,7 +12,11 @@ const num = (value: unknown): number | null => (typeof value === "number" ? valu
 
 /** A job's outcome in one short line of Persian; empty while it has not finished. */
 export function jobResultText(job: Pick<JobOut, "kind" | "status" | "result" | "error">): string {
-	if (job.status === "error" || job.status === "rejected") return job.error ?? t.common.none;
+	if (job.status === "error" || job.status === "rejected") {
+		if (job.error === "permission level does not allow this job")
+			return t.server.jobErrorPermission;
+		return job.error ?? t.common.none;
+	}
 	const result = job.result ?? {};
 	if (job.kind === "ping") {
 		const loss = num(result.loss_pct);
