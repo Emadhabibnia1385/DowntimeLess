@@ -1,6 +1,185 @@
 {
   "components": {
     "schemas": {
+      "AckBrief": {
+        "properties": {
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          },
+          "server_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Id"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          }
+        },
+        "required": [
+          "severity",
+          "server_id",
+          "server",
+          "code",
+          "title",
+          "mode",
+          "until",
+          "by",
+          "note"
+        ],
+        "title": "AckBrief",
+        "type": "object"
+      },
+      "AckIn": {
+        "properties": {
+          "key": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "mode": {
+            "default": "until_resolved",
+            "enum": [
+              "until_resolved",
+              "24h",
+              "7d",
+              "always"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "AckIn",
+        "type": "object"
+      },
+      "AckOut": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          }
+        },
+        "required": [
+          "key",
+          "mode",
+          "until",
+          "note",
+          "severity",
+          "created_at"
+        ],
+        "title": "AckOut",
+        "type": "object"
+      },
       "AgentsOutdated": {
         "properties": {
           "latest": {
@@ -127,6 +306,14 @@
       },
       "Briefing": {
         "properties": {
+          "acknowledged": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AckBrief"
+            },
+            "title": "Acknowledged",
+            "type": "array"
+          },
           "agents_outdated": {
             "$ref": "#/components/schemas/AgentsOutdated"
           },
@@ -1933,6 +2120,66 @@
       },
       "Issue": {
         "properties": {
+          "ack_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ack Mode"
+          },
+          "ack_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ack Note"
+          },
+          "acked": {
+            "default": false,
+            "title": "Acked",
+            "type": "boolean"
+          },
+          "acked_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acked At"
+          },
+          "acked_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acked By"
+          },
+          "acked_until": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acked Until"
+          },
           "code": {
             "title": "Code",
             "type": "string"
@@ -4265,6 +4512,11 @@
       },
       "ServerHealth": {
         "properties": {
+          "acked_issues": {
+            "default": 0,
+            "title": "Acked Issues",
+            "type": "integer"
+          },
           "band": {
             "title": "Band",
             "type": "string"
@@ -6519,6 +6771,116 @@
         "summary": "Issues",
         "tags": [
           "overview"
+        ]
+      }
+    },
+    "/api/v1/issues/ack": {
+      "delete": {
+        "description": "Undo an acknowledgement: the issue counts and alerts again.",
+        "operationId": "issues_unack",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unack",
+        "tags": [
+          "issues"
+        ]
+      },
+      "post": {
+        "description": "Acknowledge a current issue: it stays listed but is not counted or sent to Telegram until the ack ends.",
+        "operationId": "issues_ack",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ack",
+        "tags": [
+          "issues"
         ]
       }
     },

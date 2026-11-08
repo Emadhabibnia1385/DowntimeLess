@@ -2,6 +2,7 @@ import { PageHeader, Tabs } from "@nyxon/nasim";
 import { Loadable } from "@/shared/Loadable";
 import { useDocumentTitle } from "@/shared/useDocumentTitle";
 import { t } from "@/strings";
+import { AckedSection, splitAcked } from "../acks";
 import { useIssues } from "../api";
 import { type HistoryRange, type IssuesFilters, type IssuesTab, isIssuesTab } from "../lib/tabs";
 import { ChangesTab } from "./ChangesTab";
@@ -11,7 +12,19 @@ import { IssueTable } from "./IssueTable";
 
 function NowTab() {
 	const issues = useIssues();
-	return <Loadable query={issues}>{(items) => <IssueTable issues={items} />}</Loadable>;
+	return (
+		<Loadable query={issues}>
+			{(items) => {
+				const { open, acked } = splitAcked(items);
+				return (
+					<div className="flex flex-col gap-4">
+						<IssueTable issues={open} />
+						<AckedSection issues={acked} />
+					</div>
+				);
+			}}
+		</Loadable>
+	);
 }
 
 export function IssuesPage({

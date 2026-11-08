@@ -4,20 +4,30 @@
  * DowntimeLess
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
 	DataTag,
 	DefinedInitialDataOptions,
 	DefinedUseQueryResult,
+	MutationFunction,
 	QueryClient,
 	QueryFunction,
 	QueryKey,
 	UndefinedInitialDataOptions,
+	UseMutationOptions,
+	UseMutationResult,
 	UseQueryOptions,
 	UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HTTPValidationError, IssuesHistory, IssuesHistoryParams } from "../model";
+import type {
+	AckIn,
+	AckOut,
+	HTTPValidationError,
+	IssuesHistory,
+	IssuesHistoryParams,
+	IssuesUnackParams,
+} from "../model";
 
 import { apiFetch } from "../../transport";
 import type { ErrorType } from "../../transport";
@@ -40,6 +50,205 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 	return result;
 };
 
+export const getIssuesUnackUrl = (params: IssuesUnackParams) => {
+	const normalizedParams = new URLSearchParams();
+
+	Object.entries(params || {}).forEach(([key, value]) => {
+		if (value !== undefined) {
+			normalizedParams.append(key, value === null ? "null" : String(value));
+		}
+	});
+
+	const stringifiedParams = normalizedParams.toString();
+
+	return stringifiedParams.length > 0
+		? `/api/v1/issues/ack?${stringifiedParams}`
+		: `/api/v1/issues/ack`;
+};
+
+/**
+ * Undo an acknowledgement: the issue counts and alerts again.
+ * @summary Unack
+ */
+export const issuesUnack = async (
+	params: IssuesUnackParams,
+	options?: Parameters<typeof apiFetch>[1],
+): Promise<void> => {
+	return apiFetch<void>(getIssuesUnackUrl(params), {
+		...options,
+		method: "DELETE",
+	});
+};
+
+export const getIssuesUnackMutationKey = () => ["issuesUnack"] as const;
+
+export const getIssuesUnackMutationOptions = <
+	TError = ErrorType<HTTPValidationError>,
+	TContext = unknown,
+>(options?: {
+	mutation?: UseMutationOptions<
+		Awaited<ReturnType<typeof issuesUnack>>,
+		TError,
+		IssuesUnackMutationVariables,
+		TContext
+	>;
+	request?: SecondParameter<typeof apiFetch>;
+}): UseMutationOptions<
+	Awaited<ReturnType<typeof issuesUnack>>,
+	TError,
+	IssuesUnackMutationVariables,
+	TContext
+> => {
+	const mutationKey = getIssuesUnackMutationKey();
+	const { mutation: mutationOptions, request: requestOptions } = options
+		? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+			? options
+			: { ...options, mutation: { ...options.mutation, mutationKey } }
+		: { mutation: { mutationKey }, request: undefined };
+
+	const mutationFn: MutationFunction<
+		Awaited<ReturnType<typeof issuesUnack>>,
+		IssuesUnackMutationVariables
+	> = (props) => {
+		const { params } = props ?? {};
+
+		return issuesUnack(params, requestOptions);
+	};
+
+	return { mutationFn, ...mutationOptions };
+};
+
+export type IssuesUnackMutationResult = NonNullable<Awaited<ReturnType<typeof issuesUnack>>>;
+
+export type IssuesUnackMutationError = ErrorType<HTTPValidationError>;
+export type IssuesUnackMutationVariables = { params: IssuesUnackParams };
+
+/**
+ * @summary Unack
+ */
+export const useIssuesUnack = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+	options?: {
+		mutation?: UseMutationOptions<
+			Awaited<ReturnType<typeof issuesUnack>>,
+			TError,
+			IssuesUnackMutationVariables,
+			TContext
+		>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseMutationResult<
+	Awaited<ReturnType<typeof issuesUnack>>,
+	TError,
+	IssuesUnackMutationVariables,
+	TContext
+> => {
+	return useMutation(getIssuesUnackMutationOptions(options), queryClient);
+};
+export const getIssuesAckUrl = () => {
+	return `/api/v1/issues/ack`;
+};
+
+/**
+ * Acknowledge a current issue: it stays listed but is not counted or sent to Telegram until the ack ends.
+ * @summary Ack
+ */
+export const issuesAck = async (
+	ackIn: AckIn,
+	options?: Parameters<typeof apiFetch>[1],
+): Promise<AckOut> => {
+	const getHeaders = (
+		h?: NonNullable<RequestInit["headers"]>,
+	): Record<string, string | readonly string[]> => {
+		if (!h) return {};
+		if (h instanceof Headers) return Object.fromEntries(h.entries());
+		if (Symbol.iterator in h) {
+			return Object.fromEntries(
+				Array.from(
+					h as Iterable<Iterable<string>>,
+					(entry) => Array.from(entry) as [string, string],
+				),
+			);
+		}
+		const headers: Record<string, string | readonly string[]> = {};
+		for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+			if (value !== undefined) headers[name] = value;
+		}
+		return headers;
+	};
+	return apiFetch<AckOut>(getIssuesAckUrl(), {
+		...options,
+		method: "POST",
+		headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+		body: JSON.stringify(ackIn),
+	});
+};
+
+export const getIssuesAckMutationKey = () => ["issuesAck"] as const;
+
+export const getIssuesAckMutationOptions = <
+	TError = ErrorType<HTTPValidationError>,
+	TContext = unknown,
+>(options?: {
+	mutation?: UseMutationOptions<
+		Awaited<ReturnType<typeof issuesAck>>,
+		TError,
+		IssuesAckMutationVariables,
+		TContext
+	>;
+	request?: SecondParameter<typeof apiFetch>;
+}): UseMutationOptions<
+	Awaited<ReturnType<typeof issuesAck>>,
+	TError,
+	IssuesAckMutationVariables,
+	TContext
+> => {
+	const mutationKey = getIssuesAckMutationKey();
+	const { mutation: mutationOptions, request: requestOptions } = options
+		? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+			? options
+			: { ...options, mutation: { ...options.mutation, mutationKey } }
+		: { mutation: { mutationKey }, request: undefined };
+
+	const mutationFn: MutationFunction<
+		Awaited<ReturnType<typeof issuesAck>>,
+		IssuesAckMutationVariables
+	> = (props) => {
+		const { data } = props ?? {};
+
+		return issuesAck(data, requestOptions);
+	};
+
+	return { mutationFn, ...mutationOptions };
+};
+
+export type IssuesAckMutationResult = NonNullable<Awaited<ReturnType<typeof issuesAck>>>;
+export type IssuesAckMutationBody = AckIn;
+export type IssuesAckMutationError = ErrorType<HTTPValidationError>;
+export type IssuesAckMutationVariables = { data: AckIn };
+
+/**
+ * @summary Ack
+ */
+export const useIssuesAck = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+	options?: {
+		mutation?: UseMutationOptions<
+			Awaited<ReturnType<typeof issuesAck>>,
+			TError,
+			IssuesAckMutationVariables,
+			TContext
+		>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseMutationResult<
+	Awaited<ReturnType<typeof issuesAck>>,
+	TError,
+	IssuesAckMutationVariables,
+	TContext
+> => {
+	return useMutation(getIssuesAckMutationOptions(options), queryClient);
+};
 export const getIssuesHistoryUrl = (params?: IssuesHistoryParams) => {
 	const normalizedParams = new URLSearchParams();
 

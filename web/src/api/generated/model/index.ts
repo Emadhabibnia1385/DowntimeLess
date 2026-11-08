@@ -5,6 +5,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./ackBrief";
+export * from "./ackIn";
+export * from "./ackInMode";
+export * from "./ackOut";
 export * from "./agentsOutdated";
 export * from "./appFeaturesReportsSchemasPeakDay";
 export * from "./appFeaturesTrafficRouterPeakDay";
@@ -65,6 +69,7 @@ export * from "./issuesHistory";
 export * from "./issuesHistoryParams";
 export * from "./issueSummary";
 export * from "./issueSummaryEvidence";
+export * from "./issuesUnackParams";
 export * from "./jobCreate";
 export * from "./jobCreateArgs";
 export * from "./jobDone";

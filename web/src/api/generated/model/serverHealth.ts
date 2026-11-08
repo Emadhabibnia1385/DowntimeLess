@@ -8,6 +8,7 @@ import type { Gate } from "./gate";
 import type { Penalty } from "./penalty";
 
 export interface ServerHealth {
+	acked_issues?: number;
 	band: string;
 	category_id: number | null;
 	country: string | null;

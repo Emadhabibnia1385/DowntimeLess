@@ -7,6 +7,12 @@
 import type { IssueEvidence } from "./issueEvidence";
 
 export interface Issue {
+	ack_mode?: string | null;
+	ack_note?: string | null;
+	acked?: boolean;
+	acked_at?: number | null;
+	acked_by?: string | null;
+	acked_until?: number | null;
 	code: string;
 	evidence: IssueEvidence;
 	id: string;

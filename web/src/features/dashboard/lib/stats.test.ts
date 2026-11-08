@@ -36,6 +36,12 @@ describe("issues", () => {
 		expect(counts).toEqual({ critical: 1, warning: 0, info: 2, total: 3 });
 	});
 
+	it("does not count acknowledged issues", () => {
+		const known = { ...issue("d", "critical"), acked: true } as Issue;
+		const counts = issueCounts([issue("a", "warning"), known]);
+		expect(counts).toEqual({ critical: 0, warning: 1, info: 0, total: 1 });
+	});
+
 	it("takes the earliest start of an open incident and ignores closed ones", () => {
 		const since = openSince([
 			{ key: "a", opened_at: 50, closed_at: null },

@@ -1,3 +1,4 @@
+export { AckButton, splitAcked } from "./acks";
 export { IssuesPage } from "./components/IssuesPage";
 export { ServerLabel } from "./components/ServerLabel";
 export { useHistory, useIssues } from "./api";

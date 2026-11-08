@@ -2,12 +2,13 @@ import { DataTable, EmptyState, StatusChip } from "@nyxon/nasim";
 import { Link } from "@tanstack/react-router";
 import type { Issue } from "@/api/generated/model";
 import { formatNumber, t } from "@/strings";
+import { AckButton } from "../acks";
 import { type GroupItem, groupIssues, type IssueGroup } from "../lib/group";
 
 const TONES = { critical: "danger", warning: "warning", info: "info" } as const;
 const LABELS: Record<string, string> = t.severity;
 
-function ServerLine({ item }: { item: GroupItem }) {
+function ServerLine({ item, title }: { item: GroupItem; title: string }) {
 	const name =
 		item.to === "server" && item.serverId !== null ? (
 			<Link
@@ -39,7 +40,10 @@ function ServerLine({ item }: { item: GroupItem }) {
 					/>
 				) : null}
 			</span>
-			<span className="tabular-nums text-muted">{item.value || t.common.none}</span>
+			<span className="flex items-center gap-2">
+				<span className="tabular-nums text-muted">{item.value || t.common.none}</span>
+				<AckButton target={{ key: item.id, title, server: item.serverName }} />
+			</span>
 		</li>
 	);
 }
@@ -73,7 +77,7 @@ export function IssueTable({ issues }: { issues: readonly Issue[] }) {
 					cell: (group) => (
 						<ul className="flex min-w-60 flex-col text-sm">
 							{group.items.map((item) => (
-								<ServerLine key={item.id} item={item} />
+								<ServerLine key={item.id} item={item} title={group.title} />
 							))}
 						</ul>
 					),

@@ -1,6 +1,14 @@
 import { EmptyState, StaticTable, StatusChip } from "@nyxon/nasim";
 import type { Issue } from "@/api/generated/model";
-import { ServerLabel, severityTone, useHistory, useIssues } from "@/features/issues";
+import {
+	AckButton,
+	ServerLabel,
+	severityTone,
+	splitAcked,
+	useHistory,
+	useIssues,
+} from "@/features/issues";
+import { useCanCheck } from "@/features/auth/session";
 import { useServers } from "@/features/servers";
 import { flagOf, formatDateTime, formatDuration, formatNumber, t } from "@/strings";
 import { openSince, secondsSince, sortIssues } from "../lib/stats";
@@ -24,6 +32,7 @@ export function IssuesCard() {
 	const issues = useIssues();
 	const history = useHistory("24h");
 	const servers = useServers();
+	const canAck = useCanCheck();
 	const flags = new Map((servers.data ?? []).map((server) => [server.id, flagOf(server.country)]));
 	const since = openSince(history.data?.incidents ?? []);
 	const row = (issue: Issue) => ({
@@ -45,6 +54,14 @@ export function IssuesCard() {
 				{issue.title}
 			</span>,
 			<OpenFor key="open" since={since.get(issue.id)} />,
+			...(canAck
+				? [
+						<AckButton
+							key="ack"
+							target={{ key: issue.id, title: issue.title, server: issue.server_name ?? "" }}
+						/>,
+					]
+				: []),
 		],
 	});
 	return (
@@ -55,22 +72,35 @@ export function IssuesCard() {
 			linkLabel={COPY.all}
 			query={issues}
 		>
-			{(items) => {
+			{(all) => {
+				const { open: items, acked } = splitAcked(all);
+				const known = acked.length ? (
+					<p className="text-xs text-muted">
+						{t.issueAcks.onDashboard(formatNumber(acked.length))}
+					</p>
+				) : null;
 				if (items.length === 0) {
-					return <EmptyState title={COPY.emptyTitle} description={COPY.empty} />;
+					return (
+						<div className="flex flex-col gap-3">
+							<EmptyState title={COPY.emptyTitle} description={COPY.empty} />
+							{known}
+						</div>
+					);
 				}
 				const shown = sortIssues(items, since).slice(0, SHOWN);
+				const columns = [COPY.severity, COPY.server, COPY.problem, COPY.openFor];
 				return (
 					<div className="flex flex-col gap-3">
 						<StaticTable
 							caption={COPY.tableLabel}
 							className={COMPACT_TABLE}
-							columns={[COPY.severity, COPY.server, COPY.problem, COPY.openFor]}
+							columns={canAck ? [...columns, t.issueAcks.actionColumn] : columns}
 							rows={shown.map(row)}
 						/>
 						{items.length > SHOWN ? (
 							<p className="text-xs text-muted">{COPY.more(formatNumber(items.length - SHOWN))}</p>
 						) : null}
+						{known}
 					</div>
 				);
 			}}

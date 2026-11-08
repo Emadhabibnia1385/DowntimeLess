@@ -13,9 +13,16 @@ export const OverviewIssuesHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const overviewIssuesResponseAckedDefault = false;
 export const overviewIssuesResponseRecent24hDefault = 0;
 
 export const OverviewIssuesResponseItem = zod.object({
+	ack_mode: zod.union([zod.string(), zod.null()]).optional(),
+	ack_note: zod.union([zod.string(), zod.null()]).optional(),
+	acked: zod.boolean().default(overviewIssuesResponseAckedDefault),
+	acked_at: zod.union([zod.int(), zod.null()]).optional(),
+	acked_by: zod.union([zod.string(), zod.null()]).optional(),
+	acked_until: zod.union([zod.int(), zod.null()]).optional(),
 	code: zod.string(),
 	evidence: zod.record(zod.string(), zod.unknown()),
 	id: zod.string(),

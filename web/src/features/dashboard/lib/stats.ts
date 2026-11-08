@@ -23,13 +23,15 @@ export function fleetAverages(servers: readonly ServerOut[]): Averages {
 
 export type IssueCounts = { critical: number; warning: number; info: number; total: number };
 
+/** Acknowledged issues are known to the team, so they are not counted. */
 export function issueCounts(issues: readonly Issue[]): IssueCounts {
-	const count = (severity: string) => issues.filter((issue) => issue.severity === severity).length;
+	const open = issues.filter((issue) => !issue.acked);
+	const count = (severity: string) => open.filter((issue) => issue.severity === severity).length;
 	return {
 		critical: count("critical"),
 		warning: count("warning"),
 		info: count("info"),
-		total: issues.length,
+		total: open.length,
 	};
 }
 

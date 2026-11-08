@@ -352,6 +352,18 @@ describe("DashboardPage", () => {
 		expect(within(rows[3]).getByText("اطلاع")).toBeTruthy();
 	});
 
+	it("leaves acknowledged issues out of the tile and the card, with a note and an ack button", async () => {
+		const known = issue("e", "critical", { acked: true, ack_mode: "always", server_name: "ir-4" });
+		open("/", { ...full, issues: [...issues, known] });
+		const table = await screen.findByRole("region", { name: "جدول مشکل‌های باز" });
+		await waitFor(() => expect(within(tile("مشکل‌های باز")).getByText("۴")).toBeTruthy());
+		expect(within(tile("مشکل‌های باز")).getByText("۱ بحرانی، ۲ هشدار، ۱ اطلاع")).toBeTruthy();
+		expect(within(table).getAllByRole("row").slice(1)).toHaveLength(4);
+		expect(within(table).queryByText("ir-4")).toBeNull();
+		expect(screen.getByText("۱ مشکل پذیرفته‌شده در صفحهٔ مشکلات")).toBeTruthy();
+		expect(within(table).getAllByRole("button", { name: /^پذیرفتن/ })).toHaveLength(4);
+	});
+
 	it("lists the problems that came back in 24 hours", async () => {
 		open("/");
 		const table = await screen.findByRole("region", { name: "جدول مشکل‌های ناپایدار در ۲۴ ساعت" });

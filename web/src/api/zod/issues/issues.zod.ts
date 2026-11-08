@@ -7,6 +7,49 @@
 import * as zod from "zod";
 
 /**
+ * Undo an acknowledgement: the issue counts and alerts again.
+ * @summary Unack
+ */
+export const IssuesUnackQueryParams = zod.object({
+	key: zod.string(),
+});
+
+export const IssuesUnackHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const IssuesUnackResponse = zod.void();
+
+/**
+ * Acknowledge a current issue: it stays listed but is not counted or sent to Telegram until the ack ends.
+ * @summary Ack
+ */
+export const IssuesAckHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const issuesAckBodyKeyMax = 200;
+
+export const issuesAckBodyModeDefault = `until_resolved`;
+export const issuesAckBodyNoteDefault = ``;
+export const issuesAckBodyNoteMax = 200;
+
+export const IssuesAckBody = zod.object({
+	key: zod.string().min(1).max(issuesAckBodyKeyMax),
+	mode: zod.enum(["until_resolved", "24h", "7d", "always"]).default(issuesAckBodyModeDefault),
+	note: zod.string().max(issuesAckBodyNoteMax).default(issuesAckBodyNoteDefault),
+});
+
+export const IssuesAckResponse = zod.object({
+	created_at: zod.int(),
+	key: zod.string(),
+	mode: zod.string(),
+	note: zod.union([zod.string(), zod.null()]),
+	severity: zod.string(),
+	until: zod.union([zod.int(), zod.null()]),
+});
+
+/**
  * Every issue that was active during the range, with how often and how long, and each separate occurrence.
  * @summary History
  */

@@ -58,7 +58,24 @@ export const ReportsBriefingHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const reportsBriefingResponseAcknowledgedDefault = [];
+
 export const ReportsBriefingResponse = zod.object({
+	acknowledged: zod
+		.array(
+			zod.object({
+				by: zod.union([zod.string(), zod.null()]),
+				code: zod.string(),
+				mode: zod.union([zod.string(), zod.null()]),
+				note: zod.union([zod.string(), zod.null()]),
+				server: zod.union([zod.string(), zod.null()]),
+				server_id: zod.union([zod.int(), zod.null()]),
+				severity: zod.string(),
+				title: zod.string(),
+				until: zod.union([zod.int(), zod.null()]),
+			}),
+		)
+		.default(reportsBriefingResponseAcknowledgedDefault),
 	agents_outdated: zod.object({
 		latest: zod.union([zod.string(), zod.null()]),
 		servers: zod.array(zod.string()),
@@ -400,6 +417,8 @@ export const ReportsHealthHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const reportsHealthResponseServersItemAckedIssuesDefault = 0;
+
 export const ReportsHealthResponse = zod.object({
 	counts: zod.record(zod.string(), zod.int()),
 	description: zod.string(),
@@ -408,6 +427,7 @@ export const ReportsHealthResponse = zod.object({
 	quota_measured: zod.boolean(),
 	servers: zod.array(
 		zod.object({
+			acked_issues: zod.int().default(reportsHealthResponseServersItemAckedIssuesDefault),
 			band: zod.string(),
 			category_id: zod.union([zod.int(), zod.null()]),
 			country: zod.union([zod.string(), zod.null()]),

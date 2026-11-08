@@ -4,6 +4,7 @@
  * DowntimeLess
  * OpenAPI spec version: 0.1.0
  */
+import type { AckBrief } from "./ackBrief";
 import type { AgentsOutdated } from "./agentsOutdated";
 import type { CertRisk } from "./certRisk";
 import type { ChangeBrief } from "./changeBrief";
@@ -17,6 +18,7 @@ import type { RecurringBrief } from "./recurringBrief";
 import type { TrafficBrief } from "./trafficBrief";
 
 export interface Briefing {
+	acknowledged?: AckBrief[];
 	agents_outdated: AgentsOutdated;
 	certs_at_risk: CertRisk[];
 	changes_24h: ChangeBrief[];

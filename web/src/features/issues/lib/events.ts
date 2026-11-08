@@ -59,6 +59,13 @@ export function describeEvent(event: EventOut): string {
 			return W.issue_opened(text(d.code));
 		case "issue_closed":
 			return W.issue_closed(text(d.code));
+		case "issue_acked":
+			return W.issue_acked(
+				text(d.code),
+				(t.issueAcks.modes as Record<string, string>)[text(d.mode)] ?? text(d.mode),
+			);
+		case "issue_unacked":
+			return W.issue_unacked(text(d.key));
 		case "rebooted":
 			return W.rebooted;
 		case "resized":
