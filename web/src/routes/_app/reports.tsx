@@ -1,23 +1,15 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { isReportsTab, ReportsPage, type ReportsTab } from "@/features/reports";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// The reports page moved into the issues page; an old bookmark lands on the matching tab.
 export const Route = createFileRoute("/_app/reports")({
-	// The open tab lives in the address so a reload or a shared link keeps it.
-	validateSearch: (search: Record<string, unknown>): { tab?: Exclude<ReportsTab, "ai"> } => ({
-		tab: isReportsTab(search.tab) && search.tab !== "ai" ? search.tab : undefined,
+	validateSearch: (search: Record<string, unknown>): { tab?: "changes" } => ({
+		tab: search.tab === "changes" ? "changes" : undefined,
 	}),
-	component: ReportsRoute,
+	beforeLoad: ({ search }) => {
+		throw redirect({
+			to: "/issues",
+			search: { tab: search.tab === "changes" ? "changes" : "health" },
+			replace: true,
+		});
+	},
 });
-
-function ReportsRoute() {
-	const { tab } = Route.useSearch();
-	const navigate = useNavigate({ from: Route.fullPath });
-	return (
-		<ReportsPage
-			tab={tab ?? "ai"}
-			onTabChange={(next) =>
-				void navigate({ search: { tab: next === "ai" ? undefined : next }, replace: true })
-			}
-		/>
-	);
-}

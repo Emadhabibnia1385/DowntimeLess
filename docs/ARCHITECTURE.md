@@ -121,6 +121,8 @@ Everything the panel shows comes from the same JSON API. A program (Claude, a sc
 Everything is computed on the master from data it already holds, so an assistant reads one document instead of gathering
 facts itself. All endpoints are `GET`, viewer or `read` key, JSON by default and dense Markdown with `?format=md`; windows are
 unix seconds (`since`/`until`, at most 366 days, error `window.invalid`). `/llms.txt` tells an assistant to start at the briefing.
+The panel has no reports page: it shows only the health scores and the change log, as the «سلامت» and «تغییرات» tabs of the
+Issues page (`/issues?tab=health|changes`; the old `/reports` address redirects there). Briefing and playbooks are for agents only.
 
 | Path | What |
 | --- | --- |

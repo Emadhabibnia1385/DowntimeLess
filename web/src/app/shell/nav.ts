@@ -8,7 +8,6 @@ import {
 	PingIcon,
 	ServerIcon,
 	ShieldIcon,
-	TableIcon,
 	UsersIcon,
 } from "@/shared/icons";
 import { t } from "@/strings";
@@ -22,7 +21,6 @@ export type NavItem = {
 		| "/issues"
 		| "/ping-matrix"
 		| "/traffic"
-		| "/reports"
 		| "/ssl"
 		| "/api-keys"
 		| "/members"
@@ -40,7 +38,6 @@ export const NAV: readonly NavItem[] = [
 	{ to: "/issues", label: t.nav.issues, icon: IssuesIcon, primary: true },
 	{ to: "/ping-matrix", label: t.nav.pingMatrix, icon: PingIcon, primary: true },
 	{ to: "/traffic", label: t.nav.traffic, icon: ChartIcon, primary: true },
-	{ to: "/reports", label: t.nav.reports, icon: TableIcon },
 	{ to: "/ssl", label: t.nav.ssl, icon: ShieldIcon },
 	{ to: "/api-keys", label: t.nav.apiKeys, icon: KeyIcon, ownerOnly: true },
 	{ to: "/members", label: t.nav.members, icon: UsersIcon, ownerOnly: true },

@@ -9,3 +9,11 @@ export {
 	isHistoryRange,
 	isIssuesTab,
 } from "./lib/tabs";
+export {
+	DEFAULT_FILTERS,
+	filtersToSearch,
+	type IssuesFilters,
+	isBand,
+	isEventKind,
+	isPeriod,
+} from "./lib/tabs";
