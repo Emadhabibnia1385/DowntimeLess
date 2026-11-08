@@ -5,9 +5,18 @@ export type Usage = { percent: string; detail: string | null };
 
 const MB_PER_GB = 1024;
 
+/** "۷۵٪" and, when the agent reports its cores, "۳ از ۴" (busy of total) under it. */
 export function cpuUsage(latest: Latest): Usage | null {
 	if (latest.cpu_pct == null) return null;
-	return { percent: formatPercent(latest.cpu_pct), detail: null };
+	const { cpu_cores: cores } = latest;
+	const busy = cores ? Math.round(((latest.cpu_pct * cores) / 100) * 10) / 10 : null;
+	return {
+		percent: formatPercent(latest.cpu_pct),
+		detail:
+			cores && busy != null
+				? t.servers.coresOf(formatDecimal(busy), formatDecimal(cores, 0))
+				: null,
+	};
 }
 
 export function ramUsage(latest: Latest): Usage | null {

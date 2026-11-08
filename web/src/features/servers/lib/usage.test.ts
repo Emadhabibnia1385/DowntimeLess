@@ -6,12 +6,13 @@ const latest = (over: Partial<Latest>): Latest =>
 	({ failed_units: [], reboot_required: false, ...over }) as Latest;
 
 describe("usage", () => {
-	it("gives the CPU as a percent only, with or without cores reported", () => {
-		for (const over of [{ cpu_pct: 75 }, { cpu_pct: 75, cpu_cores: 4 }]) {
-			const u = cpuUsage(latest(over));
-			expect(u?.percent).toContain("۷۵");
-			expect(u?.detail).toBeNull();
-		}
+	it("gives the busy cores out of the total, bare, when the agent reports them", () => {
+		const u = cpuUsage(latest({ cpu_pct: 55, cpu_cores: 4 }));
+		expect(u?.percent).toContain("۵۵");
+		expect(u?.detail).toBe("۲٫۲ از ۴");
+	});
+	it("gives only the percent while the agent does not send cores", () => {
+		expect(cpuUsage(latest({ cpu_pct: 10 }))?.detail).toBeNull();
 		expect(cpuUsage(latest({}))).toBeNull();
 	});
 	it("shows used and total gigabytes for memory and disk", () => {
