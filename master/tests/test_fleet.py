@@ -154,3 +154,17 @@ def test_only_iran_relays_measure_and_only_towards_foreign_servers(owner):
     assert {(c["from_name"], c["to_name"]) for c in cells} == {("iran-1", "de-1"), ("iran-1", "nl-1")}
     pings = [i for i in owner.get("/api/v1/issues").json() if i["code"].startswith("ping:")]
     assert [i["evidence"]["to"] for i in pings] == ["nl-1"]
+
+
+def test_old_agents_may_run_self_update_at_read_but_nothing_else(owner):
+    sid, key = make_server(owner)
+    assert owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": "self_update"}).status_code == 201
+    res = report(owner, key).json()
+    assert [j["kind"] for j in res["jobs"]] == ["self_update"] and res["permission"] == "safe"
+    # the stored level is untouched, and a batch with any other kind keeps it
+    assert owner.get("/api/v1/servers/%d" % sid).json()["permission"] == "read"
+    owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": "self_update"})
+    owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": "ping", "args": {"target": "127.0.0.1"}})
+    mixed = report(owner, key).json()
+    assert len(mixed["jobs"]) == 2 and mixed["permission"] == "read"
+    assert report(owner, key).json()["permission"] == "read"

@@ -68,4 +68,7 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
     jobs = [{"id": r["id"], "kind": r["kind"], "args": json.loads(r["args"])} for r in db.execute("SELECT * FROM jobs WHERE server_id=? AND status='queued' ORDER BY id", (sid,))]
     if jobs:
         db.execute("UPDATE jobs SET status='sent' WHERE server_id=? AND status='queued'", (sid,))
-    return {"interval_s": get_settings().interval_s, "permission": server["permission"], "ping_targets": targets, "jobs": jobs}
+    permission = server["permission"]
+    if jobs and all(j["kind"] == "self_update" for j in jobs) and permission == "read":
+        permission = "safe"  # agents before 0.2.3 still refuse self_update at 'read'; the master already allows it
+    return {"interval_s": get_settings().interval_s, "permission": permission, "ping_targets": targets, "jobs": jobs}

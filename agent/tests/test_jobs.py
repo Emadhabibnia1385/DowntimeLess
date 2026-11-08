@@ -61,7 +61,7 @@ def test_unknown_kinds_are_rejected_even_with_full_permission(kind, monkeypatch)
     assert rec.calls == []
 
 
-@pytest.mark.parametrize("kind", ["apt_upgrade_safe", "reboot", "self_update"])
+@pytest.mark.parametrize("kind", ["apt_upgrade_safe", "reboot"])
 @pytest.mark.parametrize("permission", ["none", "readonly", "", "FULL", None])
 def test_mutating_jobs_need_safe_or_full(kind, permission, monkeypatch, master):
     rec = Recorder()
@@ -69,6 +69,17 @@ def test_mutating_jobs_need_safe_or_full(kind, permission, monkeypatch, master):
     res = agent.run_job(job(kind), state(permission, master.url))
     assert res["status"] == "rejected"
     assert rec.calls == [] and master.requests == []
+
+
+@pytest.mark.parametrize("permission", ["none", "read", "", None])
+def test_self_update_needs_no_permission_level(permission, tmp_path, monkeypatch, master):
+    target = tmp_path / "agent.py"
+    target.write_text("old")
+    monkeypatch.setattr(agent, "SELF_PATH", str(target))
+    with open(AGENT_SRC, "rb") as f:
+        master.agent_source = f.read()
+    res = agent.run_job(job("self_update"), state(permission, master.url))
+    assert res["status"] == "ok" and target.read_bytes() == master.agent_source
 
 
 def test_readonly_jobs_do_not_need_permission(master):

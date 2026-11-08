@@ -19,7 +19,7 @@ import time
 import urllib.parse
 import urllib.request
 
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 UA = "DowntimeLess-Agent/" + VERSION
 SELF_PATH = os.path.realpath(__file__)
 GEO_URLS = ("https://ipinfo.io/json", "https://ipwho.is/")
@@ -28,7 +28,8 @@ GEO_RETRY_S = 900
 SSL_TTL_S = 1800
 CERT_GLOBS = ("/etc/letsencrypt/live/*/cert.pem", "/root/.acme.sh/*/*.cer")
 ACME_SKIP = ("ca.cer", "fullchain.cer")
-MUTATING = ("apt_upgrade_safe", "reboot", "self_update")
+# self_update only swaps this file for the master's copy, so it needs no permission level (the master agrees)
+MUTATING = ("apt_upgrade_safe", "reboot")
 HOLD_PKGS = ("docker-ce", "docker-ce-cli", "containerd.io", "docker-compose-plugin", "docker-buildx-plugin")
 # Hold only what is not held already, and release only our own holds afterwards.
 APT_SCRIPT = """
