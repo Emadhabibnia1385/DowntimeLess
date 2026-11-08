@@ -1,1 +1,0 @@
-import{S as e,T as t,rr as n,yn as r}from"./useDocumentTitle-Dn_1o-MA.js";var i=n();function a({query:n,children:a,skeleton:o=(0,i.jsx)(e,{})}){return n.isPending?o:n.isError?(0,i.jsx)(t,{message:r(n.error),onRetry:()=>void n.refetch()}):a(n.data)}export{a as t};
