@@ -104,13 +104,28 @@ def test_only_ipv4_is_kept_as_the_public_ip(owner):
     assert owner.get("/api/v1/servers/%d" % sid).json()["public_ip"] == "203.0.113.5"
 
 
-def test_fleet_defaults_to_emad_and_can_change(owner):
-    r = owner.post("/api/v1/servers", json={"name": "f", "role": "exit", "fleet": "mobin"})
-    assert r.json()["server"]["fleet"] == "mobin"
+def test_categories_are_free_and_a_server_may_have_none(owner):
+    cat = owner.post("/api/v1/categories", json={"name": "نیکسون"})
+    assert cat.status_code == 201 and cat.json()["server_count"] == 0
+    cid = cat.json()["id"]
+    assert owner.post("/api/v1/categories", json={"name": "نیکسون"}).json()["code"] == "category.exists"
+    r = owner.post("/api/v1/servers", json={"name": "c", "category_id": cid})
     sid = r.json()["server"]["id"]
-    assert owner.patch("/api/v1/servers/%d" % sid, json={"fleet": "shared"}).json()["fleet"] == "shared"
-    assert owner.post("/api/v1/servers", json={"name": "g"}).json()["server"]["fleet"] == "emad"
-    assert owner.post("/api/v1/servers", json={"name": "h", "fleet": "x"}).status_code == 422
+    assert r.json()["server"]["category_id"] == cid
+    assert owner.post("/api/v1/servers", json={"name": "d"}).json()["server"]["category_id"] is None
+    assert owner.get("/api/v1/categories").json()[-1]["server_count"] == 1
+    assert owner.patch("/api/v1/servers/%d" % sid, json={"category_id": None}).json()["category_id"] is None
+    assert owner.patch("/api/v1/servers/%d" % sid, json={"category_id": cid}).json()["category_id"] == cid
+    assert owner.patch("/api/v1/servers/%d" % sid, json={"alias": "x"}).json()["category_id"] == cid
+    assert owner.patch("/api/v1/servers/%d" % sid, json={"category_id": 9999}).json()["code"] == "category.not_found"
+
+
+def test_deleting_a_category_keeps_its_servers(owner):
+    cid = owner.post("/api/v1/categories", json={"name": "موقت"}).json()["id"]
+    sid = owner.post("/api/v1/servers", json={"name": "k", "category_id": cid}).json()["server"]["id"]
+    assert owner.patch("/api/v1/categories/%d" % cid, json={"name": "دائمی"}).json()["name"] == "دائمی"
+    assert owner.delete("/api/v1/categories/%d" % cid).status_code == 204
+    assert owner.get("/api/v1/servers/%d" % sid).json()["category_id"] is None
 
 
 def test_latest_carries_cores_and_totals(owner):

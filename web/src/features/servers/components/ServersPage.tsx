@@ -2,6 +2,7 @@ import { Button, type DataColumn, DataTable, FilterChips, PageHeader } from "@ny
 import { type ReactNode, useMemo, useState } from "react";
 import type { ServerOut } from "@/api/generated/model";
 import { useCanManage } from "@/features/auth";
+import { CategoryManager, useCategories } from "@/features/categories";
 import { AddIcon } from "@/shared/icons";
 import { useDocumentTitle } from "@/shared/useDocumentTitle";
 import { formatNumber, formatPercent, t } from "@/strings";
@@ -40,7 +41,8 @@ const usageCell = (usage: Usage | null): ReactNode =>
 		t.common.none
 	);
 
-const FLEET_FILTERS = ["all", "emad", "mobin", "shared"] as const;
+const ALL = "all";
+const NONE = "none";
 
 export function ServersPage() {
 	useDocumentTitle(t.servers.title);
@@ -48,13 +50,33 @@ export function ServersPage() {
 	const canManage = useCanManage();
 	const [adding, setAdding] = useState(false);
 	const [sort, setSort] = useState<SortState>(null);
-	const [fleet, setFleet] = useState<string>("all");
+	const categories = useCategories();
+	const [managing, setManaging] = useState(false);
+	const [filter, setFilter] = useState<string>(ALL);
+	const names = useMemo(
+		() => new Map((categories.data ?? []).map((category) => [category.id, category.name])),
+		[categories.data],
+	);
+	const hasUncategorized = (servers.data ?? []).some((server) => server.category_id == null);
+	const options = [
+		{ value: ALL, label: t.categories.filterAll },
+		...(categories.data ?? []).map((category) => ({
+			value: String(category.id),
+			label: category.name,
+		})),
+		...(hasUncategorized && names.size > 0 ? [{ value: NONE, label: t.categories.none }] : []),
+	];
+	const fleet = options.some((option) => option.value === filter) ? filter : ALL;
 	const onSort = (key: SortKey, first: SortDirection) =>
 		setSort((current) => nextSort(current, key, first));
 	const rows = useMemo(
 		() =>
 			sortServers(
-				(servers.data ?? []).filter((server) => fleet === "all" || server.fleet === fleet),
+				(servers.data ?? []).filter(
+					(server) =>
+						fleet === ALL ||
+						(fleet === NONE ? server.category_id == null : String(server.category_id) === fleet),
+				),
 				sort,
 			),
 		[servers.data, sort, fleet],
@@ -75,7 +97,11 @@ export function ServersPage() {
 			cell: (server) => (
 				<div className="flex flex-col items-start gap-1">
 					<ServerStatusChip status={server.status} />
-					<span className="text-xs text-muted">{roleLabel(server.role)}</span>
+					<span className="text-xs text-muted">
+						{[roleLabel(server.role), names.get(server.category_id ?? -1)]
+							.filter(Boolean)
+							.join(" · ")}
+					</span>
 				</div>
 			),
 		},
@@ -130,10 +156,6 @@ export function ServersPage() {
 				]
 			: []),
 	];
-	const filterOptions = FLEET_FILTERS.map((value) => ({
-		value,
-		label: value === "all" ? t.servers.filterAll : t.servers.fleets[value],
-	}));
 	return (
 		<div className="flex flex-col gap-6">
 			<PageHeader
@@ -151,12 +173,19 @@ export function ServersPage() {
 					) : undefined
 				}
 			/>
-			<FilterChips
-				label={t.servers.filterLabel}
-				value={fleet}
-				onChange={setFleet}
-				options={filterOptions}
-			/>
+			<div className="flex flex-wrap items-center justify-between gap-3">
+				<FilterChips
+					label={t.categories.filterLabel}
+					value={fleet}
+					onChange={setFilter}
+					options={options}
+				/>
+				{canManage ? (
+					<Button variant="secondary" onPress={() => setManaging(true)}>
+						{t.categories.manage}
+					</Button>
+				) : null}
+			</div>
 			<DataTable
 				ariaLabel={t.servers.tableLabel}
 				columns={columns}
@@ -169,6 +198,7 @@ export function ServersPage() {
 				cards="md"
 			/>
 			<AddServerDialog isOpen={adding} onOpenChange={setAdding} />
+			<CategoryManager isOpen={managing} onOpenChange={setManaging} />
 		</div>
 	);
 }

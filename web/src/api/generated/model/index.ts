@@ -5,6 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./categoryBody";
+export * from "./categoryOut";
 export * from "./domainCreate";
 export * from "./enrollRequest";
 export * from "./enrollResult";

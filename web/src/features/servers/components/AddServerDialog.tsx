@@ -4,6 +4,7 @@ import type { ServerCreated } from "@/api/generated/model";
 import { useServersCreate } from "@/api/generated/servers/servers";
 import { useRefreshAll } from "@/shared/useRefreshAll";
 import { t } from "@/strings";
+import { NO_CATEGORY, toServerPayload } from "../lib/category";
 import { InstallCommand } from "./InstallCommand";
 import { ServerForm } from "./ServerForm";
 
@@ -44,10 +45,10 @@ export function AddServerDialog({
 				<InstallCommand serverId={created.server.id} command={created.install_command} />
 			) : (
 				<ServerForm
-					defaults={{ name: "", alias: "", fleet: "emad", role: "exit" }}
+					defaults={{ name: "", alias: "", category: NO_CATEGORY, role: "exit" }}
 					submitLabel={t.servers.create}
 					error={create.error}
-					onSubmit={(values) => create.mutate({ data: values })}
+					onSubmit={(values) => create.mutate({ data: toServerPayload(values) })}
 				/>
 			)}
 		</Modal>

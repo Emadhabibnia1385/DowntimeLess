@@ -15,6 +15,12 @@ from .schemas import JobCreate, JobOut, MetricsOut, ServerCreate, ServerCreated,
 router = APIRouter(prefix="/servers", tags=["servers"])
 
 
+def _category(db: sqlite3.Connection, category_id):
+    if category_id is not None and not db.execute("SELECT 1 FROM categories WHERE id=?", (category_id,)).fetchone():
+        raise DLError("category.not_found")
+    return category_id
+
+
 def _row(db: sqlite3.Connection, server_id: int) -> sqlite3.Row:
     row = db.execute("SELECT * FROM servers WHERE id=?", (server_id,)).fetchone()
     if not row:
@@ -24,7 +30,7 @@ def _row(db: sqlite3.Connection, server_id: int) -> sqlite3.Row:
 
 @router.get("", response_model=List[ServerOut], operation_id="servers_list")
 def list_servers(_: Actor = Depends(require("viewer")), db: sqlite3.Connection = Depends(get_db)):
-    return [svc.server_out(r) for r in db.execute("SELECT * FROM servers ORDER BY fleet, role, name")]
+    return [svc.server_out(r) for r in db.execute("SELECT * FROM servers ORDER BY role, name")]
 
 
 @router.post("", response_model=ServerCreated, status_code=201, operation_id="servers_create")
@@ -32,8 +38,8 @@ def create_server(body: ServerCreate, _: Actor = Depends(require("admin")), db: 
     token = new_token(24)
     cols = svc.role_columns(body.role)
     cur = db.execute(
-        "INSERT INTO servers (name, alias, role, panel_only, fleet, enroll_hash, created_at) VALUES (?,?,?,?,?,?,?)",
-        (body.name, body.alias, cols["role"], cols["panel_only"], body.fleet, digest(token), int(time.time())),
+        "INSERT INTO servers (name, alias, role, panel_only, category_id, enroll_hash, created_at) VALUES (?,?,?,?,?,?,?)",
+        (body.name, body.alias, cols["role"], cols["panel_only"], _category(db, body.category_id), digest(token), int(time.time())),
     )
     return {"server": svc.server_out(_row(db, cur.lastrowid)), "install_command": svc.install_command(token)}
 
@@ -55,6 +61,8 @@ def get_server(server_id: int, _: Actor = Depends(require("viewer")), db: sqlite
 def patch_server(server_id: int, body: ServerPatch, _: Actor = Depends(require("admin")), db: sqlite3.Connection = Depends(get_db)):
     _row(db, server_id)
     changes = body.model_dump(exclude_none=True)
+    if "category_id" in body.model_fields_set:
+        changes["category_id"] = _category(db, body.category_id)
     if "role" in changes:
         changes.update(svc.role_columns(changes["role"]))
     for field, value in changes.items():

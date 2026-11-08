@@ -80,7 +80,7 @@ def role_of(row: sqlite3.Row) -> str:
 
 
 def server_out(row: sqlite3.Row) -> Dict[str, Any]:
-    keys = ("id", "name", "alias", "fleet", "permission", "last_seen", "hostname", "public_ip", "country", "city", "org", "agent_version")
+    keys = ("id", "name", "alias", "category_id", "permission", "last_seen", "hostname", "public_ip", "country", "city", "org", "agent_version")
     return {
         **{k: row[k] for k in keys},
         "role": role_of(row),

@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field
 
 ROLES = "^(relay|exit|panel|panel_only|other)$"
 PERMS = "^(read|safe|full)$"
-FLEETS = "^(emad|mobin|shared)$"
 
 
 class Latest(BaseModel):
@@ -32,7 +31,7 @@ class ServerOut(BaseModel):
     name: str
     alias: str
     role: str
-    fleet: str = "emad"
+    category_id: Optional[int] = None
     permission: str
     status: str
     last_seen: Optional[int]
@@ -50,14 +49,14 @@ class ServerCreate(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     alias: str = Field(default="", max_length=64)
     role: str = Field(default="other", pattern=ROLES)
-    fleet: str = Field(default="emad", pattern=FLEETS)
+    category_id: Optional[int] = None
 
 
 class ServerPatch(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=64)
     alias: Optional[str] = Field(default=None, max_length=64)
     role: Optional[str] = Field(default=None, pattern=ROLES)
-    fleet: Optional[str] = Field(default=None, pattern=FLEETS)
+    category_id: Optional[int] = None  # null clears it; leave it out to keep it
     permission: Optional[str] = Field(default=None, pattern=PERMS)
 
 

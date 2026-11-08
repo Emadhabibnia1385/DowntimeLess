@@ -14,7 +14,6 @@ export const ServersListHeader = zod.object({
 });
 
 export const serversListResponseAgentOutdatedDefault = false;
-export const serversListResponseFleetDefault = `emad`;
 export const serversListResponseLatestFailedUnitsDefault = [];
 export const serversListResponseLatestRebootRequiredDefault = false;
 
@@ -22,9 +21,9 @@ export const ServersListResponseItem = zod.object({
 	agent_outdated: zod.boolean().default(serversListResponseAgentOutdatedDefault),
 	agent_version: zod.union([zod.string(), zod.null()]),
 	alias: zod.string(),
+	category_id: zod.union([zod.int(), zod.null()]).optional(),
 	city: zod.union([zod.string(), zod.null()]),
 	country: zod.union([zod.string(), zod.null()]),
-	fleet: zod.string().default(serversListResponseFleetDefault),
 	hostname: zod.union([zod.string(), zod.null()]),
 	id: zod.int(),
 	last_seen: zod.union([zod.int(), zod.null()]),
@@ -66,8 +65,6 @@ export const ServersCreateHeader = zod.object({
 export const serversCreateBodyAliasDefault = ``;
 export const serversCreateBodyAliasMax = 64;
 
-export const serversCreateBodyFleetDefault = `emad`;
-export const serversCreateBodyFleetRegExp = new RegExp("^(emad|mobin|shared)$");
 export const serversCreateBodyNameMax = 64;
 
 export const serversCreateBodyRoleDefault = `other`;
@@ -75,13 +72,12 @@ export const serversCreateBodyRoleRegExp = new RegExp("^(relay|exit|panel|panel_
 
 export const ServersCreateBody = zod.object({
 	alias: zod.string().max(serversCreateBodyAliasMax).default(serversCreateBodyAliasDefault),
-	fleet: zod.string().regex(serversCreateBodyFleetRegExp).default(serversCreateBodyFleetDefault),
+	category_id: zod.union([zod.int(), zod.null()]).optional(),
 	name: zod.string().min(1).max(serversCreateBodyNameMax),
 	role: zod.string().regex(serversCreateBodyRoleRegExp).default(serversCreateBodyRoleDefault),
 });
 
 export const serversCreateResponseServerAgentOutdatedDefault = false;
-export const serversCreateResponseServerFleetDefault = `emad`;
 export const serversCreateResponseServerLatestFailedUnitsDefault = [];
 export const serversCreateResponseServerLatestRebootRequiredDefault = false;
 
@@ -91,9 +87,9 @@ export const ServersCreateResponse = zod.object({
 		agent_outdated: zod.boolean().default(serversCreateResponseServerAgentOutdatedDefault),
 		agent_version: zod.union([zod.string(), zod.null()]),
 		alias: zod.string(),
+		category_id: zod.union([zod.int(), zod.null()]).optional(),
 		city: zod.union([zod.string(), zod.null()]),
 		country: zod.union([zod.string(), zod.null()]),
-		fleet: zod.string().default(serversCreateResponseServerFleetDefault),
 		hostname: zod.union([zod.string(), zod.null()]),
 		id: zod.int(),
 		last_seen: zod.union([zod.int(), zod.null()]),
@@ -154,7 +150,6 @@ export const ServersGetHeader = zod.object({
 });
 
 export const serversGetResponseAgentOutdatedDefault = false;
-export const serversGetResponseFleetDefault = `emad`;
 export const serversGetResponseLatestFailedUnitsDefault = [];
 export const serversGetResponseLatestRebootRequiredDefault = false;
 
@@ -162,9 +157,9 @@ export const ServersGetResponse = zod.object({
 	agent_outdated: zod.boolean().default(serversGetResponseAgentOutdatedDefault),
 	agent_version: zod.union([zod.string(), zod.null()]),
 	alias: zod.string(),
+	category_id: zod.union([zod.int(), zod.null()]).optional(),
 	city: zod.union([zod.string(), zod.null()]),
 	country: zod.union([zod.string(), zod.null()]),
-	fleet: zod.string().default(serversGetResponseFleetDefault),
 	hostname: zod.union([zod.string(), zod.null()]),
 	id: zod.int(),
 	last_seen: zod.union([zod.int(), zod.null()]),
@@ -208,7 +203,6 @@ export const ServersUpdateHeader = zod.object({
 
 export const serversUpdateBodyAliasOneMax = 64;
 
-export const serversUpdateBodyFleetOneRegExp = new RegExp("^(emad|mobin|shared)$");
 export const serversUpdateBodyNameOneMax = 64;
 
 export const serversUpdateBodyPermissionOneRegExp = new RegExp("^(read|safe|full)$");
@@ -216,7 +210,7 @@ export const serversUpdateBodyRoleOneRegExp = new RegExp("^(relay|exit|panel|pan
 
 export const ServersUpdateBody = zod.object({
 	alias: zod.union([zod.string().max(serversUpdateBodyAliasOneMax), zod.null()]).optional(),
-	fleet: zod.union([zod.string().regex(serversUpdateBodyFleetOneRegExp), zod.null()]).optional(),
+	category_id: zod.union([zod.int(), zod.null()]).optional(),
 	name: zod.union([zod.string().min(1).max(serversUpdateBodyNameOneMax), zod.null()]).optional(),
 	permission: zod
 		.union([zod.string().regex(serversUpdateBodyPermissionOneRegExp), zod.null()])
@@ -225,7 +219,6 @@ export const ServersUpdateBody = zod.object({
 });
 
 export const serversUpdateResponseAgentOutdatedDefault = false;
-export const serversUpdateResponseFleetDefault = `emad`;
 export const serversUpdateResponseLatestFailedUnitsDefault = [];
 export const serversUpdateResponseLatestRebootRequiredDefault = false;
 
@@ -233,9 +226,9 @@ export const ServersUpdateResponse = zod.object({
 	agent_outdated: zod.boolean().default(serversUpdateResponseAgentOutdatedDefault),
 	agent_version: zod.union([zod.string(), zod.null()]),
 	alias: zod.string(),
+	category_id: zod.union([zod.int(), zod.null()]).optional(),
 	city: zod.union([zod.string(), zod.null()]),
 	country: zod.union([zod.string(), zod.null()]),
-	fleet: zod.string().default(serversUpdateResponseFleetDefault),
 	hostname: zod.union([zod.string(), zod.null()]),
 	id: zod.int(),
 	last_seen: zod.union([zod.int(), zod.null()]),
@@ -278,7 +271,6 @@ export const ServersNewEnrollTokenHeader = zod.object({
 });
 
 export const serversNewEnrollTokenResponseServerAgentOutdatedDefault = false;
-export const serversNewEnrollTokenResponseServerFleetDefault = `emad`;
 export const serversNewEnrollTokenResponseServerLatestFailedUnitsDefault = [];
 export const serversNewEnrollTokenResponseServerLatestRebootRequiredDefault = false;
 
@@ -288,9 +280,9 @@ export const ServersNewEnrollTokenResponse = zod.object({
 		agent_outdated: zod.boolean().default(serversNewEnrollTokenResponseServerAgentOutdatedDefault),
 		agent_version: zod.union([zod.string(), zod.null()]),
 		alias: zod.string(),
+		category_id: zod.union([zod.int(), zod.null()]).optional(),
 		city: zod.union([zod.string(), zod.null()]),
 		country: zod.union([zod.string(), zod.null()]),
-		fleet: zod.string().default(serversNewEnrollTokenResponseServerFleetDefault),
 		hostname: zod.union([zod.string(), zod.null()]),
 		id: zod.int(),
 		last_seen: zod.union([zod.int(), zod.null()]),

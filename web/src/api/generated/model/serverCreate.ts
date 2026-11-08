@@ -8,8 +8,7 @@
 export interface ServerCreate {
 	/** @maxLength 64 */
 	alias?: string;
-	/** @pattern ^(emad|mobin|shared)$ */
-	fleet?: string;
+	category_id?: number | null;
 	/**
 	 * @minLength 1
 	 * @maxLength 64

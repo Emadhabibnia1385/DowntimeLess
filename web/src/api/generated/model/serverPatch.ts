@@ -7,7 +7,7 @@
 
 export interface ServerPatch {
 	alias?: string | null;
-	fleet?: string | null;
+	category_id?: number | null;
 	name?: string | null;
 	permission?: string | null;
 	role?: string | null;

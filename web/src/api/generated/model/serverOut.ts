@@ -10,9 +10,9 @@ export interface ServerOut {
 	agent_outdated?: boolean;
 	agent_version: string | null;
 	alias: string;
+	category_id?: number | null;
 	city: string | null;
 	country: string | null;
-	fleet?: string;
 	hostname: string | null;
 	id: number;
 	last_seen: number | null;

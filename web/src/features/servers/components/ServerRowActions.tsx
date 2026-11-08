@@ -11,6 +11,7 @@ import { errorMessage } from "@/api/transport";
 import { CheckIcon, CloseIcon, EditIcon, RefreshIcon, TrashIcon } from "@/shared/icons";
 import { useRefreshAll } from "@/shared/useRefreshAll";
 import { t } from "@/strings";
+import { categoryValue, toServerPayload } from "../lib/category";
 import { ServerForm, type ServerFormValues } from "./ServerForm";
 
 const ROLES = ["exit", "relay", "panel", "panel_only", "other"];
@@ -52,9 +53,7 @@ export function ServerRowActions({ server }: { server: ServerOut }) {
 	const defaults: ServerFormValues = {
 		name: server.name,
 		alias: server.alias,
-		fleet: (["emad", "mobin", "shared"].includes(server.fleet ?? "")
-			? server.fleet
-			: "emad") as ServerFormValues["fleet"],
+		category: categoryValue(server.category_id),
 		role: (ROLES.includes(server.role) ? server.role : "other") as ServerFormValues["role"],
 	};
 	const canUpdate = server.status === "online";
@@ -117,7 +116,9 @@ export function ServerRowActions({ server }: { server: ServerOut }) {
 					defaults={defaults}
 					submitLabel={t.common.save}
 					error={update.error}
-					onSubmit={(values) => update.mutate({ serverId: server.id, data: values })}
+					onSubmit={(values) =>
+						update.mutate({ serverId: server.id, data: toServerPayload(values) })
+					}
 				/>
 			</Modal>
 			<ConfirmDialog

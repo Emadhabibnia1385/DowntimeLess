@@ -24,7 +24,7 @@ def migrate(db: sqlite3.Connection) -> None:
     for f in sorted(MIGRATIONS.glob("*.sql")):
         if f.name in done:
             continue
-        db.executescript("BEGIN;\n" + f.read_text() + "\nINSERT INTO schema_migrations VALUES ('" + f.name + "');\nCOMMIT;")
+        db.executescript("BEGIN;\n" + f.read_text(encoding="utf-8") + "\nINSERT INTO schema_migrations VALUES ('" + f.name + "');\nCOMMIT;")
 
 
 def get_db() -> Iterator[sqlite3.Connection]:

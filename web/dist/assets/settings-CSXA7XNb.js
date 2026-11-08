@@ -1,0 +1,1 @@
+import{t as e}from"./settings-CMJK27kv.js";var t=e;export{t as component};
