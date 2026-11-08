@@ -105,6 +105,7 @@ def server_out(row: sqlite3.Row) -> Dict[str, Any]:
         "role": role_of(row),
         "status": status_of(row),
         "agent_outdated": agent_outdated(row["agent_version"]),
+        "acct_on": bool(row["acct_on"]),
         "latest": latest_of(row),
         "system": system_of(row),
     }

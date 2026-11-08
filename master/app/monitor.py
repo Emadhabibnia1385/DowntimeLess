@@ -5,6 +5,7 @@ import time
 from .bot import notify_admins
 from .db import connect
 from .features.issues import service as incidents_svc
+from .features.links import service as links_svc
 from .features.servers.service import status_of
 from .features.settings.router import thresholds
 from .features.ssl import service as ssl_svc
@@ -39,6 +40,7 @@ def sweep(tg: Telegram) -> None:
         cut = int(time.time())
         db.execute("DELETE FROM metrics WHERE ts<?", (cut - 90 * 86400,))
         db.execute("DELETE FROM pings WHERE ts<?", (cut - 7 * 86400,))
+        links_svc.prune(db, cut)
         db.execute("DELETE FROM sessions WHERE expires_at<?", (cut,))
     finally:
         db.close()

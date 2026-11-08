@@ -15,6 +15,7 @@ import { t } from "@/strings";
 import { useQueueJobs } from "../api";
 import { SPEEDTEST_DOWN_URL, SPEEDTEST_UP_URL } from "../lib/jobs";
 import { CheckDialog } from "./CheckDialog";
+import { AcctToggle } from "./AcctToggle";
 import { JobConfirm, type Mutating } from "./JobConfirm";
 import { ToolDialog, type ToolKind } from "./ToolDialog";
 
@@ -116,6 +117,7 @@ export function OperationsCard({ server, canManage }: { server: ServerOut; canMa
 								{t.server.toolVacuum}
 							</Button>
 						</Group>
+						<AcctToggle server={server} />
 						<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger px-3 py-2.5">
 							<div className="min-w-0">
 								<h3 className="text-xs font-semibold text-danger-soft-foreground">

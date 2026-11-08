@@ -66,7 +66,10 @@ export const AgentReportBody = zod.object({
 	tcp_retrans_pct: zod.union([zod.number(), zod.null()]).optional(),
 });
 
+export const agentReportResponseAcctPeersDefault = [];
+
 export const AgentReportResponse = zod.object({
+	acct_peers: zod.array(zod.string()).default(agentReportResponseAcctPeersDefault),
 	interval_s: zod.int(),
 	jobs: zod.array(
 		zod.object({

@@ -8,6 +8,7 @@ import type { JobToRun } from "./jobToRun";
 import type { PingTarget } from "./pingTarget";
 
 export interface ReportResult {
+	acct_peers?: string[];
 	interval_s: number;
 	jobs: JobToRun[];
 	permission: string;

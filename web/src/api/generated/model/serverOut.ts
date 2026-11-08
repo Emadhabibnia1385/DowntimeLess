@@ -8,6 +8,7 @@ import type { Latest } from "./latest";
 import type { SystemInfo } from "./systemInfo";
 
 export interface ServerOut {
+	acct_on?: boolean;
 	agent_outdated?: boolean;
 	agent_version: string | null;
 	alias: string;

@@ -21,7 +21,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-VERSION = "0.2.7"
+VERSION = "0.2.8"
 UA = "DowntimeLess-Agent/" + VERSION
 SELF_PATH = os.path.realpath(__file__)
 # With no address they describe the caller's outbound address; with one, that address itself.
@@ -481,7 +481,123 @@ def build_report(state):
         "ssl": ssl_cached(state),
         "ping": run_pings(state["ping_targets"]),
         "jobs_done": list(state["jobs_done"]),
+        **acct_fields(state),
     }
+
+
+# ---- link accounting: counter-only nftables table, one in/out counter per peer server ----
+
+ACCT_TABLE = "dl_acct"
+ACCT_MAX_PEERS = 64
+
+
+def acct_peers(values):
+    """The valid, unique IPv4 peers out of what the master sent."""
+    out = []
+    for v in values if isinstance(values, list) else []:
+        if not isinstance(v, str):
+            continue
+        try:
+            ip = str(ipaddress.IPv4Address(v))
+        except (ValueError, TypeError):
+            continue
+        if ip not in out:
+            out.append(ip)
+    return out[:ACCT_MAX_PEERS]
+
+
+def acct_ruleset(peers):
+    """A table that only counts: it never accepts, drops or changes a packet (policy accept, counters only).
+
+    Inbound is counted before NAT (source = peer), outbound after NAT (destination = peer), so traffic that
+    this server forwards or tunnels to a peer is counted too.
+    """
+    pre = "\n".join('    ip saddr %s counter comment "dl:in:%s"' % (ip, ip) for ip in peers)
+    post = "\n".join('    ip daddr %s counter comment "dl:out:%s"' % (ip, ip) for ip in peers)
+    return (
+        "add table inet %(t)s\ndelete table inet %(t)s\n"
+        "table inet %(t)s {\n"
+        "  chain dl_in { type filter hook prerouting priority -300; policy accept;\n%(pre)s\n  }\n"
+        "  chain dl_out { type filter hook postrouting priority 300; policy accept;\n%(post)s\n  }\n}\n"
+    ) % {"t": ACCT_TABLE, "pre": pre, "post": post}
+
+
+def parse_acct(text):
+    """{ip: {"in": bytes, "out": bytes}} from `nft -j list table`; None when the text is not that listing."""
+    try:
+        items = json.loads(text)["nftables"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    out = {}
+    for item in items:
+        rule = item.get("rule") if isinstance(item, dict) else None
+        if not rule:
+            continue
+        m = re.fullmatch(r"dl:(in|out):(\d+\.\d+\.\d+\.\d+)", str(rule.get("comment") or ""))
+        if not m:
+            continue
+        for expr in rule.get("expr") or []:
+            counter = expr.get("counter") if isinstance(expr, dict) else None
+            if isinstance(counter, dict) and isinstance(counter.get("bytes"), int):
+                out.setdefault(m.group(2), {"in": 0, "out": 0})[m.group(1)] = counter["bytes"]
+    return out
+
+
+def nft_run(args, text=None):
+    r = subprocess.run(["nft"] + args, input=text, capture_output=True, text=True, timeout=15)
+    return r.returncode, (r.stdout if r.returncode == 0 else r.stderr).strip()
+
+
+def acct_remove(state):
+    if shutil.which("nft"):
+        nft_run(["delete", "table", "inet", ACCT_TABLE])
+    state["acct_sig"] = None
+
+
+def acct_fields(state):
+    counters, error = acct_report(state)
+    out = {}
+    if counters is not None:
+        out["acct"] = counters
+    if error:
+        out["acct_error"] = error
+    return out
+
+
+def acct_report(state):
+    """Keeps the counting table in step with the peers the master asks for and returns its counters."""
+    peers = acct_peers(state.get("acct_peers"))
+    if not peers:
+        if state.get("acct_sig") is not None or not state.get("acct_checked"):
+            state["acct_checked"] = True
+            try:
+                acct_remove(state)
+            except (OSError, subprocess.SubprocessError) as e:
+                log("acct remove failed: %s" % e)
+        return None, None
+    state["acct_checked"] = True
+    if not shutil.which("nft"):
+        return None, "nft is not installed on this server"
+    sig = tuple(sorted(peers))
+    try:
+        for attempt in (1, 2):
+            if state.get("acct_sig") != sig or attempt == 2:
+                script = acct_ruleset(peers)
+                code, msg = nft_run(["-c", "-f", "-"], script)
+                if code == 0:
+                    code, msg = nft_run(["-f", "-"], script)
+                if code != 0:
+                    state["acct_sig"] = None
+                    return None, ("nft refused the counting table: %s" % msg)[:200]
+                state["acct_sig"] = sig
+            code, text = nft_run(["-j", "list", "table", "inet", ACCT_TABLE])
+            counters = parse_acct(text) if code == 0 else None
+            if counters is not None:
+                return counters, None
+            state["acct_sig"] = None  # the table vanished (a ruleset flush): build it again once
+        return None, "counting table could not be read"
+    except (OSError, subprocess.SubprocessError) as e:
+        return None, ("%s: %s" % (type(e).__name__, e))[:200]
 
 
 # ---- system info ----
@@ -870,6 +986,7 @@ def run_cycle(state):
     if isinstance(resp.get("permission"), str):
         state["permission"] = resp["permission"]
     state["ping_targets"] = [t for t in resp.get("ping_targets") or [] if isinstance(t, dict)]
+    state["acct_peers"] = resp.get("acct_peers") or []
     if not state["restart"]:
         for job in resp.get("jobs") or []:
             state["jobs_done"].append(run_job(job, state))

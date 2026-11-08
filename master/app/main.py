@@ -15,6 +15,7 @@ from .features.agent.router import router as agent_router
 from .features.auth.router import router as auth_router
 from .features.categories.router import router as categories_router
 from .features.keys.router import router as keys_router
+from .features.links.router import router as links_router
 from .features.issues.router import router as issues_router
 from .features.overview.router import router as overview_router
 from .features.servers.router import router as servers_router
@@ -73,7 +74,7 @@ def create_app() -> FastAPI:
     s = get_settings()
     app = FastAPI(title="DowntimeLess", version="0.1.0", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json")
     app.add_exception_handler(DLError, dl_error_handler)
-    for r in (auth_router, servers_router, categories_router, overview_router, issues_router, settings_router, keys_router, ssl_router):
+    for r in (auth_router, servers_router, categories_router, overview_router, issues_router, settings_router, keys_router, ssl_router, links_router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(agent_router, prefix="/api")
 
@@ -97,6 +98,7 @@ def create_app() -> FastAPI:
             "- GET /api/v1/snapshot: whole fleet, issues and ping matrix in one document.\n"
             "- GET /api/v1/issues: current problems with evidence and a suggested next step.\n"
             "- GET /api/v1/issues/history?range=24h|7d|30d: every issue that was active in the range (occurrences, time active, each incident).\n"
+            "- GET /api/v1/links/traffic?since=&until=: bytes each server exchanged with each peer server (relay to exit), per window; /links/traffic/series adds the hourly series. Needs counting switched on per server (PATCH acct_on).\n"
             "- GET /api/v1/servers, /api/v1/servers/{id}/metrics?range=24h, /api/v1/ping-matrix, /api/v1/overview\n"
             "- A `read` key only reads. A `full` key may do everything the owner does: POST /api/v1/servers/{id}/jobs"
             " (ping, tcp_check, speedtest_down/up, apt_upgrade_safe, reboot, self_update, cert_renew, cert_delete, processes, ports, disk_usage, journal, traceroute, http_check, dns_check, service_restart, vacuum_logs), manage servers, domains, settings and keys.\n"

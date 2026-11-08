@@ -62,6 +62,8 @@ def get_server(server_id: int, _: Actor = Depends(require("viewer")), db: sqlite
 def patch_server(server_id: int, body: ServerPatch, _: Actor = Depends(require("admin")), db: sqlite3.Connection = Depends(get_db)):
     _row(db, server_id)
     changes = body.model_dump(exclude_none=True)
+    if "acct_on" in changes:
+        changes["acct_on"] = 1 if changes["acct_on"] else 0
     if "category_id" in body.model_fields_set:
         changes["category_id"] = _category(db, body.category_id)
     if "role" in changes:

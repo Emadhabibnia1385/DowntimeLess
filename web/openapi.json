@@ -1055,6 +1055,165 @@
         "title": "Latest",
         "type": "object"
       },
+      "LinkPoint": {
+        "properties": {
+          "in_bytes": {
+            "title": "In Bytes",
+            "type": "integer"
+          },
+          "out_bytes": {
+            "title": "Out Bytes",
+            "type": "integer"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ts",
+          "in_bytes",
+          "out_bytes"
+        ],
+        "title": "LinkPoint",
+        "type": "object"
+      },
+      "LinkRow": {
+        "properties": {
+          "in_bytes": {
+            "title": "In Bytes",
+            "type": "integer"
+          },
+          "out_bytes": {
+            "title": "Out Bytes",
+            "type": "integer"
+          },
+          "peer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peer Id"
+          },
+          "peer_ip": {
+            "title": "Peer Ip",
+            "type": "string"
+          },
+          "peer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peer Name"
+          },
+          "peer_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peer Role"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "integer"
+          },
+          "server_name": {
+            "title": "Server Name",
+            "type": "string"
+          },
+          "server_role": {
+            "title": "Server Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "server_id",
+          "server_name",
+          "server_role",
+          "peer_ip",
+          "peer_id",
+          "peer_name",
+          "peer_role",
+          "in_bytes",
+          "out_bytes"
+        ],
+        "title": "LinkRow",
+        "type": "object"
+      },
+      "LinkSeries": {
+        "properties": {
+          "peer_ip": {
+            "title": "Peer Ip",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/LinkPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "integer"
+          },
+          "since": {
+            "title": "Since",
+            "type": "integer"
+          },
+          "until": {
+            "title": "Until",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "server_id",
+          "peer_ip",
+          "since",
+          "until",
+          "points"
+        ],
+        "title": "LinkSeries",
+        "type": "object"
+      },
+      "LinksOut": {
+        "properties": {
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/LinkRow"
+            },
+            "title": "Links",
+            "type": "array"
+          },
+          "since": {
+            "title": "Since",
+            "type": "integer"
+          },
+          "until": {
+            "title": "Until",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "since",
+          "until",
+          "links"
+        ],
+        "title": "LinksOut",
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "password": {
@@ -1621,6 +1780,14 @@
       },
       "ReportResult": {
         "properties": {
+          "acct_peers": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Acct Peers",
+            "type": "array"
+          },
           "interval_s": {
             "title": "Interval S",
             "type": "integer"
@@ -1710,6 +1877,11 @@
       },
       "ServerOut": {
         "properties": {
+          "acct_on": {
+            "default": false,
+            "title": "Acct On",
+            "type": "boolean"
+          },
           "agent_outdated": {
             "default": false,
             "title": "Agent Outdated",
@@ -1856,6 +2028,17 @@
       },
       "ServerPatch": {
         "properties": {
+          "acct_on": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acct On"
+          },
           "alias": {
             "anyOf": [
               {
@@ -3355,6 +3538,187 @@
         "summary": "Delete Key",
         "tags": [
           "keys"
+        ]
+      }
+    },
+    "/api/v1/links/traffic": {
+      "get": {
+        "description": "Bytes each server exchanged with each peer server in a window (hour resolution), biggest first.",
+        "operationId": "links_traffic",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinksOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Traffic",
+        "tags": [
+          "links"
+        ]
+      }
+    },
+    "/api/v1/links/traffic/series": {
+      "get": {
+        "operationId": "links_series",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "peer_ip",
+            "required": true,
+            "schema": {
+              "title": "Peer Ip",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkSeries"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Series",
+        "tags": [
+          "links"
         ]
       }
     },

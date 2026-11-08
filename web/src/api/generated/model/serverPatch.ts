@@ -6,6 +6,7 @@
  */
 
 export interface ServerPatch {
+	acct_on?: boolean | null;
 	alias?: string | null;
 	category_id?: number | null;
 	name?: string | null;

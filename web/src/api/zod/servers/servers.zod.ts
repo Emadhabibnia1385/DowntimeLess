@@ -13,12 +13,14 @@ export const ServersListHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const serversListResponseAcctOnDefault = false;
 export const serversListResponseAgentOutdatedDefault = false;
 export const serversListResponseLatestFailedUnitsDefault = [];
 export const serversListResponseLatestRebootRequiredDefault = false;
 export const serversListResponseSystemDefault = {};
 
 export const ServersListResponseItem = zod.object({
+	acct_on: zod.boolean().default(serversListResponseAcctOnDefault),
 	agent_outdated: zod.boolean().default(serversListResponseAgentOutdatedDefault),
 	agent_version: zod.union([zod.string(), zod.null()]),
 	alias: zod.string(),
@@ -94,6 +96,7 @@ export const ServersCreateBody = zod.object({
 	role: zod.string().regex(serversCreateBodyRoleRegExp).default(serversCreateBodyRoleDefault),
 });
 
+export const serversCreateResponseServerAcctOnDefault = false;
 export const serversCreateResponseServerAgentOutdatedDefault = false;
 export const serversCreateResponseServerLatestFailedUnitsDefault = [];
 export const serversCreateResponseServerLatestRebootRequiredDefault = false;
@@ -102,6 +105,7 @@ export const serversCreateResponseServerSystemDefault = {};
 export const ServersCreateResponse = zod.object({
 	install_command: zod.string(),
 	server: zod.object({
+		acct_on: zod.boolean().default(serversCreateResponseServerAcctOnDefault),
 		agent_outdated: zod.boolean().default(serversCreateResponseServerAgentOutdatedDefault),
 		agent_version: zod.union([zod.string(), zod.null()]),
 		alias: zod.string(),
@@ -183,12 +187,14 @@ export const ServersGetHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const serversGetResponseAcctOnDefault = false;
 export const serversGetResponseAgentOutdatedDefault = false;
 export const serversGetResponseLatestFailedUnitsDefault = [];
 export const serversGetResponseLatestRebootRequiredDefault = false;
 export const serversGetResponseSystemDefault = {};
 
 export const ServersGetResponse = zod.object({
+	acct_on: zod.boolean().default(serversGetResponseAcctOnDefault),
 	agent_outdated: zod.boolean().default(serversGetResponseAgentOutdatedDefault),
 	agent_version: zod.union([zod.string(), zod.null()]),
 	alias: zod.string(),
@@ -260,6 +266,7 @@ export const serversUpdateBodyPermissionOneRegExp = new RegExp("^(read|safe|full
 export const serversUpdateBodyRoleOneRegExp = new RegExp("^(relay|exit|panel|panel_only|other)$");
 
 export const ServersUpdateBody = zod.object({
+	acct_on: zod.union([zod.boolean(), zod.null()]).optional(),
 	alias: zod.union([zod.string().max(serversUpdateBodyAliasOneMax), zod.null()]).optional(),
 	category_id: zod.union([zod.int(), zod.null()]).optional(),
 	name: zod.union([zod.string().min(1).max(serversUpdateBodyNameOneMax), zod.null()]).optional(),
@@ -269,12 +276,14 @@ export const ServersUpdateBody = zod.object({
 	role: zod.union([zod.string().regex(serversUpdateBodyRoleOneRegExp), zod.null()]).optional(),
 });
 
+export const serversUpdateResponseAcctOnDefault = false;
 export const serversUpdateResponseAgentOutdatedDefault = false;
 export const serversUpdateResponseLatestFailedUnitsDefault = [];
 export const serversUpdateResponseLatestRebootRequiredDefault = false;
 export const serversUpdateResponseSystemDefault = {};
 
 export const ServersUpdateResponse = zod.object({
+	acct_on: zod.boolean().default(serversUpdateResponseAcctOnDefault),
 	agent_outdated: zod.boolean().default(serversUpdateResponseAgentOutdatedDefault),
 	agent_version: zod.union([zod.string(), zod.null()]),
 	alias: zod.string(),
@@ -338,6 +347,7 @@ export const ServersNewEnrollTokenHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const serversNewEnrollTokenResponseServerAcctOnDefault = false;
 export const serversNewEnrollTokenResponseServerAgentOutdatedDefault = false;
 export const serversNewEnrollTokenResponseServerLatestFailedUnitsDefault = [];
 export const serversNewEnrollTokenResponseServerLatestRebootRequiredDefault = false;
@@ -346,6 +356,7 @@ export const serversNewEnrollTokenResponseServerSystemDefault = {};
 export const ServersNewEnrollTokenResponse = zod.object({
 	install_command: zod.string(),
 	server: zod.object({
+		acct_on: zod.boolean().default(serversNewEnrollTokenResponseServerAcctOnDefault),
 		agent_outdated: zod.boolean().default(serversNewEnrollTokenResponseServerAgentOutdatedDefault),
 		agent_version: zod.union([zod.string(), zod.null()]),
 		alias: zod.string(),

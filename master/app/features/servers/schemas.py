@@ -57,6 +57,7 @@ class ServerOut(BaseModel):
     org: Optional[str]
     agent_version: Optional[str]
     agent_outdated: bool = False
+    acct_on: bool = False
     latest: Latest
     system: SystemInfo = SystemInfo()
 
@@ -74,6 +75,7 @@ class ServerPatch(BaseModel):
     role: Optional[str] = Field(default=None, pattern=ROLES)
     category_id: Optional[int] = None  # null clears it; leave it out to keep it
     permission: Optional[str] = Field(default=None, pattern=PERMS)
+    acct_on: Optional[bool] = None
 
 
 class ServerCreated(BaseModel):

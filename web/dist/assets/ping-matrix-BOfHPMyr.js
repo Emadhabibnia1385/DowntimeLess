@@ -1,1 +1,0 @@
-import{r as e}from"./servers-BrBdIVLO.js";var t=e;export{t as component};

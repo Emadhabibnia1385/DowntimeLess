@@ -53,5 +53,6 @@ class JobToRun(BaseModel):
 class ReportResult(BaseModel):
     interval_s: int
     permission: str
+    acct_peers: List[str] = []
     ping_targets: List[PingTarget]
     jobs: List[JobToRun]
