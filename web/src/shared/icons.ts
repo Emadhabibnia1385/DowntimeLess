@@ -12,7 +12,6 @@ export { default as PingIcon } from "~icons/solar/routing-2-linear";
 export { default as PowerIcon } from "~icons/solar/power-linear";
 export { default as RefreshIcon } from "~icons/solar/refresh-linear";
 export { default as ServerIcon } from "~icons/solar/server-linear";
-export { default as SettingsIcon } from "~icons/solar/settings-linear";
 export { default as ShieldIcon } from "~icons/solar/shield-check-linear";
 export { default as TelegramIcon } from "~icons/solar/plain-linear";
 export { default as TrashIcon } from "~icons/solar/trash-bin-minimalistic-linear";

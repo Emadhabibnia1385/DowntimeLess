@@ -1,0 +1,1 @@
+import{t as e}from"./issues-CUsa-Xkc.js";var t=e;export{t as component};

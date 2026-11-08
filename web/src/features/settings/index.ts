@@ -1,2 +1,2 @@
-export { SettingsPage } from "./components/SettingsPage";
+export { NotificationsTab } from "./components/NotificationsTab";
 export { useThresholds } from "./api";

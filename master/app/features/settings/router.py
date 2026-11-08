@@ -14,6 +14,10 @@ DEFAULTS: Dict[str, float] = {
     "ssl_warn_days": 21, "ssl_crit_days": 7,
 }
 
+# One on/off switch per kind of alert (1 = on); an alert that is off is neither listed as an issue nor sent to Telegram.
+RULES = ("offline", "cpu", "ram", "disk", "steal", "retrans", "conntrack", "ping", "ssl", "failed_units", "reboot")
+DEFAULTS.update({"on_" + r: 1 for r in RULES})
+
 
 def thresholds(db: sqlite3.Connection) -> Dict[str, float]:
     out = dict(DEFAULTS)
@@ -32,5 +36,7 @@ def get_settings_(_: Actor = Depends(require("viewer")), db: sqlite3.Connection 
 def put_settings(body: Dict[str, float], _: Actor = Depends(require("admin")), db: sqlite3.Connection = Depends(get_db)):
     for k, v in body.items():
         if k in DEFAULTS:
+            if k.startswith("on_"):
+                v = 1 if v else 0
             db.execute("INSERT INTO settings (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (k, str(v)))
     return thresholds(db)

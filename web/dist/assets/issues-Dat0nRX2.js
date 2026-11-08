@@ -1,1 +1,0 @@
-import{t as e}from"./issues-Cv9k-3N0.js";var t=e;export{t as component};

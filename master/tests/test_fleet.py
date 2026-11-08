@@ -224,3 +224,33 @@ def test_fleet_history_sums_traffic_of_every_server_and_counts_who_reported(owne
     h = owner.get("/api/v1/overview/history?range=1h").json()
     assert (h["rx_total"], h["tx_total"]) == (1200, 600)
     assert h["points"][-1]["servers"] == 2
+
+
+def test_an_alert_switched_off_is_not_listed_and_comes_back_when_switched_on(owner):
+    sid, key = make_server(owner)
+    report(owner, key, disk_used_gb=96, failed_units=["x.service"])
+    assert {"disk", "failed_units"} <= {i["code"] for i in owner.get("/api/v1/issues").json()}
+    got = owner.get("/api/v1/settings").json()
+    assert got["on_disk"] == 1 and got["on_offline"] == 1 and got["ssl_warn_days"] == 21
+    assert owner.put("/api/v1/settings", json={"on_disk": False, "on_failed_units": 0}).json()["on_disk"] == 0
+    assert {"disk", "failed_units"}.isdisjoint(i["code"] for i in owner.get("/api/v1/issues").json())
+    owner.put("/api/v1/settings", json={"on_disk": 1, "disk_warn": 99})
+    assert "disk" not in {i["code"] for i in owner.get("/api/v1/issues").json()}  # 96 < 99
+    owner.put("/api/v1/settings", json={"disk_warn": 80})
+    assert "disk" in {i["code"] for i in owner.get("/api/v1/issues").json()}
+
+
+def test_offline_alert_off_means_no_telegram_message(owner, tg):
+    from app.monitor import sweep
+
+    sid, key = make_server(owner)
+    report(owner, key)
+    db = connect()
+    db.execute("UPDATE servers SET last_seen=?", (int(time.time()) - 1000,))
+    db.close()
+    owner.put("/api/v1/settings", json={"on_offline": 0})
+    sweep(tg)
+    assert not any("گزارش نمی‌دهد" in m[1] for m in tg.sent)
+    owner.put("/api/v1/settings", json={"on_offline": 1})
+    sweep(tg)
+    assert any("گزارش نمی‌دهد" in m[1] for m in tg.sent)

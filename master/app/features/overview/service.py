@@ -59,24 +59,25 @@ def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
                 out.append(_issue(s, "agent_missing", "info", "agent هنوز نصب نشده", "دستور نصب را روی سرور اجرا کنید یا توکن جدید بگیرید."))
             continue
         if st == "offline":
-            out.append(_issue(s, "offline", "critical", "سرور گزارش نمی‌دهد", "از سرورهای دیگر ping بگیرید؛ اگر ping هم نیست حجم/وضعیت سرویس‌دهنده را بررسی کنید، وگرنه سرویس agent را ریستارت کنید.", last_seen_s_ago=now - s["last_seen"]))
+            if th["on_offline"]:
+                out.append(_issue(s, "offline", "critical", "سرور گزارش نمی‌دهد", "از سرورهای دیگر ping بگیرید؛ اگر ping هم نیست حجم/وضعیت سرویس‌دهنده را بررسی کنید، وگرنه سرویس agent را ریستارت کنید.", last_seen_s_ago=now - s["last_seen"]))
             continue
-        if lt["disk_pct"] is not None and lt["disk_pct"] >= th["disk_warn"]:
+        if th["on_disk"] and lt["disk_pct"] is not None and lt["disk_pct"] >= th["disk_warn"]:
             crit = lt["disk_pct"] >= th["disk_crit"]
             out.append(_issue(s, "disk", "critical" if crit else "warning", "دیسک رو به پر شدن است", "لاگ‌ها و بکاپ‌های قدیمی را پاک کنید (journalctl --vacuum-size، docker system df).", disk_pct=lt["disk_pct"]))
-        if lt["ram_pct"] is not None and lt["ram_pct"] >= th["ram_warn"]:
+        if th["on_ram"] and lt["ram_pct"] is not None and lt["ram_pct"] >= th["ram_warn"]:
             out.append(_issue(s, "ram", "warning", "مصرف RAM بالاست", "پردازش‌های پرمصرف را ببینید؛ پس از اطمینان سرویس مربوط را ریستارت کنید.", ram_pct=lt["ram_pct"]))
-        if lt["cpu_pct"] is not None and lt["cpu_pct"] >= th["cpu_warn"]:
+        if th["on_cpu"] and lt["cpu_pct"] is not None and lt["cpu_pct"] >= th["cpu_warn"]:
             out.append(_issue(s, "cpu", "warning", "مصرف CPU بالاست", "بررسی کنید ترافیک کاربران یا یک پردازش گیرکرده باعث آن شده است.", cpu_pct=lt["cpu_pct"]))
-        if lt["steal_pct"] is not None and lt["steal_pct"] >= th["steal_warn"]:
+        if th["on_steal"] and lt["steal_pct"] is not None and lt["steal_pct"] >= th["steal_warn"]:
             out.append(_issue(s, "steal", "warning", "steal بالا: میزبان مجازی شلوغ است", "اگر پایدار است به سرویس‌دهنده تیکت بدهید یا سرور را منتقل کنید.", steal_pct=lt["steal_pct"]))
-        if lt["tcp_retrans_pct"] is not None and lt["tcp_retrans_pct"] >= th["retrans_warn"]:
+        if th["on_retrans"] and lt["tcp_retrans_pct"] is not None and lt["tcp_retrans_pct"] >= th["retrans_warn"]:
             out.append(_issue(s, "retrans", "warning", "ارسال مجدد TCP بالاست (مسیر بد)", "مسیر بین رله و خروج را با تست حجمی بررسی کنید.", retrans_pct=lt["tcp_retrans_pct"]))
-        if lt["conntrack_pct"] is not None and lt["conntrack_pct"] >= th["conntrack_crit"]:
+        if th["on_conntrack"] and lt["conntrack_pct"] is not None and lt["conntrack_pct"] >= th["conntrack_crit"]:
             out.append(_issue(s, "conntrack", "critical", "جدول conntrack نزدیک پر شدن است", "nf_conntrack_max را بالا ببرید و timeout اتصال‌های برقرار را کم کنید.", conntrack_pct=lt["conntrack_pct"]))
-        if lt["failed_units"]:
+        if th["on_failed_units"] and lt["failed_units"]:
             out.append(_issue(s, "failed_units", "warning", "سرویس‌های ناموفق systemd", "با systemctl status وضعیت را ببینید و در صورت نیاز ریستارت کنید.", units=lt["failed_units"]))
-        if lt["reboot_required"]:
+        if th["on_reboot"] and lt["reboot_required"]:
             out.append(_issue(s, "reboot_required", "info", "سرور برای اعمال آپدیت نیاز به ریبوت دارد", "در ساعت کم‌ترافیک و با تأیید خودتان ریبوت کنید؛ رله‌ها را یکی‌یکی."))
     names = {s["id"]: s for s in servers}
     by_target: Dict[int, List[Dict[str, Any]]] = {}
@@ -85,7 +86,7 @@ def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
     for to_id, links in by_target.items():
         target = names.get(to_id)
         bad = [w for w in links if w["loss"] is not None and w["loss"] >= th["loss_warn"]]
-        if not target or not bad:
+        if not th["on_ping"] or not target or not bad:
             continue
         loss = sum(w["loss"] for w in bad) / len(bad)
         rtt = [w["rtt"] for w in bad if w["rtt"] is not None]
@@ -104,7 +105,8 @@ def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
                 "اتصال به %s فقط از یک رله ناپایدار دیده شده (تأیید نشده)" % (target["alias"] or target["name"]),
                 "پینگ ICMP روی بعضی میزبان‌ها محدود می‌شود؛ با رلهٔ دوم یا تست TCP تأیید کنید.", **evidence,
             ))
-    out.extend(ssl_svc.issues(db))
+    if th["on_ssl"]:
+        out.extend(ssl_svc.issues(db))
     order = {"critical": 0, "warning": 1, "info": 2}
     return sorted(out, key=lambda i: (order[i["severity"]], i["server_name"] or ""))
 

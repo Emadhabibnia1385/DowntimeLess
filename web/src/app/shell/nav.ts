@@ -6,7 +6,6 @@ import {
 	KeyIcon,
 	PingIcon,
 	ServerIcon,
-	SettingsIcon,
 	ShieldIcon,
 } from "@/shared/icons";
 import { t } from "@/strings";
@@ -14,15 +13,7 @@ import { t } from "@/strings";
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
 export type NavItem = {
-	to:
-		| "/"
-		| "/servers"
-		| "/issues"
-		| "/ping-matrix"
-		| "/ssl"
-		| "/api-keys"
-		| "/settings"
-		| "/account";
+	to: "/" | "/servers" | "/issues" | "/ping-matrix" | "/ssl" | "/api-keys" | "/account";
 	label: string;
 	icon: Icon;
 	/** Shown in the phone's bottom bar too. */
@@ -37,7 +28,6 @@ export const NAV: readonly NavItem[] = [
 	{ to: "/ping-matrix", label: t.nav.pingMatrix, icon: PingIcon, primary: true },
 	{ to: "/ssl", label: t.nav.ssl, icon: ShieldIcon },
 	{ to: "/api-keys", label: t.nav.apiKeys, icon: KeyIcon, ownerOnly: true },
-	{ to: "/settings", label: t.nav.settings, icon: SettingsIcon },
 	{ to: "/account", label: t.nav.account, icon: AccountIcon },
 ];
 

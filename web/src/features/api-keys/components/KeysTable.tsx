@@ -75,7 +75,6 @@ export function KeysTable() {
 				onRetry={() => void keys.refetch()}
 				emptyTitle={t.apiKeys.emptyTitle}
 				empty={t.apiKeys.empty}
-				cards="md"
 			/>
 			<ConfirmDialog
 				isOpen={removing !== null}

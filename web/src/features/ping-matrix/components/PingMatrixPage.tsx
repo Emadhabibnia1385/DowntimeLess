@@ -2,11 +2,12 @@ import { EmptyState, PageHeader, StaticTable, StatusChip } from "@nyxon/nasim";
 import { Link } from "@tanstack/react-router";
 import type { PingCell } from "@/api/generated/model";
 import { useOverviewPingMatrix } from "@/api/generated/overview/overview";
+import { useServers } from "@/features/servers";
 import { useThresholds } from "@/features/settings";
 import { IpText } from "@/shared/IpText";
 import { Loadable } from "@/shared/Loadable";
 import { useDocumentTitle } from "@/shared/useDocumentTitle";
-import { formatMs, formatPercent, t } from "@/strings";
+import { flagOf, formatMs, formatPercent, t } from "@/strings";
 import { buildMatrix, type Health, healthOf, numberOrNull, type Thresholds } from "../lib/matrix";
 
 const TONES = { ok: "success", degraded: "warning", down: "danger", unknown: "neutral" } as const;
@@ -38,6 +39,8 @@ export function PingMatrixPage() {
 	useDocumentTitle(t.pingMatrix.title);
 	const matrix = useOverviewPingMatrix({ query: { refetchInterval: 30_000 } });
 	const limits = useThresholds() as Thresholds;
+	const servers = useServers();
+	const countryOf = new Map((servers.data ?? []).map((server) => [server.id, server.country]));
 	return (
 		<div className="flex flex-col gap-6">
 			<PageHeader title={t.pingMatrix.title} description={t.pingMatrix.subtitle} />
@@ -55,7 +58,9 @@ export function PingMatrixPage() {
 								t.pingMatrix.foreignServer,
 								...grid.columns.map((column) => (
 									<span key={column.key} className="flex flex-col">
-										<span>{column.name}</span>
+										<span>
+											<span aria-hidden>{flagOf("IR")}</span> {column.name}
+										</span>
 										<span className="text-xs font-normal text-muted">{t.pingMatrix.iranRelay}</span>
 									</span>
 								)),
@@ -69,7 +74,7 @@ export function PingMatrixPage() {
 											params={{ serverId: String(row.id) }}
 											className="font-semibold text-accent-soft-foreground underline-offset-4 hover:underline"
 										>
-											{row.name}
+											<span aria-hidden>{flagOf(countryOf.get(row.id))}</span> {row.name}
 										</Link>
 										<IpText ip={row.target} className="text-xs text-muted" />
 									</div>,

@@ -5,6 +5,7 @@ import time
 from .bot import notify_admins
 from .db import connect
 from .features.servers.service import status_of
+from .features.settings.router import thresholds
 from .features.ssl import service as ssl_svc
 from .telegram import Telegram
 
@@ -15,8 +16,11 @@ def sweep(tg: Telegram) -> None:
     """Tell admins once when a server goes quiet and once when it comes back."""
     db = connect()
     try:
-        for s in db.execute("SELECT * FROM servers WHERE last_seen IS NOT NULL"):
+        th = thresholds(db)
+        for s in db.execute("SELECT * FROM servers WHERE last_seen IS NOT NULL").fetchall():
             st, label = status_of(s), s["alias"] or s["name"]
+            if not th["on_offline"]:
+                continue
             if st == "offline" and not s["offline_notified"]:
                 db.execute("UPDATE servers SET offline_notified=1 WHERE id=?", (s["id"],))
                 notify_admins(tg, "🔴 <b>%s</b> گزارش نمی‌دهد (آخرین گزارش %d ثانیه پیش)." % (label, time.time() - s["last_seen"]))
@@ -25,7 +29,8 @@ def sweep(tg: Telegram) -> None:
                 notify_admins(tg, "🟢 <b>%s</b> دوباره آنلاین شد." % label)
         ssl_svc.probe_due(db)
         ssl_svc.drop_stale_auto(db)
-        _ssl_alerts(db, tg)
+        if th["on_ssl"]:
+            _ssl_alerts(db, tg)
         cut = int(time.time())
         db.execute("DELETE FROM metrics WHERE ts<?", (cut - 90 * 86400,))
         db.execute("DELETE FROM pings WHERE ts<?", (cut - 7 * 86400,))
