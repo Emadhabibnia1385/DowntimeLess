@@ -46,7 +46,6 @@ def test_ping_matrix_and_loss_issue(owner):
     assert res["ping_targets"] == [{"target": "198.51.100.7", "tcp_port": None}]
     cell = owner.get("/api/v1/ping-matrix").json()[0]
     assert cell["from_name"] == "a" and cell["to_name"] == "b"
-    assert any(i["code"].startswith("ping:") and i["severity"] == "critical" for i in owner.get("/api/v1/issues").json())
 
 
 def test_mutating_job_needs_permission_and_a_human(owner):
@@ -152,8 +151,8 @@ def test_only_iran_relays_measure_and_only_towards_foreign_servers(owner):
                                                              {"target": "203.0.113.9", "loss_pct": 100, "rtt_ms": None}]).json()["ping_targets"] == []
     cells = owner.get("/api/v1/ping-matrix").json()
     assert {(c["from_name"], c["to_name"]) for c in cells} == {("iran-1", "de-1"), ("iran-1", "nl-1")}
-    pings = [i for i in owner.get("/api/v1/issues").json() if i["code"].startswith("ping:")]
-    assert [i["evidence"]["to"] for i in pings] == ["nl-1"]
+    # one sample is not a window: no link is called bad yet
+    assert [i for i in owner.get("/api/v1/issues").json() if i["code"].startswith("ping:")] == []
 
 
 def test_old_agents_may_run_self_update_at_read_but_nothing_else(owner):
@@ -168,3 +167,43 @@ def test_old_agents_may_run_self_update_at_read_but_nothing_else(owner):
     mixed = report(owner, key).json()
     assert len(mixed["jobs"]) == 2 and mixed["permission"] == "read"
     assert report(owner, key).json()["permission"] == "read"
+
+
+def _fleet_with_relays(owner, losses):
+    """Foreign exit 'nl-1' and one relay per entry of `losses`, each reporting that loss to it."""
+    _, kx = make_server(owner, "nl-1", "exit")
+    report(owner, kx, public_ip="198.51.100.2")
+    for n, loss in enumerate(losses, 1):
+        _, kr = make_server(owner, "iran-%d" % n, "relay")
+        report(owner, kr, public_ip="203.0.113.%d" % n, ping=[{"target": "198.51.100.2", "loss_pct": loss, "rtt_ms": 90}])
+
+
+def _ping_issues(owner):
+    return [i for i in owner.get("/api/v1/issues").json() if i["code"].startswith("ping:")]
+
+
+def test_a_link_is_bad_only_when_two_relays_agree(owner, monkeypatch):
+    from app.features.overview import service as overview
+
+    monkeypatch.setattr(overview, "PING_MIN_SAMPLES", 1)
+    _fleet_with_relays(owner, [100, 100, 0])
+    (issue,) = _ping_issues(owner)
+    assert issue["severity"] == "critical" and issue["server_name"] == "nl-1"
+    assert issue["evidence"]["relays"] == ["iran-1", "iran-2"] and issue["evidence"]["measured_by"] == 3
+
+
+def test_one_relay_disagreeing_with_the_others_is_an_icmp_artefact(owner, monkeypatch):
+    from app.features.overview import service as overview
+
+    monkeypatch.setattr(overview, "PING_MIN_SAMPLES", 1)
+    _fleet_with_relays(owner, [40, 0, 0])
+    assert _ping_issues(owner) == []
+
+
+def test_a_single_relay_cannot_confirm_so_the_issue_is_only_info(owner, monkeypatch):
+    from app.features.overview import service as overview
+
+    monkeypatch.setattr(overview, "PING_MIN_SAMPLES", 1)
+    _fleet_with_relays(owner, [100])
+    (issue,) = _ping_issues(owner)
+    assert issue["severity"] == "info" and "تأیید نشده" in issue["title"]

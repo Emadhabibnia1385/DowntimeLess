@@ -25,6 +25,23 @@ def ping_matrix(db: sqlite3.Connection) -> List[Dict[str, Any]]:
     ]
 
 
+# ICMP is rate-limited or dropped by many hosts, so a link counts as bad only on a window of samples
+# and only when at least two Iran relays agree; one relay disagreeing with the rest is an artefact.
+PING_WINDOW_S = 600
+PING_MIN_SAMPLES = 6
+
+
+def ping_windows(db: sqlite3.Connection) -> List[Dict[str, Any]]:
+    """Average loss per Iran relay and foreign server over the last window, with the number of samples."""
+    rows = db.execute(
+        "SELECT p.server_id, s.name AS from_name, t.id AS to_id, t.public_ip AS target, AVG(p.loss) AS loss, AVG(p.rtt) AS rtt, COUNT(p.loss) AS n "
+        "FROM pings p JOIN servers s ON s.id=p.server_id JOIN servers t ON t.public_ip=p.target "
+        "WHERE s.role='relay' AND t.role<>'relay' AND p.ts>=? GROUP BY p.server_id, t.id",
+        (int(time.time()) - PING_WINDOW_S,),
+    ).fetchall()
+    return [dict(r) for r in rows if r["n"] >= PING_MIN_SAMPLES]
+
+
 def _issue(row, code: str, severity: str, title: str, suggestion: str, **evidence: Any) -> Dict[str, Any]:
     return {
         "id": "server:%d:%s" % (row["id"], code), "server_id": row["id"], "server_name": row["alias"] or row["name"],
@@ -62,17 +79,31 @@ def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
         if lt["reboot_required"]:
             out.append(_issue(s, "reboot_required", "info", "سرور برای اعمال آپدیت نیاز به ریبوت دارد", "در ساعت کم‌ترافیک و با تأیید خودتان ریبوت کنید؛ رله‌ها را یکی‌یکی."))
     names = {s["id"]: s for s in servers}
-    for m in ping_matrix(db):
-        s = names.get(m["from_id"])
-        if not s or m["loss_pct"] is None or m["loss_pct"] < th["loss_warn"]:
+    by_target: Dict[int, List[Dict[str, Any]]] = {}
+    for w in ping_windows(db):
+        by_target.setdefault(w["to_id"], []).append(w)
+    for to_id, links in by_target.items():
+        target = names.get(to_id)
+        bad = [w for w in links if w["loss"] is not None and w["loss"] >= th["loss_warn"]]
+        if not target or not bad:
             continue
-        crit = m["loss_pct"] >= th["loss_crit"]
-        out.append(_issue(
-            s, "ping:%s" % m["target"], "critical" if crit else "warning",
-            "اتصال به %s قطع یا ناپایدار است" % m["to_name"],
-            "همین ارتباط را از یک سرور دیگر هم بسنجید؛ فقط وقتی دو مبدأ هم‌نظر باشند DNS را تغییر دهید.",
-            to=m["to_name"], loss_pct=m["loss_pct"], rtt_ms=m["rtt_ms"],
-        ))
+        loss = sum(w["loss"] for w in bad) / len(bad)
+        rtt = [w["rtt"] for w in bad if w["rtt"] is not None]
+        evidence = {"relays": sorted(w["from_name"] for w in bad), "measured_by": len(links), "loss_pct": round(loss, 1),
+                    "rtt_ms": round(sum(rtt) / len(rtt), 1) if rtt else None}
+        if len(bad) >= 2:
+            out.append(_issue(
+                target, "ping:%s" % target["public_ip"], "critical" if loss >= th["loss_crit"] else "warning",
+                "اتصال رله‌های ایران به %s قطع یا ناپایدار است" % (target["alias"] or target["name"]),
+                "چند رله هم‌نظرند. با TCP یا یک تست حجمی مسیر را بسنجید و فقط بعد از تأیید دو مبدأ DNS را تغییر دهید.",
+                **evidence,
+            ))
+        elif len(links) == 1:
+            out.append(_issue(
+                target, "ping:%s" % target["public_ip"], "info",
+                "اتصال به %s فقط از یک رله ناپایدار دیده شده (تأیید نشده)" % (target["alias"] or target["name"]),
+                "پینگ ICMP روی بعضی میزبان‌ها محدود می‌شود؛ با رلهٔ دوم یا تست TCP تأیید کنید.", **evidence,
+            ))
     out.extend(ssl_svc.issues(db))
     order = {"critical": 0, "warning": 1, "info": 2}
     return sorted(out, key=lambda i: (order[i["severity"]], i["server_name"] or ""))

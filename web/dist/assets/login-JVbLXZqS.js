@@ -1,1 +1,0 @@
-import{Ln as e,or as t}from"./useDocumentTitle-P-S6EHOY.js";import{t as n}from"./auth-BXNgsLEK.js";import{n as r}from"./index-z3ms_3du.js";var i=e(),a=t();function o(){let e=(0,i.c)(2),{redirect:t}=r.useSearch(),o;return e[0]===t?o=e[1]:(o=(0,a.jsx)(n,{redirect:t}),e[0]=t,e[1]=o),o}export{o as component};

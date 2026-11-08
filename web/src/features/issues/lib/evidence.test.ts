@@ -30,3 +30,15 @@ describe("evidenceRows", () => {
 		expect(evidenceRows({ mystery: 3 })[0]).toMatchObject({ label: "mystery", value: "۳" });
 	});
 });
+
+describe("evidenceRows for the multi-relay ping issue", () => {
+	it("labels the relays and the number of probes in Persian and joins the names", () => {
+		const rows = evidenceRows({ relays: ["iran-1", "iran-2"], measured_by: 3, loss_pct: 40 });
+		expect(rows.map((row) => row.label)).toEqual([
+			"رله‌های دارای افت",
+			"تعداد رله‌های سنجنده",
+			"افت بسته",
+		]);
+		expect(rows[0].value).toBe("iran-1, iran-2");
+	});
+});
