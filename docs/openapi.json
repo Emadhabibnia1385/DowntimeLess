@@ -208,6 +208,45 @@
         "title": "AgentsOutdated",
         "type": "object"
       },
+      "AptState": {
+        "properties": {
+          "dpkg_audit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dpkg Audit"
+          },
+          "held_docker": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Held Docker"
+          },
+          "reboot_required_pkgs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reboot Required Pkgs"
+          }
+        },
+        "title": "AptState",
+        "type": "object"
+      },
       "AvailabilityReport": {
         "properties": {
           "fleet_availability_pct": {
@@ -352,6 +391,9 @@
           "health": {
             "$ref": "#/components/schemas/HealthBrief"
           },
+          "host_checks": {
+            "$ref": "#/components/schemas/HostChecksBrief"
+          },
           "issue_events_24h": {
             "title": "Issue Events 24H",
             "type": "integer"
@@ -364,6 +406,13 @@
               "type": "string"
             },
             "title": "Not Measured",
+            "type": "array"
+          },
+          "panel": {
+            "items": {
+              "$ref": "#/components/schemas/PanelBrief"
+            },
+            "title": "Panel",
             "type": "array"
           },
           "path_problems": {
@@ -418,6 +467,8 @@
           "changes_24h",
           "issue_events_24h",
           "check_first",
+          "host_checks",
+          "panel",
           "not_measured"
         ],
         "title": "Briefing",
@@ -974,6 +1025,169 @@
           "why"
         ],
         "title": "CheckStep",
+        "type": "object"
+      },
+      "ConntrackLive": {
+        "properties": {
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "drop": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drop"
+          },
+          "early_drop": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Early Drop"
+          },
+          "insert_failed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insert Failed"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "module_loaded": {
+            "title": "Module Loaded",
+            "type": "boolean"
+          },
+          "pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct"
+          },
+          "tcp_established_timeout": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tcp Established Timeout"
+          }
+        },
+        "required": [
+          "module_loaded"
+        ],
+        "title": "ConntrackLive",
+        "type": "object"
+      },
+      "ContainerRow": {
+        "properties": {
+          "health": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy"
+          },
+          "restarts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restarts"
+          },
+          "retired": {
+            "title": "Retired",
+            "type": "boolean"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          }
+        },
+        "required": [
+          "name",
+          "retired"
+        ],
+        "title": "ContainerRow",
         "type": "object"
       },
       "DailyAvailability": {
@@ -1695,6 +1909,195 @@
         "title": "HistoryTotals",
         "type": "object"
       },
+      "HostChecksBrief": {
+        "properties": {
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/HostProblem"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "reporting": {
+            "title": "Reporting",
+            "type": "integer"
+          },
+          "without": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Without",
+            "type": "array"
+          }
+        },
+        "required": [
+          "reporting",
+          "without",
+          "problems"
+        ],
+        "title": "HostChecksBrief",
+        "type": "object"
+      },
+      "HostHealth": {
+        "properties": {
+          "agent_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Version"
+          },
+          "apt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AptState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checks_error": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Checks Error",
+            "type": "array"
+          },
+          "conntrack": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConntrackLive"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "containers": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ContainerRow"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Containers"
+          },
+          "has_checks": {
+            "title": "Has Checks",
+            "type": "boolean"
+          },
+          "kernel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KernelFlags"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "listeners": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ListenerSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nft": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NftSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "security": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecurityState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "integer"
+          },
+          "units": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UnitRow"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Units"
+          }
+        },
+        "required": [
+          "server_id",
+          "has_checks",
+          "checks_error"
+        ],
+        "title": "HostHealth",
+        "type": "object"
+      },
+      "HostProblem": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "server",
+          "code",
+          "severity",
+          "detail"
+        ],
+        "title": "HostProblem",
+        "type": "object"
+      },
       "HourProfile": {
         "properties": {
           "hour": {
@@ -1716,6 +2119,77 @@
           "tx"
         ],
         "title": "HourProfile",
+        "type": "object"
+      },
+      "IgnoreOut": {
+        "properties": {
+          "ignored": {
+            "title": "Ignored",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "ignored"
+        ],
+        "title": "IgnoreOut",
+        "type": "object"
+      },
+      "IgnoreSet": {
+        "properties": {
+          "ignored": {
+            "default": true,
+            "title": "Ignored",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "container",
+              "node",
+              "inbound",
+              "dnat"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "IgnoreSet",
+        "type": "object"
+      },
+      "InboundTag": {
+        "properties": {
+          "ignored": {
+            "title": "Ignored",
+            "type": "boolean"
+          },
+          "tag": {
+            "title": "Tag",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "ignored"
+        ],
+        "title": "InboundTag",
         "type": "object"
       },
       "IncByCode": {
@@ -2635,6 +3109,111 @@
         "title": "JobToRun",
         "type": "object"
       },
+      "KernelFlags": {
+        "properties": {
+          "congestion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Congestion"
+          },
+          "inode_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inode Pct"
+          },
+          "ip_forward": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Forward"
+          },
+          "journal_mb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Journal Mb"
+          },
+          "mtu_probing": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mtu Probing"
+          },
+          "ntp_synced": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ntp Synced"
+          },
+          "oom_kill": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oom Kill"
+          },
+          "qdisc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qdisc"
+          },
+          "swappiness": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Swappiness"
+          }
+        },
+        "title": "KernelFlags",
+        "type": "object"
+      },
       "KeyCreate": {
         "properties": {
           "name": {
@@ -3193,6 +3772,61 @@
         "title": "LinksOut",
         "type": "object"
       },
+      "ListenerDrop": {
+        "properties": {
+          "port": {
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "type": "integer"
+          },
+          "proto": {
+            "enum": [
+              "tcp",
+              "udp"
+            ],
+            "title": "Proto",
+            "type": "string"
+          }
+        },
+        "required": [
+          "proto",
+          "port"
+        ],
+        "title": "ListenerDrop",
+        "type": "object"
+      },
+      "ListenerSummary": {
+        "properties": {
+          "baseline": {
+            "title": "Baseline",
+            "type": "integer"
+          },
+          "current": {
+            "title": "Current",
+            "type": "integer"
+          },
+          "learning": {
+            "title": "Learning",
+            "type": "integer"
+          },
+          "missing": {
+            "items": {
+              "$ref": "#/components/schemas/MissingPort"
+            },
+            "title": "Missing",
+            "type": "array"
+          }
+        },
+        "required": [
+          "current",
+          "baseline",
+          "learning",
+          "missing"
+        ],
+        "title": "ListenerSummary",
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "password": {
@@ -3506,6 +4140,96 @@
         "title": "MetricsOut",
         "type": "object"
       },
+      "MissingPort": {
+        "properties": {
+          "alerting": {
+            "title": "Alerting",
+            "type": "boolean"
+          },
+          "missing_reports": {
+            "title": "Missing Reports",
+            "type": "integer"
+          },
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "proc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proc"
+          },
+          "proto": {
+            "title": "Proto",
+            "type": "string"
+          }
+        },
+        "required": [
+          "proto",
+          "port",
+          "missing_reports",
+          "alerting"
+        ],
+        "title": "MissingPort",
+        "type": "object"
+      },
+      "NftSummary": {
+        "properties": {
+          "dnat_rules": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dnat Rules"
+          },
+          "had_dnat": {
+            "title": "Had Dnat",
+            "type": "boolean"
+          },
+          "ip_forward": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Forward"
+          },
+          "relay_dnat": {
+            "title": "Relay Dnat",
+            "type": "boolean"
+          },
+          "tables": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tables"
+          }
+        },
+        "required": [
+          "relay_dnat",
+          "had_dnat"
+        ],
+        "title": "NftSummary",
+        "type": "object"
+      },
       "Overview": {
         "properties": {
           "issues_critical": {
@@ -3552,6 +4276,432 @@
           "tx_bytes_24h"
         ],
         "title": "Overview",
+        "type": "object"
+      },
+      "PanelBrief": {
+        "properties": {
+          "connected": {
+            "title": "Connected",
+            "type": "integer"
+          },
+          "disabled": {
+            "title": "Disabled",
+            "type": "integer"
+          },
+          "dropped": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dropped",
+            "type": "array"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "inbounds_without_group": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Inbounds Without Group",
+            "type": "array"
+          },
+          "nodes_total": {
+            "title": "Nodes Total",
+            "type": "integer"
+          },
+          "not_connected": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Not Connected",
+            "type": "array"
+          },
+          "resellers_near_quota": {
+            "items": {
+              "$ref": "#/components/schemas/ResellerBrief"
+            },
+            "title": "Resellers Near Quota",
+            "type": "array"
+          },
+          "server": {
+            "title": "Server",
+            "type": "string"
+          },
+          "user_status": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Status"
+          },
+          "users_last_hour": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Users Last Hour"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "server",
+          "version",
+          "nodes_total",
+          "connected",
+          "disabled",
+          "not_connected",
+          "dropped",
+          "users_last_hour",
+          "resellers_near_quota",
+          "user_status",
+          "inbounds_without_group",
+          "errors"
+        ],
+        "title": "PanelBrief",
+        "type": "object"
+      },
+      "PanelHost": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "hour_start": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hour Start"
+          },
+          "inbounds_without_group": {
+            "items": {
+              "$ref": "#/components/schemas/InboundTag"
+            },
+            "title": "Inbounds Without Group",
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/PanelNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "panel_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panel Error"
+          },
+          "reported_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported At"
+          },
+          "resellers": {
+            "items": {
+              "$ref": "#/components/schemas/Reseller"
+            },
+            "title": "Resellers",
+            "type": "array"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "integer"
+          },
+          "server_name": {
+            "title": "Server Name",
+            "type": "string"
+          },
+          "user_status": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Status"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "server_id",
+          "server_name",
+          "errors",
+          "available",
+          "nodes",
+          "resellers",
+          "inbounds_without_group"
+        ],
+        "title": "PanelHost",
+        "type": "object"
+      },
+      "PanelNode": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "bytes_last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes Last"
+          },
+          "bytes_median": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes Median"
+          },
+          "bytes_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes Pct"
+          },
+          "down_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Down S"
+          },
+          "dropped": {
+            "title": "Dropped",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "ignored": {
+            "title": "Ignored",
+            "type": "boolean"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "others_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Others Pct"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "unavailable_10m": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable 10M"
+          },
+          "users_last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Users Last"
+          },
+          "users_median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Users Median"
+          },
+          "users_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Users Pct"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "status",
+          "enabled",
+          "ignored",
+          "dropped"
+        ],
+        "title": "PanelNode",
+        "type": "object"
+      },
+      "PanelOut": {
+        "properties": {
+          "generated_at": {
+            "title": "Generated At",
+            "type": "integer"
+          },
+          "node_drop_pct": {
+            "title": "Node Drop Pct",
+            "type": "number"
+          },
+          "panels": {
+            "items": {
+              "$ref": "#/components/schemas/PanelHost"
+            },
+            "title": "Panels",
+            "type": "array"
+          },
+          "reseller_crit": {
+            "title": "Reseller Crit",
+            "type": "number"
+          },
+          "reseller_warn": {
+            "title": "Reseller Warn",
+            "type": "number"
+          }
+        },
+        "required": [
+          "generated_at",
+          "reseller_warn",
+          "reseller_crit",
+          "node_drop_pct",
+          "panels"
+        ],
+        "title": "PanelOut",
         "type": "object"
       },
       "PasswordRequest": {
@@ -4394,6 +5544,96 @@
         "title": "ReportResult",
         "type": "object"
       },
+      "Reseller": {
+        "properties": {
+          "hours_left": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hours Left"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "per_hour": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Hour"
+          },
+          "used": {
+            "title": "Used",
+            "type": "integer"
+          },
+          "used_pct": {
+            "title": "Used Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "used",
+          "limit",
+          "used_pct",
+          "level"
+        ],
+        "title": "Reseller",
+        "type": "object"
+      },
+      "ResellerBrief": {
+        "properties": {
+          "hours_left": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hours Left"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "used_pct": {
+            "title": "Used Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "used_pct",
+          "hours_left",
+          "level"
+        ],
+        "title": "ResellerBrief",
+        "type": "object"
+      },
       "RoleCount": {
         "properties": {
           "offline": {
@@ -4420,6 +5660,59 @@
           "pending"
         ],
         "title": "RoleCount",
+        "type": "object"
+      },
+      "SecurityState": {
+        "properties": {
+          "fail2ban": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fail2Ban"
+          },
+          "password_auth": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password Auth"
+          },
+          "sshd_ports": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sshd Ports"
+          },
+          "ufw": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ufw"
+          }
+        },
+        "title": "SecurityState",
         "type": "object"
       },
       "ServerBytes": {
@@ -5621,6 +6914,67 @@
           "servers"
         ],
         "title": "TrafficSummary",
+        "type": "object"
+      },
+      "UnitRow": {
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "restarts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restarts"
+          },
+          "restarts_10m": {
+            "title": "Restarts 10M",
+            "type": "integer"
+          },
+          "sub": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub"
+          },
+          "tunnel": {
+            "title": "Tunnel",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "enabled",
+          "restarts_10m",
+          "tunnel"
+        ],
+        "title": "UnitRow",
         "type": "object"
       },
       "UserOut": {
@@ -7662,6 +9016,55 @@
         ]
       }
     },
+    "/api/v1/panel": {
+      "get": {
+        "operationId": "checks_panel",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Panel View",
+        "tags": [
+          "checks"
+        ]
+      }
+    },
     "/api/v1/ping-matrix": {
       "get": {
         "operationId": "overview_ping_matrix",
@@ -8991,6 +10394,133 @@
         ]
       }
     },
+    "/api/v1/servers/{server_id}/host-health": {
+      "get": {
+        "operationId": "checks_host_health",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostHealth"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Host Health",
+        "tags": [
+          "checks"
+        ]
+      }
+    },
+    "/api/v1/servers/{server_id}/ignores": {
+      "patch": {
+        "description": "Retire a container or a panel node, mark an inbound as group-less on purpose, or accept that DNAT is gone.",
+        "operationId": "checks_set_ignore",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IgnoreSet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IgnoreOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Ignore",
+        "tags": [
+          "checks"
+        ]
+      }
+    },
     "/api/v1/servers/{server_id}/jobs": {
       "get": {
         "operationId": "servers_jobs",
@@ -9116,6 +10646,75 @@
         "summary": "Create Job",
         "tags": [
           "servers"
+        ]
+      }
+    },
+    "/api/v1/servers/{server_id}/listeners": {
+      "patch": {
+        "description": "A port that was removed on purpose leaves the baseline; if it listens again it is learned again from zero.",
+        "operationId": "checks_drop_listener",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListenerDrop"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostHealth"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Drop Listener",
+        "tags": [
+          "checks"
         ]
       }
     },

@@ -18,6 +18,13 @@ function ServerLine({ item, title }: { item: GroupItem; title: string }) {
 			>
 				{item.serverName}
 			</Link>
+		) : item.to === "panel" ? (
+			<Link
+				to="/panel"
+				className="font-medium text-accent-soft-foreground underline-offset-4 hover:underline"
+			>
+				{item.serverName}
+			</Link>
 		) : item.to === "ssl" ? (
 			<Link
 				to="/ssl"

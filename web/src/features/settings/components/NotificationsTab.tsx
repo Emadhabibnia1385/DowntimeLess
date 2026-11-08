@@ -23,27 +23,36 @@ import { useCanManage } from "@/features/auth";
 import { Loadable } from "@/shared/Loadable";
 import { useRefreshAll } from "@/shared/useRefreshAll";
 import { t } from "@/strings";
-import { DEFAULT_SETTINGS, onKey, QUOTA_BASIS, type Rule, RULES } from "../lib/rules";
+import {
+	DEFAULT_SETTINGS,
+	onKey,
+	QUOTA_BASIS,
+	RULE_GROUPS,
+	RULES,
+	type Rule,
+	type RuleUnit,
+	UNIT_MAX,
+} from "../lib/rules";
 import { PANEL_ROUTE, routeKey, routeOptions, toRoutes } from "../lib/routes";
 import { ChannelsCard } from "./ChannelsCard";
 
 type Values = Record<string, number | boolean | string>;
 
-const RULE_TEXT: Record<string, { title: string; hint: string }> = t.notifications.rules;
+const RULE_TEXT: Record<
+	string,
+	{ title: string; hint: string; warnNote?: string; critNote?: string }
+> = t.notifications.rules;
 
-const range = (rule: Rule) =>
-	rule.unit === "days"
-		? { max: 365, message: t.notifications.rangeDays }
-		: { max: 100, message: t.notifications.rangePercent };
+const range = (unit: RuleUnit) => ({ max: UNIT_MAX[unit], message: t.notifications.range(unit) });
 
 // One number per level, one switch per alert; a pair must stay in order (critical beyond warning).
 const shape: Record<string, z.ZodType<number | boolean | string>> = { [QUOTA_BASIS]: z.boolean() };
 for (const rule of RULES) {
 	shape[onKey(rule.id)] = z.boolean();
 	shape[routeKey(rule.id)] = z.string();
-	const { max, message } = range(rule);
 	for (const key of [rule.warn, rule.crit]) {
-		if (key) {
+		if (key && rule.unit) {
+			const { max, message } = range(rule.unit);
 			shape[key] = z
 				.number({ error: message })
 				.min(1, { error: message })
@@ -53,7 +62,7 @@ for (const rule of RULES) {
 }
 const schema = z.object(shape).superRefine((values, context) => {
 	for (const rule of RULES) {
-		if (!rule.warn || !rule.crit) continue;
+		if (!rule.warn || !rule.crit || rule.unordered) continue;
 		const warn = values[rule.warn] as number;
 		const crit = values[rule.crit] as number;
 		const ascending = rule.unit !== "days";
@@ -84,28 +93,31 @@ function Level({
 	name,
 	label,
 	unit,
+	note,
 	isDisabled,
 }: {
 	name: string | undefined;
 	label: string;
 	unit: Rule["unit"];
+	note?: string;
 	isDisabled: boolean;
 }) {
-	if (!name) return <span className="text-muted">{t.notifications.noValue}</span>;
+	if (!name || !unit) return <span className="text-muted">{t.notifications.noValue}</span>;
 	return (
-		<div className="flex items-center gap-2">
-			<NumberField
-				name={name}
-				label={<span className="sr-only">{label}</span>}
-				hideSteppers
-				minValue={1}
-				maxValue={unit === "days" ? 365 : 100}
-				isDisabled={isDisabled}
-				className="w-20"
-			/>
-			<span className="text-sm text-muted">
-				{unit === "days" ? t.notifications.days : t.notifications.percent}
-			</span>
+		<div className="flex flex-col gap-1">
+			<div className="flex items-center gap-2">
+				<NumberField
+					name={name}
+					label={<span className="sr-only">{label}</span>}
+					hideSteppers
+					minValue={1}
+					maxValue={UNIT_MAX[unit]}
+					isDisabled={isDisabled}
+					className={unit === "count" ? "w-28" : "w-20"}
+				/>
+				<span className="text-sm text-muted">{t.notifications.unit[unit]}</span>
+			</div>
+			{note ? <span className="text-xs text-muted">{note}</span> : null}
 		</div>
 	);
 }
@@ -178,52 +190,68 @@ function RulesTable({ values, channels }: { values: Values; channels: readonly C
 						t.notifications.colChannel,
 						t.notifications.colEnabled,
 					]}
-					rows={RULES.map((rule) => {
-						const text = RULE_TEXT[rule.id];
-						const title = text?.title ?? rule.id;
-						return {
-							id: rule.id,
+					rows={RULE_GROUPS.flatMap((group) => [
+						{
+							id: `group-${group}`,
 							cells: [
-								<div key="rule" className="flex flex-col gap-0.5">
-									<span className="font-semibold">{title}</span>
-									<span className="text-xs font-normal text-muted">{text?.hint}</span>
-								</div>,
-								<Level
-									key="warn"
-									name={rule.warn}
-									label={t.notifications.warnOf(title)}
-									unit={rule.unit}
-									isDisabled={!canManage}
-								/>,
-								<Level
-									key="crit"
-									name={rule.crit}
-									label={t.notifications.critOf(title)}
-									unit={rule.unit}
-									isDisabled={!canManage}
-								/>,
-								canManage ? (
-									<SelectField
-										key="channel"
-										name={routeKey(rule.id)}
-										label={<span className="sr-only">{t.notifications.routeOf(title)}</span>}
-										options={options}
-										className="w-52"
-									/>
-								) : (
-									<span key="channel" className="text-muted">
-										{t.notifications.noValue}
-									</span>
-								),
-								<SwitchField
-									key="on"
-									name={onKey(rule.id)}
-									label={<span className="sr-only">{t.notifications.enabled(title)}</span>}
-									isDisabled={!canManage}
-								/>,
+								<span key="group" className="text-sm font-bold text-accent-soft-foreground">
+									{t.notifications.groups[group]}
+								</span>,
+								"",
+								"",
+								"",
+								"",
 							],
-						};
-					})}
+						},
+						...RULES.filter((rule) => rule.group === group).map((rule) => {
+							const text = RULE_TEXT[rule.id];
+							const title = text?.title ?? rule.id;
+							return {
+								id: rule.id,
+								cells: [
+									<div key="rule" className="flex flex-col gap-0.5">
+										<span className="font-semibold">{title}</span>
+										<span className="text-xs font-normal text-muted">{text?.hint}</span>
+									</div>,
+									<Level
+										key="warn"
+										name={rule.warn}
+										label={t.notifications.warnOf(title)}
+										unit={rule.unit}
+										note={text?.warnNote}
+										isDisabled={!canManage}
+									/>,
+									<Level
+										key="crit"
+										name={rule.crit}
+										label={t.notifications.critOf(title)}
+										unit={rule.unit}
+										note={text?.critNote}
+										isDisabled={!canManage}
+									/>,
+									canManage ? (
+										<SelectField
+											key="channel"
+											name={routeKey(rule.id)}
+											label={<span className="sr-only">{t.notifications.routeOf(title)}</span>}
+											options={options}
+											className="w-52"
+										/>
+									) : (
+										<span key="channel" className="text-muted">
+											{t.notifications.noValue}
+										</span>
+									),
+									<SwitchField
+										key="on"
+										name={onKey(rule.id)}
+										label={<span className="sr-only">{t.notifications.enabled(title)}</span>}
+										isDisabled={!canManage}
+									/>,
+								],
+							};
+						}),
+					])}
 				/>
 				<SwitchField
 					name={QUOTA_BASIS}

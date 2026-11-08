@@ -39,6 +39,23 @@ describe("describeEvent", () => {
 		);
 	});
 
+	it("says what a host-check acknowledgement did", () => {
+		const ack = (detail: Record<string, unknown>) =>
+			describeEvent({
+				id: 1,
+				ts: 1,
+				server_id: 1,
+				server: "ir-1",
+				kind: "check_ack",
+				title: "x",
+				detail,
+			});
+		expect(ack({ what: "listener", name: "tcp/443", ignored: true })).toBe(
+			"پورت tcp/443 عمدی علامت خورد",
+		);
+		expect(ack({ what: "container", name: "panel-2", ignored: false })).toContain("دوباره پایش");
+	});
+
 	it("says which issue was acknowledged and for how long", () => {
 		expect(describeEvent(event("issue_acked", { code: "cpu", mode: "24h" }))).toBe(
 			"مشکل cpu پذیرفته شد (۲۴ ساعت)",
@@ -46,7 +63,7 @@ describe("describeEvent", () => {
 	});
 
 	it("labels every kind the master can write", () => {
-		expect(EVENT_KINDS).toHaveLength(15);
+		expect(EVENT_KINDS).toHaveLength(16);
 		for (const kind of EVENT_KINDS) expect(kindLabel(kind)).not.toBe(kind);
 		expect(kindLabel("mystery")).toBe("mystery");
 	});

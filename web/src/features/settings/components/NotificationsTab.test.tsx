@@ -141,6 +141,78 @@ describe("NotificationsTab destinations", () => {
 	});
 });
 
+describe("NotificationsTab phase 2 and 3 rows", () => {
+	beforeEach(() => {
+		window.scrollTo = () => {};
+	});
+	afterEach(() => vi.unstubAllGlobals());
+
+	it("groups the rows under headings, the host checks and panel rules included", async () => {
+		await open();
+		await screen.findByRole("region", { name: "فهرست اعلان‌ها" });
+		for (const heading of [
+			"لیسنرها، تانل‌ها و کانتینرها",
+			"DNAT، conntrack و کرنل",
+			"پنل PasarGuard",
+		]) {
+			expect(within(table()).getByText(heading)).toBeTruthy();
+		}
+		for (const title of [
+			"بسته شدن پورت همیشگی",
+			"توقف سرویس تانل یا DNAT",
+			"توقف کانتینر",
+			"از بین رفتن DNAT",
+			"دور ریختن اتصال در conntrack",
+			"نود «وصل» با Xray متوقف",
+			"افت ناگهانی مصرف نود",
+			"حجم نماینده‌ها",
+			"اینباند بدون گروه",
+		]) {
+			expect(within(line(title)).getByRole("switch")).toBeTruthy();
+		}
+		const rows = within(table()).getAllByRole("row");
+		expect(rows).toHaveLength(RULES.length + 5 + 1); // the rules, five group headings, the header row
+	});
+
+	it("tunes the numbers of the new rules and names the two conntrack limits", async () => {
+		const calls = await open();
+		await screen.findByRole("region", { name: "فهرست اعلان‌ها" });
+		const conntrack = line("برگشت حد conntrack به پیش‌فرض");
+		expect(within(conntrack).getByText("کمینهٔ رله")).toBeTruthy();
+		expect(within(conntrack).getByText("کمینهٔ نود")).toBeTruthy();
+		const reseller = within(line("حجم نماینده‌ها")).getByRole("textbox", { name: /مقدار هشدار/ });
+		await userEvent.clear(reseller);
+		await userEvent.type(reseller, "80");
+		await userEvent.click(screen.getByRole("button", { name: "ذخیرهٔ اعلان‌ها" }));
+		await waitFor(() =>
+			expect(calls.some((c) => c.method === "PUT" && c.url.endsWith("/settings"))).toBe(true),
+		);
+		const put = calls.find((c) => c.method === "PUT" && c.url.endsWith("/settings"));
+		expect(put?.body).toMatchObject({
+			reseller_warn: 80,
+			reseller_crit: 95,
+			ct_max_relay: 65536,
+			ct_max_exit: 262144,
+			node_drop_pct: 30,
+			node_others_pct: 70,
+			[onKey("node_silent")]: 1,
+		});
+	});
+
+	it("keeps a reseller critical level from going below its warning level", async () => {
+		const calls = await open();
+		await screen.findByRole("region", { name: "فهرست اعلان‌ها" });
+		const crit = within(line("حجم نماینده‌ها")).getByRole("textbox", { name: /مقدار بحرانی/ });
+		await userEvent.clear(crit);
+		await userEvent.type(crit, "50");
+		await userEvent.click(screen.getByRole("button", { name: "ذخیرهٔ اعلان‌ها" }));
+		expect(
+			await screen.findByText("مقدار بحرانی باید از مقدار هشدار بیشتر یا برابر آن باشد."),
+		).toBeTruthy();
+		expect(calls.some((c) => c.method === "PUT" && c.url.endsWith("/settings"))).toBe(false);
+	});
+});
+
 describe("ChannelsCard", () => {
 	beforeEach(() => {
 		window.scrollTo = () => {};

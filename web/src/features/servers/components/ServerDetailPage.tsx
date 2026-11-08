@@ -9,6 +9,7 @@ import { displayName } from "../lib/status";
 import { whereOf } from "../lib/where";
 import { CertsCard } from "./CertsCard";
 import { HistoryCard } from "./HistoryCard";
+import { HostHealthCard } from "./HostHealthCard";
 import { InstallCommand } from "./InstallCommand";
 import { LiveTiles } from "./LiveTiles";
 import { OperationsCard } from "./OperationsCard";
@@ -58,6 +59,9 @@ export function ServerDetailPage({
 							<OperationsCard server={data} canManage={canManage} canCheck={canCheck} />
 						</div>
 					</div>
+					{data.status === "pending" ? null : (
+						<HostHealthCard serverId={data.id} canManage={canManage} />
+					)}
 					<SectionCard title={t.server.recentJobs}>
 						<RecentJobs serverId={data.id} />
 					</SectionCard>

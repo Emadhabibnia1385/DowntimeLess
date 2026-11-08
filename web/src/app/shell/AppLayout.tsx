@@ -1,6 +1,7 @@
 import { AppShell, OfflineBanner } from "@nyxon/nasim";
 import { Outlet, useRouterState } from "@tanstack/react-router";
 import { AuthGate, useRole } from "@/features/auth";
+import { useHasPanel } from "@/features/panel";
 import { Footer } from "@/shared/Footer";
 import { t } from "@/strings";
 import { BottomBar } from "./BottomBar";
@@ -13,7 +14,10 @@ import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 function Shell() {
 	const pathname = useRouterState({ select: (state) => state.location.pathname });
 	const role = useRole();
-	const items = NAV.filter((item) => !item.ownerOnly || role === "owner");
+	const hasPanel = useHasPanel();
+	const items = NAV.filter(
+		(item) => (!item.ownerOnly || role === "owner") && (!item.panelOnly || hasPanel),
+	);
 	return (
 		<AppShell
 			brand={<Brand />}

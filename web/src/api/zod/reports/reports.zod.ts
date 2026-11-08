@@ -149,6 +149,18 @@ export const ReportsBriefingResponse = zod.object({
 		counts: zod.record(zod.string(), zod.int()),
 		truncated: zod.boolean(),
 	}),
+	host_checks: zod.object({
+		problems: zod.array(
+			zod.object({
+				code: zod.string(),
+				detail: zod.string(),
+				server: zod.union([zod.string(), zod.null()]),
+				severity: zod.string(),
+			}),
+		),
+		reporting: zod.int(),
+		without: zod.array(zod.string()),
+	}),
 	issue_events_24h: zod.int(),
 	issues: zod.object({
 		critical: zod.int(),
@@ -169,6 +181,29 @@ export const ReportsBriefingResponse = zod.object({
 		warning: zod.int(),
 	}),
 	not_measured: zod.array(zod.string()),
+	panel: zod.array(
+		zod.object({
+			connected: zod.int(),
+			disabled: zod.int(),
+			dropped: zod.array(zod.string()),
+			errors: zod.array(zod.string()),
+			inbounds_without_group: zod.array(zod.string()),
+			nodes_total: zod.int(),
+			not_connected: zod.array(zod.string()),
+			resellers_near_quota: zod.array(
+				zod.object({
+					hours_left: zod.union([zod.number(), zod.null()]),
+					level: zod.string(),
+					name: zod.string(),
+					used_pct: zod.number(),
+				}),
+			),
+			server: zod.string(),
+			user_status: zod.union([zod.record(zod.string(), zod.int()), zod.null()]),
+			users_last_hour: zod.union([zod.int(), zod.null()]),
+			version: zod.union([zod.string(), zod.null()]),
+		}),
+	),
 	path_problems: zod.array(
 		zod.object({
 			detail: zod.string(),

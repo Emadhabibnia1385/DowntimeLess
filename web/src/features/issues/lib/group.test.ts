@@ -99,3 +99,22 @@ describe("the Phase 1 detectors", () => {
 		);
 	});
 });
+
+describe("phase 2 and 3 issues", () => {
+	it("shows the ports, the reseller share and the node, and names the group in Persian", () => {
+		expect(
+			valueOf(issue({ code: "listener_missing", evidence: { ports: ["tcp/443", "tcp/22"] } })),
+		).toBe("tcp/443, tcp/22");
+		expect(
+			valueOf(issue({ code: "reseller_quota:r1", evidence: { reseller: "r1", used_pct: 97 } })),
+		).toContain("r1: ");
+		expect(valueOf(issue({ code: "node_silent:5", evidence: { node: "node-05" } }))).toBe(
+			"node-05",
+		);
+		const [group] = groupIssues([
+			issue({ code: "node_down:5", server_id: 9, server_name: "panel" }),
+		]);
+		expect(group.title).toBe("نود در پنل وصل نیست");
+		expect(group.items[0].to).toBe("panel");
+	});
+});

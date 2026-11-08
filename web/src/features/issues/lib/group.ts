@@ -6,7 +6,7 @@ export type GroupItem = {
 	id: string;
 	serverId: number | null;
 	serverName: string;
-	to: "server" | "ssl" | null;
+	to: "server" | "ssl" | "panel" | null;
 	value: string;
 	/** How many times this problem was active in the last 24 hours. */
 	recent: number;
@@ -27,7 +27,19 @@ const PERCENT_KEYS = [
 	"disk_pct",
 	"retrans_pct",
 	"conntrack_pct",
+	"inode_pct",
 ];
+// PasarGuard panel issues open the panel page, where the node or reseller is a row
+const PANEL_FAMILIES = new Set([
+	"node_down",
+	"node_silent",
+	"node_usage_drop",
+	"inbound_without_group",
+	"reseller_quota",
+	"panel_version_changed",
+	"panel_errors",
+]);
+const list = (value: unknown): string => (Array.isArray(value) ? value.map(String).join(", ") : "");
 
 /** "ping:1.2.3.4" and "ssl_expiry" both name a family of problems: the part before any colon. */
 export const familyOf = (code: string): string => code.split(":")[0];
@@ -49,6 +61,26 @@ export function valueOf(issue: Issue): string {
 		return loss === null ? by.trim() : formatPercent(loss) + by;
 	}
 	if (Array.isArray(e.units)) return e.units.join(", ");
+	for (const key of ["ports", "containers", "inbounds", "errors"]) {
+		if (Array.isArray(e[key])) return list(e[key]);
+	}
+	if (typeof e.reseller === "string") {
+		const used = num(e.used_pct);
+		return used === null ? e.reseller : `${e.reseller}: ${formatPercent(used)}`;
+	}
+	if (typeof e.node === "string") {
+		const share = num(e.users_pct);
+		return share === null ? e.node : `${e.node}: ${formatPercent(share)}`;
+	}
+	if (family === "conntrack_limits_reset") {
+		const max = num(e.conntrack_max);
+		return max === null ? "" : formatNumber(max);
+	}
+	if (family === "journal_big") {
+		const mb = num(e.journal_mb);
+		return mb === null ? "" : t.issues.values.mb(formatNumber(mb));
+	}
+	if (family === "panel_version_changed" && typeof e.new_version === "string") return e.new_version;
 	if (family === "offline") {
 		const ago = num(e.last_seen_s_ago);
 		return ago === null ? "" : t.issues.values.ago(formatDuration(ago));
@@ -98,7 +130,13 @@ export function groupIssues(issues: readonly Issue[]): IssueGroup[] {
 			id: issue.id,
 			serverId: issue.server_id ?? null,
 			serverName: issue.server_name ?? "",
-			to: family.startsWith("ssl_") ? "ssl" : issue.server_id == null ? null : "server",
+			to: family.startsWith("ssl_")
+				? "ssl"
+				: PANEL_FAMILIES.has(family)
+					? "panel"
+					: issue.server_id == null
+						? null
+						: "server",
 			value: valueOf(issue),
 			recent: issue.recent_24h ?? 0,
 		});

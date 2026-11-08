@@ -5,6 +5,7 @@ import {
 	DashboardIcon,
 	IssuesIcon,
 	KeyIcon,
+	PanelIcon,
 	PingIcon,
 	ServerIcon,
 	ShieldIcon,
@@ -22,6 +23,7 @@ export type NavItem = {
 		| "/ping-matrix"
 		| "/traffic"
 		| "/ssl"
+		| "/panel"
 		| "/api-keys"
 		| "/members"
 		| "/account";
@@ -30,6 +32,8 @@ export type NavItem = {
 	/** Shown in the phone's bottom bar too. */
 	primary?: boolean;
 	ownerOnly?: boolean;
+	/** Only while some server of the workspace reports a PasarGuard panel. */
+	panelOnly?: boolean;
 };
 
 export const NAV: readonly NavItem[] = [
@@ -39,6 +43,7 @@ export const NAV: readonly NavItem[] = [
 	{ to: "/ping-matrix", label: t.nav.pingMatrix, icon: PingIcon, primary: true },
 	{ to: "/traffic", label: t.nav.traffic, icon: ChartIcon, primary: true },
 	{ to: "/ssl", label: t.nav.ssl, icon: ShieldIcon },
+	{ to: "/panel", label: t.nav.panel, icon: PanelIcon, panelOnly: true },
 	{ to: "/members", label: t.nav.members, icon: UsersIcon, ownerOnly: true },
 	{ to: "/api-keys", label: t.nav.apiKeys, icon: KeyIcon, ownerOnly: true },
 	{ to: "/account", label: t.nav.account, icon: AccountIcon },

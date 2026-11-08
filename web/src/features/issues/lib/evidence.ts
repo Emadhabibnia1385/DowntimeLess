@@ -5,10 +5,11 @@ const LABELS: Record<string, string> = t.issues.evidenceLabels;
 export type EvidenceRow = { key: string; label: string; value: string; ltr: boolean };
 
 function valueText(key: string, value: unknown): string {
+	if (typeof value === "boolean") return value ? t.common.yes : t.common.no;
 	if (typeof value === "number") {
 		if (key.endsWith("_pct")) return formatPercent(value);
 		if (key.endsWith("_ms")) return formatMs(value);
-		if (key.endsWith("_s_ago")) return formatDuration(value);
+		if (key.endsWith("_s_ago") || key.endsWith("_s")) return formatDuration(value);
 		return formatDecimal(value, 1);
 	}
 	if (Array.isArray(value)) return value.join(", ");
@@ -21,6 +22,6 @@ export function evidenceRows(evidence: Record<string, unknown>): EvidenceRow[] {
 		key,
 		label: LABELS[key] ?? key,
 		value: valueText(key, value),
-		ltr: typeof value !== "number" && key !== "error",
+		ltr: typeof value !== "number" && typeof value !== "boolean" && key !== "error",
 	}));
 }
