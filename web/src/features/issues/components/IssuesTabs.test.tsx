@@ -223,9 +223,9 @@ describe("Issues page: health and changes tabs", () => {
 		await waitFor(() => expect(router.state.location.search).toMatchObject({ tab: "health" }));
 	});
 
-	it("has no reports item in the navigation", async () => {
+	it("names the issues item «گزارشات» and has no separate reports link", async () => {
 		open("/issues");
-		expect((await screen.findAllByRole("link", { name: "مشکلات" })).length).toBeGreaterThan(0);
+		expect((await screen.findAllByRole("link", { name: "گزارشات" })).length).toBeGreaterThan(0);
 		expect(screen.queryByRole("link", { name: "گزارش‌ها" })).toBeNull();
 		expect(document.querySelector('a[href="/reports"]')).toBeNull();
 	});

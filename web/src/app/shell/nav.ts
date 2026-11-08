@@ -39,8 +39,8 @@ export const NAV: readonly NavItem[] = [
 	{ to: "/ping-matrix", label: t.nav.pingMatrix, icon: PingIcon, primary: true },
 	{ to: "/traffic", label: t.nav.traffic, icon: ChartIcon, primary: true },
 	{ to: "/ssl", label: t.nav.ssl, icon: ShieldIcon },
-	{ to: "/api-keys", label: t.nav.apiKeys, icon: KeyIcon, ownerOnly: true },
 	{ to: "/members", label: t.nav.members, icon: UsersIcon, ownerOnly: true },
+	{ to: "/api-keys", label: t.nav.apiKeys, icon: KeyIcon, ownerOnly: true },
 	{ to: "/account", label: t.nav.account, icon: AccountIcon },
 ];
 

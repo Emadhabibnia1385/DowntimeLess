@@ -40,7 +40,7 @@ export const fa = {
 		label: "ناوبری اصلی",
 		dashboard: "داشبورد",
 		servers: "سرورها",
-		issues: "مشکلات",
+		issues: "گزارشات",
 		pingMatrix: "ماتریس پینگ",
 		traffic: "ترافیک",
 		ssl: "گواهی‌های SSL",
@@ -266,7 +266,7 @@ export const fa = {
 		},
 	},
 	issues: {
-		title: "مشکلات",
+		title: "گزارشات",
 		subtitle:
 			"مشکل‌های فعلی، تاریخچه، سلامت سرورها و تغییرات؛ مشکل‌های فعلی هر ۱۵ ثانیه به‌روز می‌شوند",
 		listLabel: "فهرست مشکلات",
@@ -443,7 +443,7 @@ export const fa = {
 		},
 	},
 	issueHistory: {
-		tabsLabel: "بخش‌های مشکلات",
+		tabsLabel: "بخش‌های گزارشات",
 		tabNow: "اکنون",
 		tabHistory: "تاریخچه",
 		recurrence: (count: string) => `${count} بار در ۲۴ ساعت`,
@@ -532,7 +532,7 @@ export const fa = {
 		},
 		undo: "لغو پذیرش",
 		undone: "پذیرش لغو شد؛ این مشکل دوباره شمرده می‌شود.",
-		onDashboard: (count: string) => `${count} مشکل پذیرفته‌شده در صفحهٔ مشکلات`,
+		onDashboard: (count: string) => `${count} مشکل پذیرفته‌شده در صفحهٔ گزارشات`,
 	},
 	categories: {
 		manage: "مدیریت دسته‌بندی‌ها",

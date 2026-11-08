@@ -360,7 +360,7 @@ describe("DashboardPage", () => {
 		expect(within(tile("مشکل‌های باز")).getByText("۱ بحرانی، ۲ هشدار، ۱ اطلاع")).toBeTruthy();
 		expect(within(table).getAllByRole("row").slice(1)).toHaveLength(4);
 		expect(within(table).queryByText("ir-4")).toBeNull();
-		expect(screen.getByText("۱ مشکل پذیرفته‌شده در صفحهٔ مشکلات")).toBeTruthy();
+		expect(screen.getByText("۱ مشکل پذیرفته‌شده در صفحهٔ گزارشات")).toBeTruthy();
 		expect(within(table).getAllByRole("button", { name: /^پذیرفتن/ })).toHaveLength(4);
 	});
 
