@@ -1,6 +1,7 @@
 export * from "./agent/agent.zod";
 export * from "./auth/auth.zod";
 export * from "./categories/categories.zod";
+export * from "./issues/issues.zod";
 export * from "./keys/keys.zod";
 export * from "./meta/meta.zod";
 export * from "./overview/overview.zod";

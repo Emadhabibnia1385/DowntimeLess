@@ -24,3 +24,6 @@ window.ResizeObserver ??= class {
 
 // axe probes the canvas for some checks; jsdom has none and would print "not implemented".
 HTMLCanvasElement.prototype.getContext = () => null;
+
+// The tab indicator slides with the Web Animations API, which jsdom lacks.
+Element.prototype.getAnimations ??= () => [];

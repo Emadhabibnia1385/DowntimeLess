@@ -210,6 +210,127 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HistoryTotals": {
+        "properties": {
+          "active_now": {
+            "title": "Active Now",
+            "type": "integer"
+          },
+          "critical": {
+            "title": "Critical",
+            "type": "integer"
+          },
+          "issues": {
+            "title": "Issues",
+            "type": "integer"
+          },
+          "occurrences": {
+            "title": "Occurrences",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "occurrences",
+          "issues",
+          "active_now",
+          "critical"
+        ],
+        "title": "HistoryTotals",
+        "type": "object"
+      },
+      "IncidentOut": {
+        "properties": {
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "duration_s": {
+            "title": "Duration S",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "opened_at": {
+            "title": "Opened At",
+            "type": "integer"
+          },
+          "server_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Id"
+          },
+          "server_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Name"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "code",
+          "server_id",
+          "server_name",
+          "severity",
+          "title",
+          "opened_at",
+          "closed_at",
+          "duration_s"
+        ],
+        "title": "IncidentOut",
+        "type": "object"
+      },
       "Issue": {
         "properties": {
           "code": {
@@ -224,6 +345,11 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "recent_24h": {
+            "default": 0,
+            "title": "Recent 24H",
+            "type": "integer"
           },
           "server_id": {
             "anyOf": [
@@ -271,6 +397,141 @@
           "evidence"
         ],
         "title": "Issue",
+        "type": "object"
+      },
+      "IssueSummary": {
+        "properties": {
+          "active_now": {
+            "title": "Active Now",
+            "type": "boolean"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "flapping": {
+            "title": "Flapping",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "last_at": {
+            "title": "Last At",
+            "type": "integer"
+          },
+          "occurrences": {
+            "title": "Occurrences",
+            "type": "integer"
+          },
+          "server_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Id"
+          },
+          "server_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Name"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "total_s": {
+            "title": "Total S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "code",
+          "server_id",
+          "server_name",
+          "title",
+          "severity",
+          "occurrences",
+          "total_s",
+          "last_at",
+          "active_now",
+          "flapping",
+          "evidence"
+        ],
+        "title": "IssueSummary",
+        "type": "object"
+      },
+      "IssuesHistory": {
+        "properties": {
+          "incidents": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentOut"
+            },
+            "title": "Incidents",
+            "type": "array"
+          },
+          "range": {
+            "title": "Range",
+            "type": "string"
+          },
+          "since": {
+            "title": "Since",
+            "type": "integer"
+          },
+          "summary": {
+            "items": {
+              "$ref": "#/components/schemas/IssueSummary"
+            },
+            "title": "Summary",
+            "type": "array"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/HistoryTotals"
+          }
+        },
+        "required": [
+          "range",
+          "since",
+          "summary",
+          "incidents",
+          "totals"
+        ],
+        "title": "IssuesHistory",
         "type": "object"
       },
       "JobCreate": {
@@ -2873,6 +3134,66 @@
         "summary": "Issues",
         "tags": [
           "overview"
+        ]
+      }
+    },
+    "/api/v1/issues/history": {
+      "get": {
+        "description": "Every issue that was active during the range, with how often and how long, and each separate occurrence.",
+        "operationId": "issues_history",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "range",
+            "required": false,
+            "schema": {
+              "default": "24h",
+              "title": "Range",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuesHistory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "History",
+        "tags": [
+          "issues"
         ]
       }
     },

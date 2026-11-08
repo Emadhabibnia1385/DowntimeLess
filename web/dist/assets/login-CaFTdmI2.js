@@ -1,0 +1,1 @@
+import{Ii as e,hi as t,t as n}from"./auth-BaT9urEv.js";import{c as r}from"./index-CjBQnrDx.js";var i=t(),a=e();function o(){let e=(0,i.c)(2),{redirect:t}=r.useSearch(),o;return e[0]===t?o=e[1]:(o=(0,a.jsx)(n,{redirect:t}),e[0]=t,e[1]=o),o}export{o as component};

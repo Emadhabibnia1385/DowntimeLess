@@ -1,7 +1,7 @@
 import { DataTable, EmptyState, StatusChip } from "@nyxon/nasim";
 import { Link } from "@tanstack/react-router";
 import type { Issue } from "@/api/generated/model";
-import { t } from "@/strings";
+import { formatNumber, t } from "@/strings";
 import { type GroupItem, groupIssues, type IssueGroup } from "../lib/group";
 
 const TONES = { critical: "danger", warning: "warning", info: "info" } as const;
@@ -29,7 +29,16 @@ function ServerLine({ item }: { item: GroupItem }) {
 		);
 	return (
 		<li className="flex items-center justify-between gap-4 py-0.5">
-			{name}
+			<span className="flex flex-wrap items-center gap-2">
+				{name}
+				{item.recent > 1 ? (
+					<StatusChip
+						tone="warning"
+						label={t.issueHistory.recurrence(formatNumber(item.recent))}
+						size="sm"
+					/>
+				) : null}
+			</span>
 			<span className="tabular-nums text-muted">{item.value || t.common.none}</span>
 		</li>
 	);

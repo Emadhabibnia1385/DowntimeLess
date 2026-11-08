@@ -1,6 +1,7 @@
 export * from "./agent/agent";
 export * from "./auth/auth";
 export * from "./categories/categories";
+export * from "./issues/issues";
 export * from "./keys/keys";
 export * from "./meta/meta";
 export * from "./overview/overview";

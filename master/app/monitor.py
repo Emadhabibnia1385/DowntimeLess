@@ -4,6 +4,7 @@ import time
 
 from .bot import notify_admins
 from .db import connect
+from .features.issues import service as incidents_svc
 from .features.servers.service import status_of
 from .features.settings.router import thresholds
 from .features.ssl import service as ssl_svc
@@ -31,6 +32,10 @@ def sweep(tg: Telegram) -> None:
         ssl_svc.drop_stale_auto(db)
         if th["on_ssl"]:
             _ssl_alerts(db, tg)
+        try:
+            incidents_svc.record(db, int(time.time()))
+        except Exception:
+            log.exception("issue history failed")
         cut = int(time.time())
         db.execute("DELETE FROM metrics WHERE ts<?", (cut - 90 * 86400,))
         db.execute("DELETE FROM pings WHERE ts<?", (cut - 7 * 86400,))

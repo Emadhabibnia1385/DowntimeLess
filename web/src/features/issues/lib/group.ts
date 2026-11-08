@@ -8,6 +8,8 @@ export type GroupItem = {
 	serverName: string;
 	to: "server" | "ssl" | null;
 	value: string;
+	/** How many times this problem was active in the last 24 hours. */
+	recent: number;
 };
 export type IssueGroup = {
 	family: string;
@@ -93,6 +95,7 @@ export function groupIssues(issues: readonly Issue[]): IssueGroup[] {
 			serverName: issue.server_name ?? "",
 			to: family.startsWith("ssl_") ? "ssl" : issue.server_id == null ? null : "server",
 			value: valueOf(issue),
+			recent: issue.recent_24h ?? 0,
 		});
 	}
 	return [...groups.values()].sort(

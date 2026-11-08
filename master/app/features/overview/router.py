@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from ...db import get_db
 from ...deps import Actor, require
+from ..issues import service as incidents_svc
 from ..servers.service import RANGES, server_out
 from . import service as svc
 
@@ -22,6 +23,7 @@ class Issue(BaseModel):
     title: str
     suggestion: str
     evidence: Dict[str, Any]
+    recent_24h: int = 0
 
 
 class PingCell(BaseModel):
@@ -91,7 +93,8 @@ def history(range: str = "24h", _: Actor = Depends(require("viewer")), db: sqlit
 
 @router.get("/issues", response_model=List[Issue], operation_id="overview_issues")
 def issues(_: Actor = Depends(require("viewer")), db: sqlite3.Connection = Depends(get_db)):
-    return svc.issues(db)
+    recent = incidents_svc.recent_counts(db, int(time.time()))
+    return [{**i, "recent_24h": recent.get(i["id"], 0)} for i in svc.issues(db)]
 
 
 @router.get("/ping-matrix", response_model=List[PingCell], operation_id="overview_ping_matrix")

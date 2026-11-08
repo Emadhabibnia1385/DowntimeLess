@@ -13,10 +13,13 @@ export const OverviewIssuesHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const overviewIssuesResponseRecent24hDefault = 0;
+
 export const OverviewIssuesResponseItem = zod.object({
 	code: zod.string(),
 	evidence: zod.record(zod.string(), zod.unknown()),
 	id: zod.string(),
+	recent_24h: zod.int().default(overviewIssuesResponseRecent24hDefault),
 	server_id: zod.union([zod.int(), zod.null()]),
 	server_name: zod.union([zod.string(), zod.null()]),
 	severity: zod.string(),

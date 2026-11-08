@@ -10,6 +10,7 @@ export interface Issue {
 	code: string;
 	evidence: IssueEvidence;
 	id: string;
+	recent_24h?: number;
 	server_id: number | null;
 	server_name: string | null;
 	severity: string;
