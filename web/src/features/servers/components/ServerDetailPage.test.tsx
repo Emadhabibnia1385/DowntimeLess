@@ -98,6 +98,17 @@ const user = {
 	tg_username: null,
 };
 
+const oneCert = {
+	key: "s1:a",
+	server_id: 1,
+	name: "a.example.com",
+	days_left: 12,
+	level: "warning",
+	error: null,
+	checked_at: NOW,
+};
+let certRows: unknown[] = [oneCert];
+
 function answer(url: string, data: ServerOut): Response {
 	const path = url.replace(/^.*\/api\/v1/, "").replace(/\?.*$/, "");
 	const body: unknown =
@@ -112,17 +123,7 @@ function answer(url: string, data: ServerOut): Response {
 						: path === "/categories"
 							? [{ id: 7, name: "اروپا", server_count: 1 }]
 							: path === "/ssl"
-								? [
-										{
-											key: "s1:a",
-											server_id: 1,
-											name: "a.example.com",
-											days_left: 12,
-											level: "warning",
-											error: null,
-											checked_at: NOW,
-										},
-									]
+								? certRows
 								: [];
 	return new Response(JSON.stringify(body), {
 		status: 200,
@@ -148,7 +149,10 @@ describe("ServerDetailPage", () => {
 	beforeEach(() => {
 		window.scrollTo = () => {};
 	});
-	afterEach(() => vi.unstubAllGlobals());
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		certRows = [oneCert];
+	});
 
 	it("names the server with its flag, status, role and category", async () => {
 		const heading = await open(server());
@@ -213,5 +217,21 @@ describe("ServerDetailPage", () => {
 		expect(heading.textContent).toContain("🇮🇷");
 		const details = await screen.findByRole("region", { name: "مشخصات" });
 		expect(within(details).getByText("Iran")).toBeTruthy();
+	});
+
+	it("shows the server's certificates five at a time and pages through them", async () => {
+		certRows = Array.from({ length: 12 }, (_, i) => ({
+			...oneCert,
+			key: `s1:c${i}`,
+			name: `c${String(i).padStart(2, "0")}.example.com`,
+			days_left: i + 1,
+		}));
+		await open(server());
+		expect(await screen.findByText("c00.example.com")).toBeTruthy();
+		expect(screen.getByText("c04.example.com")).toBeTruthy();
+		expect(screen.queryByText("c05.example.com")).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "صفحه بعد" }));
+		expect(await screen.findByText("c05.example.com")).toBeTruthy();
+		expect(screen.queryByText("c00.example.com")).toBeNull();
 	});
 });

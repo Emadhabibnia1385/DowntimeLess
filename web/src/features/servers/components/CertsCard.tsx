@@ -1,16 +1,23 @@
-import { LinkButton, SectionCard, StatusChip } from "@nyxon/nasim";
+import { LinkButton, Pager, SectionCard, StatusChip } from "@nyxon/nasim";
+import { useState } from "react";
 import { certStatus, daysLeftLabel, useSsl } from "@/features/ssl";
 import { t } from "@/strings";
 
-// The certificates found on this server, soonest to expire first; hidden when there are none.
+// This server's certificates, soonest to expire first, a few per page; hidden when there are none.
+const PAGE_SIZE = 5;
+
 export function CertsCard({ serverId }: { serverId: number }) {
 	const certs = useSsl();
+	const [page, setPage] = useState(1);
 	const rows = (certs.data ?? [])
 		.filter((row) => row.server_id === serverId)
 		.sort(
 			(a, b) => (a.days_left ?? Number.MAX_SAFE_INTEGER) - (b.days_left ?? Number.MAX_SAFE_INTEGER),
 		);
 	if (rows.length === 0) return null;
+	const pageCount = Math.ceil(rows.length / PAGE_SIZE);
+	const current = Math.min(page, pageCount);
+	const shown = rows.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
 	return (
 		<SectionCard
 			title={t.server.certsTitle}
@@ -21,7 +28,7 @@ export function CertsCard({ serverId }: { serverId: number }) {
 			}
 		>
 			<ul className="flex flex-col divide-y divide-separator">
-				{rows.map((row) => {
+				{shown.map((row) => {
 					const status = certStatus(row);
 					const label = row.days_left == null ? status.label : daysLeftLabel(row.days_left);
 					return (
@@ -34,6 +41,15 @@ export function CertsCard({ serverId }: { serverId: number }) {
 					);
 				})}
 			</ul>
+			{pageCount > 1 ? (
+				<Pager
+					className="mt-3"
+					page={current}
+					pageCount={pageCount}
+					onPrevious={() => setPage(current - 1)}
+					onNext={() => setPage(current + 1)}
+				/>
+			) : null}
 		</SectionCard>
 	);
 }
