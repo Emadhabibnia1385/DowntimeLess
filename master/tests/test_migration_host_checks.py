@@ -33,7 +33,9 @@ def test_016_keeps_every_row_and_adds_the_check_tables(at_015):
     migrate(db)
     assert "016_host_checks.sql" in [r[0] for r in db.execute("SELECT name FROM schema_migrations")]
     for t in TABLES:
-        assert _rows(db, t)[0] == before[t], t
+        after = _rows(db, t)[0]  # later migrations may add columns
+        assert [tuple(r)[: len(b)] for r, b in zip(after, before[t])] == [tuple(b) for b in before[t]], t
+        assert len(after) == len(before[t]), t
     for t in ("listener_baseline", "check_state", "check_ignores", "node_usage"):
         cols = [r[1] for r in db.execute("PRAGMA table_info(%s)" % t)]
         assert cols[:2] == ["workspace_id", "server_id"], t
