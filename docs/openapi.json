@@ -437,7 +437,7 @@
             "type": "string"
           },
           "scope": {
-            "pattern": "^(read|operate)$",
+            "pattern": "^(read|full)$",
             "title": "Scope",
             "type": "string"
           }

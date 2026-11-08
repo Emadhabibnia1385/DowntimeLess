@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from ...db import get_db
-from ...deps import Actor, require, session_only
+from ...deps import Actor, require
 from ...errors import DLError
 from ...security import digest, new_token
 
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/keys", tags=["keys"])
 
 class KeyCreate(BaseModel):
     name: str = Field(min_length=1, max_length=64)
-    scope: str = Field(pattern="^(read|operate)$")
+    scope: str = Field(pattern="^(read|full)$")
 
 
 class KeyOut(BaseModel):
@@ -31,8 +31,8 @@ class KeyCreated(KeyOut):
     token: str
 
 
-def _owner(actor: Actor = Depends(session_only)) -> Actor:
-    return require("owner")(actor)
+def _owner(actor: Actor = Depends(require("owner"))) -> Actor:
+    return actor
 
 
 @router.get("", response_model=List[KeyOut], operation_id="keys_list")

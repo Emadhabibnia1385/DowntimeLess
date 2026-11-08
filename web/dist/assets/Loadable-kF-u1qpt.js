@@ -1,1 +1,0 @@
-import{Tr as e,k as t,w as n,zn as r}from"./useDocumentTitle-DGrRXRYf.js";var i=e();function a({query:e,children:a,skeleton:o=(0,i.jsx)(n,{})}){return e.isPending?o:e.isError?(0,i.jsx)(t,{message:r(e.error),onRetry:()=>void e.refetch()}):a(e.data)}export{a as t};

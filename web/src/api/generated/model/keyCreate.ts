@@ -11,6 +11,6 @@ export interface KeyCreate {
 	 * @maxLength 64
 	 */
 	name: string;
-	/** @pattern ^(read|operate)$ */
+	/** @pattern ^(read|full)$ */
 	scope: string;
 }

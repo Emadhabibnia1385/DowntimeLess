@@ -118,8 +118,8 @@ def create_job(server_id: int, body: JobCreate, actor: Actor = Depends(require("
     if body.kind in svc.CERT_KINDS and not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$", str(body.args.get("name", ""))):
         raise DLError("job.args_invalid")
     if body.kind in svc.MUTATING_KINDS:
-        if actor.via == "key":
-            raise DLError("job.permission")  # changes to a server always come from a signed-in human
+        if actor.via == "key" and not actor.full:
+            raise DLError("job.permission")  # a read key never changes a server; a full key may
     cur = db.execute(
         "INSERT INTO jobs (server_id, kind, args, created_by, created_at) VALUES (?,?,?,?,?)",
         (server_id, body.kind, json.dumps(body.args), actor.user_id, int(time.time())),

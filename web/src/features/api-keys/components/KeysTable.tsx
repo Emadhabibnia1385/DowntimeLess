@@ -40,8 +40,8 @@ export function KeysTable() {
 			header: t.apiKeys.scope,
 			cell: (key) => (
 				<StatusChip
-					tone={key.scope === "operate" ? "warning" : "info"}
-					label={key.scope === "operate" ? t.apiKeys.scopeOperate : t.apiKeys.scopeRead}
+					tone={key.scope === "full" ? "warning" : "info"}
+					label={key.scope === "full" ? t.apiKeys.scopeFull : t.apiKeys.scopeRead}
 					size="sm"
 				/>
 			),

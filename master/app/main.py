@@ -96,8 +96,9 @@ def create_app() -> FastAPI:
             "- GET /api/v1/snapshot: whole fleet, issues and ping matrix in one document.\n"
             "- GET /api/v1/issues: current problems with evidence and a suggested next step.\n"
             "- GET /api/v1/servers, /api/v1/servers/{id}/metrics?range=24h, /api/v1/ping-matrix, /api/v1/overview\n"
-            "- POST /api/v1/servers/{id}/jobs: safe checks (ping, tcp_check, speedtest_down/up) with an `operate` key.\n"
-            "- Changes to a server (reboot, upgrade) are never allowed with a key; a signed-in human must queue them.\n"
+            "- A `read` key only reads. A `full` key may do everything the owner does: POST /api/v1/servers/{id}/jobs"
+            " (ping, tcp_check, speedtest_down/up, apt_upgrade_safe, reboot, self_update, cert_renew, cert_delete), manage servers, domains, settings and keys.\n"
+            "- Treat a `full` key like a root password.\n"
             "- Full schema: /api/openapi.json\n"
         )
 

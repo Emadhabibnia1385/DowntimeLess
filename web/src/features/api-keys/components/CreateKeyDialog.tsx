@@ -20,13 +20,13 @@ import { t } from "@/strings";
 
 const schema = z.object({
 	name: z.string().trim().min(1, { error: t.apiKeys.nameRequired }).max(64),
-	scope: z.enum(["read", "operate"]),
+	scope: z.enum(["read", "full"]),
 });
 type Values = z.input<typeof schema>;
 
 const scopes = [
 	{ value: "read", label: t.apiKeys.scopeRead, description: t.apiKeys.scopeReadHint },
-	{ value: "operate", label: t.apiKeys.scopeOperate, description: t.apiKeys.scopeOperateHint },
+	{ value: "full", label: t.apiKeys.scopeFull, description: t.apiKeys.scopeFullHint },
 ];
 
 // Two steps in one dialog: name the key, then show its token once.

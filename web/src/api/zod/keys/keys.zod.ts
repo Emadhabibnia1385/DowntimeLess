@@ -32,7 +32,7 @@ export const KeysCreateHeader = zod.object({
 
 export const keysCreateBodyNameMax = 64;
 
-export const keysCreateBodyScopeRegExp = new RegExp("^(read|operate)$");
+export const keysCreateBodyScopeRegExp = new RegExp("^(read|full)$");
 
 export const KeysCreateBody = zod.object({
 	name: zod.string().min(1).max(keysCreateBodyNameMax),

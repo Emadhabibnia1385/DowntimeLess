@@ -1,1 +1,0 @@
-import{nr as e,wr as t}from"./useDocumentTitle-DGrRXRYf.js";var n=e();function r(){let e=(0,n.c)(2),r=t(),i;return e[0]===r?i=e[1]:(i=()=>r.invalidateQueries(),e[0]=r,e[1]=i),i}export{r as t};

@@ -15,8 +15,8 @@ ROLE_RANK = {"viewer": 1, "admin": 2, "owner": 3}
 class Actor:
     """Who is calling: a signed-in user, or an API key acting with a scope."""
 
-    def __init__(self, user_id: Optional[int], role: str, via: str):
-        self.user_id, self.role, self.via = user_id, role, via
+    def __init__(self, user_id: Optional[int], role: str, via: str, full: bool = False):
+        self.user_id, self.role, self.via, self.full = user_id, role, via, full
 
 
 def current_actor(
@@ -33,8 +33,11 @@ def current_actor(
         if not row:
             raise DLError("auth.required")
         db.execute("UPDATE api_keys SET last_used=? WHERE id=?", (now, row["id"]))
-        # an 'operate' key is an admin, a 'read' key is a viewer; keys never manage users or other keys
-        return Actor(row["created_by"], "admin" if row["scope"] == "operate" else "viewer", "key")
+        # a 'full' key does everything the owner does in the panel; a 'read' key only looks.
+        # Passwords and one's own profile stay with a signed-in person (session_only).
+        if row["scope"] == "full":
+            return Actor(row["created_by"], "owner", "key", full=True)
+        return Actor(row["created_by"], "viewer", "key")
     token = request.cookies.get(COOKIE)
     if token:
         row = db.execute(
