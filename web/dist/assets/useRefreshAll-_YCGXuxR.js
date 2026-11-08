@@ -1,1 +1,0 @@
-import{Zi as e,ji as t}from"./auth-CcDU96ib.js";var n=t();function r(){let t=(0,n.c)(2),r=e(),i;return t[0]===r?i=t[1]:(i=()=>r.invalidateQueries(),t[0]=r,t[1]=i),i}export{r as t};

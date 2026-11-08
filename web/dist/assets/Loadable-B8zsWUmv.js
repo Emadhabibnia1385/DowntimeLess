@@ -1,0 +1,1 @@
+import{$i as e,Y as t,di as n,pt as r}from"./auth-BkhTqhkx.js";var i=e();function a({query:e,children:a,skeleton:o=(0,i.jsx)(t,{})}){return e.isPending?o:e.isError?(0,i.jsx)(r,{message:n(e.error),onRetry:()=>void e.refetch()}):a(e.data)}export{a as t};
