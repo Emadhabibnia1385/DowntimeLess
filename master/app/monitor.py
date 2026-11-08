@@ -27,8 +27,8 @@ def sweep(tg: Telegram) -> None:
             except Exception:
                 log.exception("sweep of workspace %d failed", ws)
         cut = int(time.time())
-        db.execute("DELETE FROM metrics WHERE ts<?", (cut - 90 * 86400,))  # ws: retention by age, every workspace alike
-        db.execute("DELETE FROM pings WHERE ts<?", (cut - 7 * 86400,))  # ws: retention by age, every workspace alike
+        db.execute("DELETE FROM metrics WHERE ts<?", (cut - 90 * 86400,))  # ws: retention - by age, every workspace alike
+        db.execute("DELETE FROM pings WHERE ts<?", (cut - 7 * 86400,))  # ws: retention - by age, every workspace alike
         links_svc.prune(db, cut)
         changelog.prune(db, cut)
         db.execute("DELETE FROM sessions WHERE expires_at<?", (cut,))

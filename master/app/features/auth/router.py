@@ -4,7 +4,7 @@ from typing import List
 from fastapi import APIRouter, Depends, Request, Response
 
 from ...db import get_db
-from ...deps import COOKIE, Actor, session_only
+from ...deps import COOKIE, Actor, session_any_workspace, session_only
 from ...errors import DLError
 from ...ratelimit import hit
 from ...security import digest
@@ -89,18 +89,20 @@ def me(actor: Actor = Depends(session_only), db: sqlite3.Connection = Depends(ge
 
 
 @router.get("/workspaces", response_model=List[WorkspaceOut], operation_id="auth_workspaces")
-def workspaces(actor: Actor = Depends(session_only), db: sqlite3.Connection = Depends(get_db)):
+def workspaces(actor: Actor = Depends(session_any_workspace), db: sqlite3.Connection = Depends(get_db)):
     """The workspaces I belong to, my own first, with my role in each."""
     return list_for_user(db, actor.user_id)
 
 
 @router.post("/workspace", response_model=UserOut, operation_id="auth_switch_workspace")
-def switch_workspace(body: SwitchWorkspace, actor: Actor = Depends(session_only), db: sqlite3.Connection = Depends(get_db)):
-    """Act in another workspace I am a member of; any other id is not found."""
+def switch_workspace(body: SwitchWorkspace, actor: Actor = Depends(session_any_workspace), db: sqlite3.Connection = Depends(get_db)):
+    """Check that I may act in a workspace and remember it for my next sign-in; any other id is not found.
+
+    The browser tab then names it in X-Workspace-Id on each request. Requests without that header (other tabs of an older
+    panel, scripts on the cookie) keep the workspace the session started in, so a switch here never redirects them."""
     hit("switch:%d" % actor.user_id, 60, 60)
     if member_role(db, body.workspace_id, actor.user_id) is None:
         raise DLError("workspace.not_found")
-    db.execute("UPDATE sessions SET active_workspace_id=? WHERE id=? AND user_id=?", (body.workspace_id, actor.session_id, actor.user_id))
     db.execute("UPDATE users SET last_workspace_id=? WHERE id=?", (body.workspace_id, actor.user_id))
     return svc.user_out(db, db.execute("SELECT * FROM users WHERE id=?", (actor.user_id,)).fetchone(), body.workspace_id)
 

@@ -35,6 +35,13 @@ def _owner(actor: Actor = Depends(require("owner"))) -> Actor:
     return actor
 
 
+def _owner_session(actor: Actor = Depends(require("owner"))) -> Actor:
+    """Making or removing a key needs a signed-in owner: a key never mints or revokes keys."""
+    if actor.via != "session":
+        raise DLError("auth.forbidden")
+    return actor
+
+
 @router.get("", response_model=List[KeyOut], operation_id="keys_list")
 def list_keys(_: Actor = Depends(_owner), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
     return [dict(r) for r in db.execute(
@@ -42,7 +49,7 @@ def list_keys(_: Actor = Depends(_owner), ws: int = Depends(current_workspace), 
 
 
 @router.post("", response_model=KeyCreated, status_code=201, operation_id="keys_create")
-def create_key(body: KeyCreate, actor: Actor = Depends(_owner), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
+def create_key(body: KeyCreate, actor: Actor = Depends(_owner_session), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
     """A key that acts only inside the current workspace."""
     token = "dl_" + new_token(32)
     now = int(time.time())
@@ -54,6 +61,6 @@ def create_key(body: KeyCreate, actor: Actor = Depends(_owner), ws: int = Depend
 
 
 @router.delete("/{key_id}", status_code=204, operation_id="keys_delete")
-def delete_key(key_id: int, _: Actor = Depends(_owner), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
+def delete_key(key_id: int, _: Actor = Depends(_owner_session), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
     if not db.execute("DELETE FROM api_keys WHERE id=? AND workspace_id=?", (key_id, ws)).rowcount:
         raise DLError("key.not_found")

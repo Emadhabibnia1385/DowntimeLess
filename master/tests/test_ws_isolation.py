@@ -191,6 +191,7 @@ def test_a_foreign_or_unknown_workspace_cannot_be_switched_to(world, owner, tg):
     from ws_world import CAROL_TG, login
 
     carol = login(world["app"], tg, CAROL_TG)
+    switch(carol, world["B"])
     assert carol.post("/api/v1/auth/workspace", json={"workspace_id": world["A"]}).json()["code"] == "workspace.not_found"
     assert carol.post("/api/v1/auth/workspace", json={"workspace_id": 999}).json()["code"] == "workspace.not_found"
     assert {s["name"] for s in carol.get("/api/v1/servers").json()} == {"bee-relay", "bee-exit", "bee-twin"}
@@ -200,7 +201,8 @@ def test_names_and_chats_are_unique_per_workspace_only(world):
     x = world["x"]
     assert x.post("/api/v1/categories", json={"name": "B-cat"}).status_code == 201
     assert x.post("/api/v1/categories", json={"name": "B-cat"}).json()["code"] == "category.exists"
-    assert x.post("/api/v1/telegram/channels", json={"name": "c", "chat_id": "-1002222222222"}).status_code == 201
+    # one chat belongs to one workspace; B's chat answers like a malformed id, so A learns nothing about it
+    assert x.post("/api/v1/telegram/channels", json={"name": "c", "chat_id": "-1002222222222"}).json()["code"] == "channel.invalid"
     assert x.post("/api/v1/domains", json={"host": "b-domain.example.com"}).status_code == 201
     assert x.post("/api/v1/domains", json={"host": "b-domain.example.com"}).json()["code"] == "domain.exists"
     y = world["y"]

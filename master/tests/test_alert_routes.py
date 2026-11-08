@@ -37,6 +37,7 @@ def test_channel_crud_and_validation(owner):
 
 def test_the_test_endpoint_sends_through_the_bot_and_reports_failures(owner, tg):
     ch = add_channel(owner).json()
+    owner.app.state.tg = None
     assert owner.post(API + "/channels/%d/test" % ch["id"]).json()["code"] == "bot.not_configured"
     owner.app.state.tg = tg
     assert owner.post(API + "/channels/%d/test" % ch["id"]).status_code == 204

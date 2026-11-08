@@ -22,12 +22,10 @@ class CategoryOut(BaseModel):
     server_count: int
 
 
-_COUNT = "(SELECT COUNT(*) FROM servers s WHERE s.category_id=c.id AND s.workspace_id=c.workspace_id) AS server_count"
-
-
 def _out(db: sqlite3.Connection, ws: int, category_id: int) -> dict:
     row = db.execute(
-        "SELECT c.id, c.name, " + _COUNT + " FROM categories c WHERE c.id=? AND c.workspace_id=?",
+        "SELECT c.id, c.name, (SELECT COUNT(*) FROM servers s WHERE s.category_id=c.id AND s.workspace_id=c.workspace_id) AS server_count "
+        "FROM categories c WHERE c.id=? AND c.workspace_id=?",
         (category_id, ws),
     ).fetchone()
     if not row:
@@ -46,7 +44,11 @@ def _unique(db: sqlite3.Connection, ws: int, name: str, except_id: int = 0) -> s
 
 @router.get("", response_model=List[CategoryOut], operation_id="categories_list")
 def list_categories(_: Actor = Depends(require("viewer")), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
-    rows = db.execute("SELECT c.id, c.name, " + _COUNT + " FROM categories c WHERE c.workspace_id=? ORDER BY c.id", (ws,))
+    rows = db.execute(
+        "SELECT c.id, c.name, (SELECT COUNT(*) FROM servers s WHERE s.category_id=c.id AND s.workspace_id=c.workspace_id) AS server_count "
+        "FROM categories c WHERE c.workspace_id=? ORDER BY c.id",
+        (ws,),
+    )
     return [dict(r) for r in rows]
 
 

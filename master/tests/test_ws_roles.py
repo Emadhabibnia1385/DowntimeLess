@@ -6,7 +6,7 @@ import pytest
 from app.db import connect
 from app.features.ssl import service as ssl_svc
 from conftest import make_server
-from ws_world import invite, login
+from ws_world import invite, login, switch
 
 RANK = {"viewer": 1, "operator": 2, "admin": 3, "owner": 4}
 
@@ -19,6 +19,7 @@ def team(owner, tg, monkeypatch):
     for tg_id, role in ((401, "admin"), (402, "operator"), (403, "viewer")):
         invite(owner, tg_id, role)
         clients[role] = login(owner.app, tg, tg_id)
+        switch(clients[role], 1)
         assert clients[role].get("/api/v1/auth/me").json()["role"] == role
     return clients
 

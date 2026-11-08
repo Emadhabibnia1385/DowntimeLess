@@ -68,17 +68,17 @@ def _day_sum(days: Dict[int, Tuple[int, int]], lo: int, hi: int) -> Dict[str, in
     return _pair(sum(v[0] for v in vals), sum(v[1] for v in vals))
 
 
-def category_cond(db: sqlite3.Connection, ws: int, category: Optional[str], alias: str = "s") -> Tuple[str, List[Any]]:
-    """SQL on a `servers` alias for one category of workspace `ws`: an id, 'none' for servers without one, None for all.
+def category_params(db: sqlite3.Connection, ws: int, category: Optional[str]) -> List[Any]:
+    """The two parameters of `(? = 1 OR s.category_id IS ?)` for one category of workspace `ws`: all (None), none ('none') or an id.
 
     A category id of another workspace (or none at all) matches nothing, never another workspace's rows."""
     if category is None or category == "":
-        return "1=1", []
+        return [1, None]
     if category == "none":
-        return "%s.category_id IS NULL" % alias, []
+        return [0, None]
     if not db.execute("SELECT 1 FROM categories WHERE id=? AND workspace_id=?", (int(category), ws)).fetchone():
-        return "0=1", []
-    return "%s.category_id=?" % alias, [int(category)]
+        return [0, -1]
+    return [0, int(category)]
 
 
 def summary(db: sqlite3.Connection, ws: int, now: int, tz_offset_min: int, since: Optional[int], until: Optional[int],
@@ -92,10 +92,10 @@ def summary(db: sqlite3.Connection, ws: int, now: int, tz_offset_min: int, since
     start = min(lo, today - DAY)
     per: Dict[int, Dict[int, Tuple[int, int]]] = {}
     fleet: Dict[int, Tuple[int, int]] = {}
-    cond, cargs = category_cond(db, ws, category)
+    cargs = category_params(db, ws, category)
     rows = db.execute(
         "SELECT m.server_id, (m.ts+?)/? AS d, SUM(m.rx_delta) rx, SUM(m.tx_delta) tx FROM metrics m JOIN servers s ON s.id=m.server_id "
-        "WHERE s.workspace_id=? AND m.ts>=? AND m.ts<=? AND " + cond + " GROUP BY m.server_id, d",
+        "WHERE s.workspace_id=? AND m.ts>=? AND m.ts<=? AND (? = 1 OR s.category_id IS ?) GROUP BY m.server_id, d",
         [off, DAY, ws, start, now] + cargs,
     )
     for r in rows:
@@ -111,8 +111,8 @@ def summary(db: sqlite3.Connection, ws: int, now: int, tz_offset_min: int, since
     fleet_total = fleet_facts["period"]["total"]
     servers: List[Dict[str, Any]] = []
     for s in db.execute(
-        "SELECT s.id, s.name, s.alias, s.role, s.panel_only, s.country, s.category_id FROM servers s WHERE s.workspace_id=? AND " + cond
-        + " ORDER BY s.role, s.name",
+        "SELECT s.id, s.name, s.alias, s.role, s.panel_only, s.country, s.category_id FROM servers s "
+        "WHERE s.workspace_id=? AND (? = 1 OR s.category_id IS ?) ORDER BY s.role, s.name",
         [ws] + cargs,
     ):
         f = facts(per.get(s["id"], {}))
@@ -134,18 +134,13 @@ def series(db: sqlite3.Connection, ws: int, now: int, since: int, until: int, tz
     size = HOUR if hourly else DAY
     first = ((since + off) // size) * size - off
     hour_start = (now + off) // HOUR * HOUR - off
-    sql = (
+    # every server, or one (server_id IS NULL means all): literal SQL with parameters only
+    rows = db.execute(
         "SELECT (m.ts+?)/? AS h, SUM(m.rx_delta) rx, SUM(m.tx_delta) tx FROM metrics m JOIN servers s ON s.id=m.server_id "
-        "WHERE s.workspace_id=? AND m.ts>=? AND m.ts<?"
+        "WHERE s.workspace_id=? AND m.ts>=? AND m.ts<? AND (? IS NULL OR m.server_id=?) AND (? = 1 OR s.category_id IS ?) GROUP BY h",
+        [off, HOUR, ws, first, end, server_id, server_id] + category_params(db, ws, category),
     )
-    args: List[Any] = [off, HOUR, ws, first, end]
-    if server_id is not None:
-        sql += " AND m.server_id=?"
-        args.append(server_id)
-    cond, cargs = category_cond(db, ws, category)
-    sql += " AND " + cond
-    args += cargs
-    hours = {r["h"] * HOUR - off: (r["rx"], r["tx"]) for r in db.execute(sql + " GROUP BY h", args)}  # ws: sql above joins servers by workspace_id
+    hours = {r["h"] * HOUR - off: (r["rx"], r["tx"]) for r in rows}
 
     # one hourly pass feeds the chart, the best days and the hour-of-day profile
     days: Dict[int, List[int]] = {}

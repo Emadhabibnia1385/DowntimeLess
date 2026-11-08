@@ -21,6 +21,20 @@ class Telegram:
     def me(self) -> Dict[str, Any]:
         return self.call("getMe")
 
+    def bot_id(self) -> int:
+        if not getattr(self, "_bot_id", None):
+            self._bot_id = int(self.me()["id"])
+        return self._bot_id
+
+    def chat_admins(self, chat_id: Union[int, str]) -> Optional[List[Dict[str, Any]]]:
+        """The administrators of a group or channel (ChatMember objects); None when Telegram refuses (a private chat,
+        a chat the bot is not in, an unknown chat)."""
+        try:
+            return self.call("getChatAdministrators", chat_id=chat_id)
+        except Exception as exc:
+            log.warning("getChatAdministrators %s failed: %s", chat_id, exc)
+            return None
+
     def updates(self, offset: int) -> List[Dict[str, Any]]:
         return self.call("getUpdates", offset=offset, timeout=25, allowed_updates=["message", "callback_query"])
 

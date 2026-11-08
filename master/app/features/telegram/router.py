@@ -59,17 +59,56 @@ def list_channels(_: Actor = Depends(require("admin")), ws: int = Depends(curren
 
 
 @router.post("/channels", response_model=ChannelOut, status_code=201, operation_id="telegram_create_channel")
-def create_channel(body: ChannelIn, _: Actor = Depends(require("admin")), ws: int = Depends(current_workspace),
+def create_channel(body: ChannelIn, request: Request, _: Actor = Depends(require("admin")), ws: int = Depends(current_workspace),
                    db: sqlite3.Connection = Depends(get_db)):
+    """A chat the shared bot may post this workspace's alerts to, checked with Telegram before it is saved.
+
+    A group or channel: the bot must be an administrator that may post, and so must one of this workspace's owner or
+    admins. A private chat (a positive id): only one of those people's own id. One chat belongs to one workspace."""
     name, chat_id = body.name.strip(), normalize_chat_id(body.chat_id)
     if not name or len(name) > 64:
         raise DLError("channel.invalid")
     if db.execute("SELECT 1 FROM telegram_channels WHERE workspace_id=? AND chat_id=?", (ws, chat_id)).fetchone():
         raise DLError("channel.exists")
-    cur = db.execute(
-        "INSERT INTO telegram_channels (workspace_id, name, chat_id, created_at) VALUES (?,?,?,?)", (ws, name, chat_id, int(time.time()))
-    )
+    # another workspace's chat: the same answer as a malformed id, so nobody learns which chats are taken
+    if db.execute("SELECT 1 FROM telegram_channels WHERE chat_id=?", (chat_id,)).fetchone():  # ws: unique_check - one chat in one workspace
+        raise DLError("channel.invalid")
+    managers = {r["tg_id"] for r in db.execute(
+        "SELECT u.tg_id FROM workspace_members m JOIN users u ON u.id=m.user_id "
+        "WHERE m.workspace_id=? AND m.role IN ('owner','admin') AND u.tg_id IS NOT NULL", (ws,))}
+    if _NUMERIC.match(chat_id) and not chat_id.startswith("-"):
+        if int(chat_id) not in managers:
+            raise DLError("channel.private_not_member")
+    else:
+        tg = getattr(request.app.state, "tg", None)
+        if tg is None:
+            raise DLError("bot.not_configured")
+        if not _verified(tg, int(chat_id) if _NUMERIC.match(chat_id) else chat_id, managers):
+            raise DLError("channel.not_verified")
+    now = int(time.time())
+    try:
+        cur = db.execute(
+            "INSERT INTO telegram_channels (workspace_id, name, chat_id, created_at, verified_at) VALUES (?,?,?,?,?)",
+            (ws, name, chat_id, now, now),
+        )
+    except sqlite3.IntegrityError:
+        raise DLError("channel.invalid")
     return _out(_channel(db, ws, cur.lastrowid))
+
+
+def _verified(tg, chat, managers) -> bool:
+    """The bot administers the chat with the right to post, and so does one of the workspace's owner or admins."""
+    admins = tg.chat_admins(chat)
+    if not admins:
+        return False
+    try:
+        me = tg.bot_id()
+    except Exception:
+        return False
+    ids = {a.get("user", {}).get("id") for a in admins}
+    bot = next((a for a in admins if a.get("user", {}).get("id") == me), None)
+    can_post = bot is not None and bot.get("can_post_messages", True) is not False
+    return can_post and bool(ids & managers)
 
 
 @router.delete("/channels/{channel_id}", status_code=204, operation_id="telegram_delete_channel")
@@ -86,6 +125,8 @@ def test_channel(channel_id: int, request: Request, _: Actor = Depends(require("
                  db: sqlite3.Connection = Depends(get_db)):
     """Send one message through the bot; the bot token never leaves the server."""
     row = _channel(db, ws, channel_id)
+    if not row["verified_at"]:
+        raise DLError("channel.not_verified")
     tg = getattr(request.app.state, "tg", None)
     if tg is None:
         raise DLError("bot.not_configured")

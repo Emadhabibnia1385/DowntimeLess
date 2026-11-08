@@ -9,7 +9,7 @@ from ...db import get_db
 from ...deps import Actor, current_workspace, require
 from ...errors import DLError
 from ...workspaces import server_row
-from ..traffic.service import category_cond
+from ..traffic.service import category_params
 
 router = APIRouter(prefix="/links", tags=["links"])
 MAX_WINDOW_S = 366 * 86400
@@ -66,18 +66,16 @@ def traffic(since: Optional[int] = None, until: Optional[int] = None, category: 
     since, until = _window(since, until)
     if category not in (None, "", "none") and not category.isdigit():
         raise DLError("traffic.category_invalid")
-    on_s, s_args = category_cond(db, ws, category, "s")
-    on_p, p_args = category_cond(db, ws, category, "p")
-    cat_sql = "1=1" if on_s == "1=1" else "(%s OR %s)" % (on_s, on_p)
+    every, cat = category_params(db, ws, category)
     rows = db.execute(
         "SELECT l.server_id, COALESCE(NULLIF(s.alias,''), s.name) AS server_name, s.role AS server_role, l.peer_ip, "
         "p.id AS peer_id, COALESCE(NULLIF(p.alias,''), p.name) AS peer_name, p.role AS peer_role, "
         "SUM(l.in_bytes) AS in_bytes, SUM(l.out_bytes) AS out_bytes "
         "FROM link_traffic l JOIN servers s ON s.id=l.server_id "
         "LEFT JOIN servers p ON p.public_ip=l.peer_ip AND p.workspace_id=s.workspace_id "
-        "WHERE s.workspace_id=? AND l.hour>=? AND l.hour<? AND " + cat_sql
-        + " GROUP BY l.server_id, l.peer_ip ORDER BY SUM(l.in_bytes)+SUM(l.out_bytes) DESC",
-        [ws, since - since % 3600, until] + s_args + p_args,
+        "WHERE s.workspace_id=? AND l.hour>=? AND l.hour<? AND (? = 1 OR s.category_id IS ? OR p.category_id IS ?) "
+        "GROUP BY l.server_id, l.peer_ip ORDER BY SUM(l.in_bytes)+SUM(l.out_bytes) DESC",
+        [ws, since - since % 3600, until, every, cat, cat],
     ).fetchall()
     return {"since": since, "until": until, "links": [dict(r) for r in rows]}
 
@@ -87,7 +85,7 @@ def series(server_id: int, peer_ip: str, since: Optional[int] = None, until: Opt
            _: Actor = Depends(require("viewer")), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
     since, until = _window(since, until)
     server_row(db, ws, server_id)
-    rows = db.execute(  # ws: server_row above
+    rows = db.execute(  # ws: server_row - checked above
         "SELECT hour AS ts, in_bytes, out_bytes FROM link_traffic WHERE server_id=? AND peer_ip=? AND hour>=? AND hour<? ORDER BY hour",
         (server_id, peer_ip, since - since % 3600, until),
     ).fetchall()

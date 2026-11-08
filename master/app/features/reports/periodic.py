@@ -203,9 +203,10 @@ def capacity_report(db: sqlite3.Connection, ws: int, since: int, until: int) -> 
         hourly.setdefault(r["server_id"], []).append(r)
     span = until - since
     now_b, prev_b = _bytes(db, ws, since, until), _bytes(db, ws, since - span, since)
-    cpu_sql = "SELECT m.server_id, AVG(m.cpu) c FROM metrics m JOIN servers s ON s.id=m.server_id WHERE s.workspace_id=? AND m.ts>=? AND m.ts<? GROUP BY m.server_id"
-    prev_cpu = {r["server_id"]: r["c"] for r in db.execute(cpu_sql, (ws, since - span, since))}  # ws: cpu_sql joins servers by workspace_id
-    cur_cpu = {r["server_id"]: r["c"] for r in db.execute(cpu_sql, (ws, since, until))}  # ws: cpu_sql joins servers by workspace_id
+    prev_cpu, cur_cpu = ({r["server_id"]: r["c"] for r in db.execute(
+        "SELECT m.server_id, AVG(m.cpu) c FROM metrics m JOIN servers s ON s.id=m.server_id "
+        "WHERE s.workspace_id=? AND m.ts>=? AND m.ts<? GROUP BY m.server_id", (ws, lo, hi))}
+        for lo, hi in ((since - span, since), (since, until)))
     items = []
     for sid, rows in hourly.items():
         srv = servers.get(sid)

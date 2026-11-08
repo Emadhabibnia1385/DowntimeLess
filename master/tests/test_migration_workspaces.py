@@ -98,6 +98,10 @@ def test_everything_lands_in_workspace_1_owned_by_the_owner(migrated):
                   "events", "alert_state", "flapping"):
         assert {r[0] for r in db.execute("SELECT workspace_id FROM %s" % table)} == {1}, table
     assert db.execute("SELECT active_workspace_id FROM sessions").fetchone()[0] is None
+    # everyone keeps landing where they always did, and the owner's channel stays usable
+    assert {r[0] for r in db.execute("SELECT last_workspace_id FROM users")} == {1}
+    assert tuple(db.execute("SELECT verified_at FROM telegram_channels").fetchone()) == (1,)
+    assert {r[0] for r in db.execute("SELECT display_name FROM workspace_members")} == {""}
     assert db.execute("SELECT last_login_at FROM users WHERE id=2").fetchone()[0] == 50
     assert list(db.execute("PRAGMA foreign_key_check")) == []
     assert db.execute("SELECT servers.category_id FROM servers WHERE id=5").fetchone()[0] == 7  # the rebuild cascaded nothing
@@ -110,7 +114,8 @@ def test_keys_are_per_workspace_now(migrated):
     db.execute("INSERT INTO settings (workspace_id, key, value) VALUES (2, 'cpu_warn', '10')")
     db.execute("INSERT INTO categories (workspace_id, name, created_at) VALUES (2, 'ویژه', 1)")
     db.execute("INSERT INTO domains (workspace_id, host, port, created_at) VALUES (2, 'panel.example.com', 443, 1)")
-    db.execute("INSERT INTO telegram_channels (workspace_id, name, chat_id, created_at) VALUES (2, 'x', '-1001234567890', 1)")
+    with pytest.raises(sqlite3.IntegrityError):  # one chat, one workspace
+        db.execute("INSERT INTO telegram_channels (workspace_id, name, chat_id, created_at) VALUES (2, 'x', '-1001234567890', 1)")
     db.execute("INSERT INTO rule_routes (workspace_id, rule, route) VALUES (2, 'cpu', 'admins')")
     with pytest.raises(sqlite3.IntegrityError):
         db.execute("INSERT INTO settings (workspace_id, key, value) VALUES (1, 'cpu_warn', '1')")
@@ -142,7 +147,8 @@ def test_the_existing_owner_sees_the_same_panel_after_the_upgrade(tmp_path, monk
         bot.handle(tg, {"update_id": 2, "callback_query": {"id": "x", "from": {"id": 111}, "data": "wl:ok:%d" % start["challenge_id"]}})
         assert c.post("/api/v1/auth/telegram/poll", json={"challenge_id": start["challenge_id"], "poll_secret": start["poll_secret"]}).json()["status"] == "approved"
         me = c.get("/api/v1/auth/me").json()
-        assert me["role"] == "owner" and me["workspace"] == {"id": 1, "name": "فضای کار اصلی", "role": "owner", "is_personal": True}
+        assert me["role"] == "owner" and me["is_panel_owner"] is True
+        assert me["workspace"] == {"id": 1, "name": "فضای کار اصلی", "role": "owner", "is_personal": True, "invited_by": None}
         assert c.get("/api/v1/auth/workspaces").json() == [me["workspace"]]  # no second, empty workspace for the owner
         assert sorted(s["name"] for s in c.get("/api/v1/servers").json()) == ["de-1", "ir-1"]
         assert c.get("/api/v1/settings").json()["cpu_warn"] == 77 and c.get("/api/v1/settings").json()["on_cpu"] == 0

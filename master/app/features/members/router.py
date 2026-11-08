@@ -10,7 +10,7 @@ from ...db import get_db
 from ...deps import Actor, current_workspace, require
 from ...errors import DLError
 from ...ratelimit import hit
-from ...workspaces import ASSIGNABLE
+from ...workspaces import ASSIGNABLE, MAX_MEMBERS, is_panel_owner
 from ..reports import events as changelog
 
 router = APIRouter(prefix="/members", tags=["members"])
@@ -52,7 +52,7 @@ def _role(role: str) -> str:
 
 def _member(db: sqlite3.Connection, ws: int, user_id: int) -> sqlite3.Row:
     row = db.execute(
-        "SELECT u.id, u.name, u.tg_id, u.tg_username, u.last_login_at, m.role, m.created_at FROM workspace_members m "
+        "SELECT u.id, u.name, u.tg_id, u.tg_username, u.last_login_at, m.role, m.created_at, m.display_name FROM workspace_members m "
         "JOIN users u ON u.id=m.user_id WHERE m.workspace_id=? AND m.user_id=?",
         (ws, user_id),
     ).fetchone()
@@ -61,23 +61,29 @@ def _member(db: sqlite3.Connection, ws: int, user_id: int) -> sqlite3.Row:
     return row
 
 
+def _name(r: sqlite3.Row) -> str:
+    """The person's own Telegram name once they have signed in; until then what this workspace's owner called them."""
+    own = (r["name"] or "").strip() if r["last_login_at"] else ""
+    return own or r["display_name"] or ""
+
+
 def _out(r: sqlite3.Row, me: Optional[int]) -> dict:
+    signed_in = r["last_login_at"] is not None
     return {
-        "user_id": r["id"], "name": r["name"], "tg_id": r["tg_id"], "tg_username": r["tg_username"], "role": r["role"],
-        "last_login": r["last_login_at"], "added_at": r["created_at"], "is_me": r["id"] == me,
+        "user_id": r["id"], "name": _name(r), "tg_id": r["tg_id"], "tg_username": r["tg_username"] if signed_in else None,
+        "role": r["role"], "last_login": r["last_login_at"], "added_at": r["created_at"], "is_me": r["id"] == me,
     }
 
 
 def _label(r: sqlite3.Row) -> str:
-    return r["name"] or ("@" + r["tg_username"] if r["tg_username"] else str(r["tg_id"] or r["id"]))
+    return _name(r) or str(r["tg_id"] or r["id"])
 
 
 @router.get("", response_model=List[MemberOut], operation_id="members_list")
 def list_members(actor: Actor = Depends(_owner), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
     rows = db.execute(
-        "SELECT u.id, u.name, u.tg_id, u.tg_username, u.last_login_at, m.role, m.created_at FROM workspace_members m "
-        "JOIN users u ON u.id=m.user_id WHERE m.workspace_id=? "
-        "ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'operator' THEN 2 ELSE 3 END, m.created_at, u.id",
+        "SELECT u.id, u.name, u.tg_id, u.tg_username, u.last_login_at, m.role, m.created_at, m.display_name FROM workspace_members m "
+        "JOIN users u ON u.id=m.user_id WHERE m.workspace_id=? ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'operator' THEN 2 ELSE 3 END, m.created_at, u.id",
         (ws,),
     ).fetchall()
     return [_out(r, actor.user_id) for r in rows]
@@ -86,7 +92,12 @@ def list_members(actor: Actor = Depends(_owner), ws: int = Depends(current_works
 @router.post("", response_model=MemberOut, status_code=201, operation_id="members_add")
 def add_member(body: MemberCreate, actor: Actor = Depends(_owner), ws: int = Depends(current_workspace),
                db: sqlite3.Connection = Depends(get_db)):
-    """Add a person by their numeric Telegram id; they sign in with Telegram and see this workspace next to their own."""
+    """Add a person by their numeric Telegram id; they sign in with Telegram and see this workspace next to their own.
+
+    Only the panel owner (owner of workspace 1) adds people: every new member can sign in and gets a workspace, so this
+    is the registration door of the panel. The answer is the membership only, never the person's profile."""
+    if not is_panel_owner(db, actor.user_id):
+        raise DLError("members.panel_owner_only")
     hit("members:%d" % actor.user_id, 30, 3600)
     role = _role(body.role)
     if not 0 < body.tg_id < TG_ID_MAX:
@@ -95,24 +106,23 @@ def add_member(body: MemberCreate, actor: Actor = Depends(_owner), ws: int = Dep
     if len(name) > 64:
         raise DLError("member.name_invalid")
     now = int(time.time())
-    user = db.execute("SELECT id, name FROM users WHERE tg_id=?", (body.tg_id,)).fetchone()
-    if user is None:
-        uid = db.execute(
-            "INSERT INTO users (tg_id, name, role, created_at) VALUES (?,?,'none',?)", (body.tg_id, name, now)
-        ).lastrowid
+    if db.execute("SELECT COUNT(*) FROM workspace_members WHERE workspace_id=?", (ws,)).fetchone()[0] >= MAX_MEMBERS:
+        raise DLError("members.limit")
+    user = db.execute("SELECT id FROM users WHERE tg_id=?", (body.tg_id,)).fetchone()
+    if user is None:  # no profile data from an invite: the name stays on this membership only
+        uid = db.execute("INSERT INTO users (tg_id, name, role, created_at) VALUES (?,'','none',?)", (body.tg_id, now)).lastrowid
     else:
         uid = user["id"]
         if db.execute("SELECT 1 FROM workspace_members WHERE workspace_id=? AND user_id=?", (ws, uid)).fetchone():
             raise DLError("member.exists")
-        if name and not user["name"]:
-            db.execute("UPDATE users SET name=? WHERE id=?", (name, uid))
     db.execute(
-        "INSERT INTO workspace_members (workspace_id, user_id, role, added_by, created_at) VALUES (?,?,?,?,?)",
-        (ws, uid, role, actor.user_id, now),
+        "INSERT INTO workspace_members (workspace_id, user_id, role, added_by, display_name, created_at) VALUES (?,?,?,?,?,?)",
+        (ws, uid, role, actor.user_id, name, now),
     )
-    row = _member(db, ws, uid)
-    changelog.record(db, ws, "member_added", "%s: %s" % (_label(row), role), None, {"user_id": uid, "role": role})
-    return _out(row, actor.user_id)
+    label = name or str(body.tg_id)
+    changelog.record(db, ws, "member_added", "%s: %s" % (label, role), None, {"user_id": uid, "role": role})
+    return {"user_id": uid, "name": name, "tg_id": body.tg_id, "tg_username": None, "role": role, "last_login": None,
+            "added_at": now, "is_me": uid == actor.user_id}
 
 
 @router.patch("/{user_id}", response_model=MemberOut, operation_id="members_update")

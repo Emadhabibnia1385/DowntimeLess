@@ -8,6 +8,7 @@ class WorkspaceOut(BaseModel):
     name: str
     role: str  # my role in it: viewer, operator, admin or owner
     is_personal: bool  # the one I own
+    invited_by: Optional[str] = None  # who added me, for a workspace that is not mine
 
 
 class UserOut(BaseModel):
@@ -17,7 +18,8 @@ class UserOut(BaseModel):
     role: str  # my role in the active workspace
     has_password: bool
     tg_username: Optional[str]
-    workspace: WorkspaceOut  # the workspace this session acts in
+    workspace: WorkspaceOut  # the workspace this request acts in
+    is_panel_owner: bool = False  # owner of workspace 1: the only one who adds new people
 
 
 class SwitchWorkspace(BaseModel):

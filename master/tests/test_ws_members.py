@@ -56,25 +56,28 @@ def test_the_owner_cannot_be_removed_or_changed_not_even_by_themselves(owner):
     assert owner.delete("/api/v1/members/99999").json()["code"] == "member.not_found"
 
 
-def test_an_invited_person_signs_in_gets_their_own_workspace_once_and_starts_in_the_inviter_s(owner, tg):
+def test_an_invited_person_signs_in_to_their_own_workspace_once_and_sees_who_invited_them(owner, tg):
     invite(owner, 7003, "admin", "Dina")
     dina = login(owner.app, tg, 7003)
     me = dina.get("/api/v1/auth/me").json()
-    assert me["workspace"] == {"id": 1, "name": "فضای کار اصلی", "role": "admin", "is_personal": False} and me["role"] == "admin"
+    # the first sign-in lands in the person's own new workspace, named by Telegram, not by the inviter
+    assert me["workspace"]["is_personal"] is True and me["workspace"]["name"] == "فضای کار شخصی" and me["role"] == "owner"
+    assert me["is_panel_owner"] is False
     spaces = dina.get("/api/v1/auth/workspaces").json()
-    assert [(w["name"], w["role"], w["is_personal"]) for w in spaces] == [("Dina", "owner", True), ("فضای کار اصلی", "admin", False)]
+    assert [(w["role"], w["is_personal"], w["invited_by"]) for w in spaces] == [("owner", True, None), ("admin", False, "Emad")]
     uid = me["id"]
     login(owner.app, tg, 7003)
     login(owner.app, tg, 7003)
     assert _count("SELECT COUNT(*) FROM workspaces WHERE owner_user_id=?", uid) == 1
     # the owner of workspace 1 already owns it; signing in again never makes them a second workspace
     assert _count("SELECT COUNT(*) FROM workspaces WHERE owner_user_id=(SELECT id FROM users WHERE tg_id=111)") == 1
-    # their own workspace starts empty and is theirs to fill
-    switch(dina, spaces[0]["id"])
+    # their own workspace starts empty and is theirs to look after, but only the panel owner lets new people in
     assert dina.get("/api/v1/servers").json() == [] and dina.get("/api/v1/members").status_code == 200
-    # next sign-in returns to the workspace used last
+    assert dina.post("/api/v1/members", json={"tg_id": 9123, "role": "viewer"}).json()["code"] == "members.panel_owner_only"
+    # the next sign-in returns to the workspace used last
+    switch(dina, 1)
     again = login(owner.app, tg, 7003)
-    assert again.get("/api/v1/auth/me").json()["workspace"]["is_personal"] is True
+    assert again.get("/api/v1/auth/me").json()["workspace"]["id"] == 1
 
 
 def test_a_stranger_is_still_not_registered(client, tg, owner):
@@ -113,17 +116,24 @@ def test_mini_app_sign_in_follows_the_same_membership_rule(owner, monkeypatch):
 
     c = TestClient(owner.app)
     r = c.post("/api/v1/auth/telegram/webapp", json={"init_data": _init_data("1:test", {"id": 7005})})
-    assert r.status_code == 200 and r.json()["workspace"]["id"] == 1 and r.json()["role"] == "viewer"
+    assert r.status_code == 200 and r.json()["workspace"]["is_personal"] is True
+    assert c.get("/api/v1/servers", headers={"X-Workspace-Id": "1"}).status_code == 200
     r = c.post("/api/v1/auth/telegram/webapp", json={"init_data": _init_data("1:test", {"id": 7999})})
     assert r.json()["code"] == "auth.not_registered"
     settings_mod._settings = None
 
 
-def test_removing_a_member_moves_their_open_session_to_their_own_workspace(owner, tg):
+def test_removing_a_member_closes_that_workspace_to_their_open_tabs(owner, tg):
     uid = invite(owner, 7006, "admin")
     lea = login(owner.app, tg, 7006)
+    switch(lea, 1)
     assert lea.get("/api/v1/servers").status_code == 200
     owner.delete("/api/v1/members/%d" % uid)
+    # a tab still naming workspace 1 is refused on every request, never quietly moved
+    assert lea.get("/api/v1/servers").json()["code"] == "workspace.not_found"
+    assert lea.put("/api/v1/settings", json={"cpu_warn": 1}).json()["code"] == "workspace.not_found"
+    assert [w["id"] for w in lea.get("/api/v1/auth/workspaces").json()] != [1]
+    del lea.headers["X-Workspace-Id"]
     me = lea.get("/api/v1/auth/me").json()
     assert me["workspace"]["is_personal"] is True and me["role"] == "owner"
     assert lea.post("/api/v1/servers", json={"name": "mine"}).status_code == 201
@@ -133,6 +143,7 @@ def test_removing_a_member_moves_their_open_session_to_their_own_workspace(owner
 def test_a_role_change_applies_to_the_next_request(owner, tg):
     uid = invite(owner, 7007, "admin")
     c = login(owner.app, tg, 7007)
+    switch(c, 1)
     assert c.post("/api/v1/categories", json={"name": "ok"}).status_code == 201
     owner.patch("/api/v1/members/%d" % uid, json={"role": "viewer"})
     assert c.post("/api/v1/categories", json={"name": "no"}).json()["code"] == "auth.forbidden"
@@ -156,7 +167,9 @@ def test_a_key_acts_only_in_the_workspace_it_was_made_in(owner, tg):
     assert [s["name"] for s in bare.get("/api/v1/servers", headers=h).json()] == ["bravo-1"]
     assert bare.get("/api/v1/servers/%d" % a_sid, headers=h).json()["code"] == "server.not_found"
     assert bare.delete("/api/v1/servers/%d" % a_sid, headers=h).json()["code"] == "server.not_found"
-    assert bare.delete("/api/v1/keys/%d" % a_key, headers=h).json()["code"] == "key.not_found"
+    assert bare.delete("/api/v1/keys/%d" % a_key, headers=h).json()["code"] == "auth.forbidden"  # keys never touch keys
+    assert y.delete("/api/v1/keys/%d" % a_key).json()["code"] == "key.not_found"
+    assert bare.get("/api/v1/servers", headers={**h, "X-Workspace-Id": "1"}).json()["code"] == "workspace.not_found"
     assert bare.post("/api/v1/servers", json={"name": "via-key"}, headers=h).status_code == 201
     assert sorted(s["name"] for s in y.get("/api/v1/servers").json()) == ["bravo-1", "via-key"]
     assert [s["name"] for s in owner.get("/api/v1/servers").json()] == ["alfa-1"]
@@ -171,13 +184,15 @@ def test_a_person_added_without_a_name_takes_the_name_telegram_knows(owner, tg):
     frm = {"id": 7009, "first_name": "Reza", "last_name": "K", "username": "rezak"}
     bot.handle(tg, {"update_id": 1, "message": {"from": frm, "chat": {"id": 7009}, "text": "/start wl_" + token}})
     row = next(m for m in owner.get("/api/v1/members").json() if m["tg_id"] == 7009)
-    assert row["name"] == "Reza K" and row["tg_username"] == "rezak"
+    assert row["name"] == "" and row["tg_username"] is None  # nothing of their profile shows until they have signed in
     bot.handle(tg, {"update_id": 2, "callback_query": {"id": "x", "from": {"id": 7009}, "data": "wl:ok:%d" % start["challenge_id"]}})
     from fastapi.testclient import TestClient
 
     c = TestClient(owner.app)
     c.post("/api/v1/auth/telegram/poll", json={"challenge_id": start["challenge_id"], "poll_secret": start["poll_secret"]})
     assert [w["name"] for w in c.get("/api/v1/auth/workspaces").json() if w["is_personal"]] == ["Reza K"]
+    row = next(m for m in owner.get("/api/v1/members").json() if m["tg_id"] == 7009)
+    assert row["name"] == "Reza K" and row["tg_username"] == "rezak"
 
 
 def test_start_tells_anyone_their_numeric_id_for_the_owner_to_add(client, tg):

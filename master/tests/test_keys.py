@@ -28,8 +28,9 @@ def test_a_full_key_can_do_everything_the_owner_does(owner):
     assert owner.post(jobs, json={"kind": "cert_renew", "args": {"name": "a.example.com"}}, headers=h).status_code == 201
     assert owner.post("/api/v1/servers", json={"name": "new"}, headers=h).status_code == 201
     assert owner.get("/api/v1/keys", headers=h).status_code == 200
-    made = owner.post("/api/v1/keys", json={"name": "child", "scope": "read"}, headers=h)
-    assert made.status_code == 201 and owner.delete("/api/v1/keys/%d" % made.json()["id"], headers=h).status_code == 204
+    # but a key never mints or revokes keys: that needs the owner signed in
+    assert owner.post("/api/v1/keys", json={"name": "child", "scope": "full"}, headers=h).json()["code"] == "auth.forbidden"
+    assert owner.delete("/api/v1/keys/1", headers=h).json()["code"] == "auth.forbidden"
 
 
 def test_even_a_full_key_cannot_change_a_password_or_open_a_profile(owner):

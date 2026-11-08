@@ -38,9 +38,26 @@ def invite(client, tg_id, role, name=""):
 
 
 def switch(client, ws):
+    """What the switcher does: check the workspace with the master, then name it on every request of this tab."""
     r = client.post("/api/v1/auth/workspace", json={"workspace_id": ws})
     assert r.status_code == 200, r.text
+    client.headers["X-Workspace-Id"] = str(ws)
     return r.json()
+
+
+def join(ws, tg_id, role, added_by=None):
+    """A membership written straight to the database: only the panel owner adds people through the API, so this is how
+    a second workspace gets members in these tests."""
+    db = connect()
+    try:
+        row = db.execute("SELECT id FROM users WHERE tg_id=?", (tg_id,)).fetchone()
+        uid = row["id"] if row else db.execute(
+            "INSERT INTO users (tg_id, name, role, created_at) VALUES (?, '', 'none', ?)", (tg_id, int(time.time()))).lastrowid
+        db.execute("INSERT INTO workspace_members (workspace_id, user_id, role, added_by, created_at) VALUES (?,?,?,?,?)",
+                   (ws, uid, role, added_by, int(time.time())))
+        return uid
+    finally:
+        db.close()
 
 
 def add_server(client, name, role, ip):
@@ -104,13 +121,15 @@ def build(owner, tg):
     app = owner.app
     y_id = invite(owner, Y_TG, "viewer", "Yasmin")
     y = login(app, tg, Y_TG)
-    assert y.get("/api/v1/auth/me").json()["workspace"]["id"] == 1  # an invited person starts where they were invited
     mine = [w for w in y.get("/api/v1/auth/workspaces").json() if w["is_personal"]]
     assert len(mine) == 1 and mine[0]["role"] == "owner"
     b = mine[0]["id"]
+    # a first sign-in lands in the person's own workspace, never in one someone else joined them to
+    assert y.get("/api/v1/auth/me").json()["workspace"]["id"] == b
     switch(y, b)
-    x_id = invite(y, X_TG, "viewer")
-    carol_id = invite(y, CAROL_TG, "admin", "Carol")
+    owner.headers["X-Workspace-Id"] = "1"
+    x_id = join(b, X_TG, "viewer", added_by=y_id)
+    carol_id = join(b, CAROL_TG, "admin", added_by=y_id)
     world = {
         "app": app, "x": owner, "y": y, "A": 1, "B": b, "x_id": x_id, "y_id": y_id, "carol_id": carol_id,
         "a": _fill(owner, 1, "A", A_IPS, "-1001111111111"),

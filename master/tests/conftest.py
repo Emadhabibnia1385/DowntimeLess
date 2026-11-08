@@ -7,11 +7,27 @@ from app import settings as settings_mod
 from app.db import connect
 
 
+BOT_ID = 999000
+
+
 class FakeTelegram:
     def __init__(self):
         self.sent = []
         self.threads = []
         self.refuse = False  # a bot that is not allowed to post: send() answers False
+        # chat -> administrators (ChatMember objects); a chat not listed has the bot and the usual test people as admins
+        self.admins = {}
+        self.default_admin_ids = (111, 222, 333)
+
+    def bot_id(self):
+        return BOT_ID
+
+    def chat_admins(self, chat_id):
+        if chat_id in self.admins:
+            return self.admins[chat_id]
+        return [{"user": {"id": BOT_ID}, "status": "administrator", "can_post_messages": True}] + [
+            {"user": {"id": i}, "status": "administrator"} for i in self.default_admin_ids
+        ]
 
     def send(self, chat_id, text, buttons=None, thread=None):
         if self.refuse:
@@ -67,6 +83,7 @@ def owner(client, tg):
     from app import bot
 
     add_user()
+    client.app.state.tg = tg  # channels are checked with the bot before they are saved
     start = client.post("/api/v1/auth/telegram/start").json()
     token = start["deep_link"].split("wl_")[1]
     bot.handle(tg, {"update_id": 1, "message": {"from": {"id": 111}, "chat": {"id": 111}, "text": "/start wl_" + token}})

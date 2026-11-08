@@ -16,12 +16,20 @@ STALE_AUTO_S = 7 * 86400
 BACKUP_RE = re.compile(r"\.bak|\.old$|\.orig$|backup", re.I)
 HOST_RE = re.compile(r"^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
 MAX_NEW_PER_REPORT = 20
+PROBE_BUDGET_S = 20  # one sweep never spends longer than this on certificates
+
+
+def domain_count(db: sqlite3.Connection, ws: int) -> int:
+    return db.execute("SELECT COUNT(*) FROM domains WHERE workspace_id=?", (ws,)).fetchone()[0]
 
 
 def adopt_domains(db: sqlite3.Connection, server: sqlite3.Row, names: List[Any]) -> None:
     """Domains an agent found in its web server's config join its workspace's list; ones seen again are kept fresh."""
+    from ...workspaces import MAX_DOMAINS
+
     now, added = int(time.time()), 0
     ws, server_id = server["workspace_id"], server["id"]
+    room = MAX_DOMAINS - domain_count(db, ws)
     for raw in sorted({str(n).lower().strip() for n in names})[:200]:
         if not HOST_RE.match(raw):
             continue
@@ -30,7 +38,7 @@ def adopt_domains(db: sqlite3.Connection, server: sqlite3.Row, names: List[Any])
             if row["source"] == "auto":
                 db.execute("UPDATE domains SET seen_at=?, server_id=? WHERE id=? AND workspace_id=?", (now, server_id, row["id"], ws))
             continue
-        if added >= MAX_NEW_PER_REPORT or not is_public_host(raw):  # a name that does not resolve has nothing to probe
+        if added >= min(MAX_NEW_PER_REPORT, room) or not is_public_host(raw):  # a name that does not resolve has nothing to probe
             continue
         db.execute(
             "INSERT INTO domains (workspace_id, host, port, note, source, server_id, seen_at, created_at) VALUES (?,?,?,?,?,?,?,?)",
@@ -40,26 +48,35 @@ def adopt_domains(db: sqlite3.Connection, server: sqlite3.Row, names: List[Any])
 
 
 def drop_stale_auto(db: sqlite3.Connection) -> None:
-    db.execute("DELETE FROM domains WHERE source='auto' AND seen_at<?", (int(time.time()) - STALE_AUTO_S,))  # ws: by age, every workspace alike
+    db.execute("DELETE FROM domains WHERE source='auto' AND seen_at<?", (int(time.time()) - STALE_AUTO_S,))  # ws: retention - by age, every workspace alike
+
+
+def public_address(host: str) -> Optional[str]:
+    """One public address of `host`, or None when it does not resolve or any of its addresses is internal."""
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return None
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
+            return None
+    return infos[0][4][0] if infos else None
 
 
 def is_public_host(host: str) -> bool:
     """Refuse loopback, private and link-local targets so the probe cannot be aimed at the inside network."""
-    try:
-        infos = socket.getaddrinfo(host, None)
-    except OSError:
-        return False
-    for info in infos:
-        ip = ipaddress.ip_address(info[4][0])
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
-            return False
-    return bool(infos)
+    return public_address(host) is not None
 
 
 def probe(host: str, port: int) -> Dict[str, Any]:
+    # resolve once, check, and connect to that very address: a name that re-resolves to the inside is never reached
+    address = public_address(host)
+    if address is None:
+        return {"not_after": None, "issuer": None, "error": "اتصال ممکن نشد: آدرس عمومی پیدا نشد"}
     ctx = ssl.create_default_context()
     try:
-        with socket.create_connection((host, port), timeout=8) as sock:
+        with socket.create_connection((address, port), timeout=8) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as tls:
                 cert = tls.getpeercert()
         issuer = dict(x[0] for x in cert.get("issuer", ())).get("organizationName")
@@ -70,14 +87,19 @@ def probe(host: str, port: int) -> Dict[str, Any]:
         return {"not_after": None, "issuer": None, "error": "اتصال ممکن نشد: %s" % (exc.__class__.__name__)}
 
 
-def probe_due(db: sqlite3.Connection, limit: int = 5) -> None:
-    """The monitor's round over the domains of every workspace; each result goes back to its own row only."""
+def probe_due(db: sqlite3.Connection, limit: int = 5, budget_s: float = PROBE_BUDGET_S) -> None:
+    """The monitor's round over the due domains of every workspace, taken in turns (the oldest of each workspace, then
+    the next of each...), so one workspace's long list never delays another's; stops when the time budget is spent."""
     now = int(time.time())
-    rows = db.execute(
-        "SELECT * FROM domains WHERE last_checked IS NULL OR last_checked<? ORDER BY last_checked LIMIT ?",  # ws: each row probed for itself
+    rows = db.execute(  # ws: probe_queue - each row is probed for itself and written back to its own row
+        "SELECT * FROM (SELECT d.*, ROW_NUMBER() OVER (PARTITION BY d.workspace_id ORDER BY COALESCE(d.last_checked, 0), d.id) AS turn "
+        "FROM domains d WHERE d.last_checked IS NULL OR d.last_checked<?) ORDER BY turn, workspace_id LIMIT ?",
         (now - RECHECK_S, limit),
     ).fetchall()
+    started = time.monotonic()
     for r in rows:
+        if time.monotonic() - started > budget_s:
+            break
         _store(db, r)
 
 

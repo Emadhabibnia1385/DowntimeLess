@@ -10,7 +10,7 @@ from ...db import get_db
 from ...deps import ROLE_RANK, Actor, current_workspace, require
 from ...errors import DLError
 from ...security import digest, new_token
-from ...workspaces import server_row
+from ...workspaces import MAX_SERVERS, server_row
 from ..reports import events as changelog
 from . import service as svc
 from .schemas import JobCreate, JobOut, MetricsOut, ServerCreate, ServerCreated, ServerOut, ServerPatch
@@ -32,6 +32,8 @@ def list_servers(_: Actor = Depends(require("viewer")), ws: int = Depends(curren
 @router.post("", response_model=ServerCreated, status_code=201, operation_id="servers_create")
 def create_server(body: ServerCreate, _: Actor = Depends(require("admin")), ws: int = Depends(current_workspace),
                   db: sqlite3.Connection = Depends(get_db)):
+    if db.execute("SELECT COUNT(*) FROM servers WHERE workspace_id=?", (ws,)).fetchone()[0] >= MAX_SERVERS:
+        raise DLError("server.limit")
     token = new_token(24)
     cols = svc.role_columns(body.role)
     cur = db.execute(
@@ -96,7 +98,7 @@ def metrics(server_id: int, range: str = "24h", _: Actor = Depends(require("view
     rows = db.execute(
         "SELECT (ts/?)*? AS t, AVG(cpu) cpu, AVG(ram_pct) ram, AVG(disk_pct) disk, AVG(rx_bps) rxb, AVG(tx_bps) txb, "
         "SUM(rx_delta) rx, SUM(tx_delta) tx, AVG(steal) steal, AVG(load1) load1, AVG(swap_pct) swap, AVG(retrans) retrans, "
-        "AVG(conntrack) conntrack, AVG(conns) conns FROM metrics WHERE server_id=? AND ts>=? GROUP BY t ORDER BY t",  # ws: server_row above
+        "AVG(conntrack) conntrack, AVG(conns) conns FROM metrics WHERE server_id=? AND ts>=? GROUP BY t ORDER BY t",  # ws: server_row - checked above
         (bucket, bucket, server_id, since),
     ).fetchall()
     pts = [
@@ -119,7 +121,7 @@ def _job_out(r: sqlite3.Row) -> dict:
 def list_jobs(server_id: int, _: Actor = Depends(require("viewer")), ws: int = Depends(current_workspace),
               db: sqlite3.Connection = Depends(get_db)):
     server_row(db, ws, server_id)
-    return [_job_out(r) for r in db.execute("SELECT * FROM jobs WHERE server_id=? ORDER BY id DESC LIMIT 50", (server_id,))]  # ws: server_row above
+    return [_job_out(r) for r in db.execute("SELECT * FROM jobs WHERE server_id=? ORDER BY id DESC LIMIT 50", (server_id,))]  # ws: server_row - checked above
 
 
 @router.post("/{server_id}/jobs", response_model=JobOut, status_code=201, operation_id="servers_create_job")
@@ -137,8 +139,8 @@ def create_job(server_id: int, body: JobCreate, actor: Actor = Depends(require("
         if actor.via == "key" and not actor.full:
             raise DLError("job.permission")  # a read key never changes a server; a full key may
     cur = db.execute(
-        "INSERT INTO jobs (server_id, kind, args, created_by, created_at) VALUES (?,?,?,?,?)",  # ws: server_row above
+        "INSERT INTO jobs (server_id, kind, args, created_by, created_at) VALUES (?,?,?,?,?)",  # ws: server_row - checked above
         (server_id, body.kind, json.dumps(body.args), actor.user_id, int(time.time())),
     )
     changelog.job_created(db, server, cur.lastrowid, body.kind, actor.user_id)
-    return _job_out(db.execute("SELECT * FROM jobs WHERE id=?", (cur.lastrowid,)).fetchone())  # ws: the row just inserted
+    return _job_out(db.execute("SELECT * FROM jobs WHERE id=?", (cur.lastrowid,)).fetchone())  # ws: server_row - the job just inserted for it

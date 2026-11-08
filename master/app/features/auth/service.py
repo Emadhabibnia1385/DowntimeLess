@@ -8,7 +8,7 @@ from urllib.parse import parse_qsl
 
 from ...errors import DLError
 from ...security import check_password, digest, hash_password, new_token, same
-from ...workspaces import default_workspace, ensure_personal, is_member_anywhere, workspace_out
+from ...workspaces import default_workspace, ensure_personal, is_member_anywhere, is_panel_owner, workspace_out
 
 CHALLENGE_TTL = 300
 SESSION_TTL = 30 * 24 * 3600
@@ -20,6 +20,7 @@ def user_out(db: sqlite3.Connection, row: sqlite3.Row, ws: int) -> Dict[str, obj
     return {
         "id": row["id"], "name": row["name"], "username": row["username"], "role": workspace["role"],
         "has_password": bool(row["password_hash"]), "tg_username": row["tg_username"], "workspace": workspace,
+        "is_panel_owner": is_panel_owner(db, row["id"]),
     }
 
 
@@ -36,7 +37,8 @@ def create_session(db: sqlite3.Connection, user_id: int, ip: str, ua: str) -> Tu
         "INSERT INTO sessions (user_id, token_hash, ip, ua, created_at, expires_at, active_workspace_id) VALUES (?,?,?,?,?,?,?)",
         (user_id, digest(token), ip, ua[:200], now, now + SESSION_TTL, ws),
     )
-    db.execute("UPDATE users SET last_login_at=? WHERE id=?", (now, user_id))
+    # the landing workspace is remembered at every sign-in, so a workspace joined later never takes over
+    db.execute("UPDATE users SET last_login_at=?, last_workspace_id=? WHERE id=?", (now, ws, user_id))
     return token, ws
 
 
@@ -99,27 +101,35 @@ def decide_challenge(db: sqlite3.Connection, challenge_id: int, tg_id: int, appr
 
 
 def claim_owner(db: sqlite3.Connection, token: str, tg_id: int, name: str, tg_username: Optional[str]) -> bool:
-    won = db.execute(
-        "UPDATE claims SET used_at=? WHERE token_hash=? AND used_at IS NULL", (int(time.time()), digest(token))
-    ).rowcount
-    if not won:
-        return False
+    """One transaction: burn the claim, make the claimer the owner of workspace 1. Refused, with nothing changed, when the
+    link is spent, workspace 1 already has an owner, or the claimer already owns a workspace."""
     now = int(time.time())
-    db.execute(
-        "INSERT INTO users (tg_id, tg_username, name, role, created_at) VALUES (?,?,?,'owner',?) "
-        "ON CONFLICT(tg_id) DO UPDATE SET role='owner'",
-        (tg_id, tg_username, name, now),
-    )
-    uid = db.execute("SELECT id FROM users WHERE tg_id=?", (tg_id,)).fetchone()["id"]
-    # the claimer owns workspace 1, the panel's original fleet
-    db.execute("UPDATE workspaces SET owner_user_id=? WHERE id=1 AND owner_user_id IS NULL", (uid,))
-    if db.execute("SELECT 1 FROM workspaces WHERE id=1 AND owner_user_id=?", (uid,)).fetchone():
+    db.execute("BEGIN IMMEDIATE")
+    try:
+        won = db.execute("UPDATE claims SET used_at=? WHERE token_hash=? AND used_at IS NULL", (now, digest(token))).rowcount
+        free = db.execute("SELECT 1 FROM workspaces WHERE id=1 AND owner_user_id IS NULL").fetchone()
+        old = db.execute("SELECT id FROM users WHERE tg_id=?", (tg_id,)).fetchone()
+        owns = old is not None and db.execute("SELECT 1 FROM workspaces WHERE owner_user_id=?", (old["id"],)).fetchone()
+        if not won or not free or owns:
+            db.execute("ROLLBACK")
+            return False
+        db.execute(
+            "INSERT INTO users (tg_id, tg_username, name, role, created_at, last_workspace_id) VALUES (?,?,?,'owner',?,1) "
+            "ON CONFLICT(tg_id) DO UPDATE SET role='owner', last_workspace_id=1",
+            (tg_id, tg_username, name, now),
+        )
+        uid = db.execute("SELECT id FROM users WHERE tg_id=?", (tg_id,)).fetchone()["id"]
+        db.execute("UPDATE workspaces SET owner_user_id=? WHERE id=1 AND owner_user_id IS NULL", (uid,))
         db.execute(
             "INSERT INTO workspace_members (workspace_id, user_id, role, added_by, created_at) VALUES (1,?,'owner',?,?) "
             "ON CONFLICT(workspace_id, user_id) DO UPDATE SET role='owner'",
             (uid, uid, now),
         )
-    return True
+        db.execute("COMMIT")
+        return True
+    except Exception:
+        db.execute("ROLLBACK")
+        raise
 
 
 def password_login(db: sqlite3.Connection, username: str, password: str):

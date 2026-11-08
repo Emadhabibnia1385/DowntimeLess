@@ -22,7 +22,7 @@ def record(db: sqlite3.Connection, ws: int, kind: str, title: str, server_id: Op
 
 
 def prune(db: sqlite3.Connection, now: int) -> None:
-    db.execute("DELETE FROM events WHERE ts<?", (now - KEEP_S,))  # ws: retention by age, every workspace alike
+    db.execute("DELETE FROM events WHERE ts<?", (now - KEEP_S,))  # ws: retention - by age, every workspace alike
 
 
 def label(row: sqlite3.Row) -> str:
@@ -37,7 +37,7 @@ def job_created(db: sqlite3.Connection, server: sqlite3.Row, job_id: int, kind: 
 def job_done(db: sqlite3.Connection, server: sqlite3.Row, job_id: int, status: str) -> None:
     """Call before the job row is updated: only a job still waiting for its result is logged, so a repeated report adds nothing."""
     row = db.execute(
-        "SELECT kind FROM jobs WHERE id=? AND server_id=? AND status IN ('queued','sent')", (job_id, server["id"])  # ws: the server row is the agent's own
+        "SELECT kind FROM jobs WHERE id=? AND server_id=? AND status IN ('queued','sent')", (job_id, server["id"])  # ws: agent_server
     ).fetchone()
     if row:
         record(db, server["workspace_id"], "job_done", "%s: %s" % (row["kind"], status), server["id"],

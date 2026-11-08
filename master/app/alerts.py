@@ -41,7 +41,9 @@ def valid_route(db: sqlite3.Connection, ws: int, route: str) -> bool:
     if route in (PANEL, ADMINS):
         return True
     if route.startswith("channel:") and route[8:].isdigit():
-        return db.execute("SELECT 1 FROM telegram_channels WHERE id=? AND workspace_id=?", (int(route[8:]), ws)).fetchone() is not None
+        return db.execute(
+            "SELECT 1 FROM telegram_channels WHERE id=? AND workspace_id=? AND verified_at IS NOT NULL", (int(route[8:]), ws)
+        ).fetchone() is not None
     return False
 
 
@@ -63,7 +65,7 @@ def notify(tg: Telegram, ws: int, rule: str, text: str, thread: Optional[int] = 
             channel = None
             if route.startswith("channel:"):
                 channel = db.execute(
-                    "SELECT chat_id FROM telegram_channels WHERE id=? AND workspace_id=?", (int(route[8:]), ws)
+                    "SELECT chat_id FROM telegram_channels WHERE id=? AND workspace_id=? AND verified_at IS NOT NULL", (int(route[8:]), ws)
                 ).fetchone()
         finally:
             db.close()
@@ -144,7 +146,10 @@ def _open(db: sqlite3.Connection, tg: Telegram, ws: int, ev: Dict[str, Any], rul
         "SELECT COUNT(*) FROM incidents WHERE workspace_id=? AND key=? AND opened_at>=?", (ws, ev["key"], now - FLAP_WINDOW_S)
     ).fetchone()[0]
     if opened >= FLAP_AT:
-        db.execute("INSERT OR REPLACE INTO flapping (workspace_id, key, since) VALUES (?,?,?)", (ws, ev["key"], now))
+        db.execute(
+            "INSERT INTO flapping (workspace_id, key, since) VALUES (?,?,?) ON CONFLICT(workspace_id, key) DO UPDATE SET since=excluded.since",
+            (ws, ev["key"], now),
+        )
         notify(tg, ws, rule, flapping_message(ev, opened))
         return
     db.execute("UPDATE incidents SET notified_at=? WHERE id=? AND workspace_id=?", (now, ev["incident_id"], ws))

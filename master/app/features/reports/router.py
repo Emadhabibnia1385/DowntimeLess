@@ -63,16 +63,12 @@ def changes(since: Optional[int] = None, until: Optional[int] = None, server_id:
     """The change log of the current workspace, newest first, at most 500 events (default last 24 h)."""
     check_format(format)
     since, until = window(since, until, DAY)
-    sql = ("SELECT e.*, COALESCE(NULLIF(s.alias,''), s.name) AS sname FROM events e "
-           "LEFT JOIN servers s ON s.id=e.server_id AND s.workspace_id=e.workspace_id WHERE e.workspace_id=? AND e.ts>=? AND e.ts<=?")
-    args: list = [ws, since, until]
-    if server_id is not None:
-        sql += " AND e.server_id=?"
-        args.append(server_id)
-    if kind:
-        sql += " AND e.kind=?"
-        args.append(kind)
-    rows = db.execute(sql + " ORDER BY e.ts DESC, e.id DESC LIMIT ?", args + [MAX_EVENTS + 1]).fetchall()  # ws: sql filters e.workspace_id
+    rows = db.execute(
+        "SELECT e.*, COALESCE(NULLIF(s.alias,''), s.name) AS sname FROM events e "
+        "LEFT JOIN servers s ON s.id=e.server_id AND s.workspace_id=e.workspace_id WHERE e.workspace_id=? AND e.ts>=? AND e.ts<=? "
+        "AND (? IS NULL OR e.server_id=?) AND (? IS NULL OR e.kind=?) ORDER BY e.ts DESC, e.id DESC LIMIT ?",
+        (ws, since, until, server_id, server_id, kind or None, kind or None, MAX_EVENTS + 1),
+    ).fetchall()
     events = [{"id": r["id"], "ts": r["ts"], "server_id": r["server_id"], "server": r["sname"], "kind": r["kind"], "title": r["title"],
                "detail": json.loads(r["detail"] or "{}")} for r in rows[:MAX_EVENTS]]
     return _answer(format, {"since": since, "until": until, "events": events, "truncated": len(rows) > MAX_EVENTS}, render.changes_md)

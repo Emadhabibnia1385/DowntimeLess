@@ -13,6 +13,8 @@ CREATE TABLE workspace_members (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('viewer','operator','admin','owner')),
   added_by INTEGER REFERENCES users(id),
+  -- what the inviter called this person; their own Telegram name wins once they have signed in
+  display_name TEXT NOT NULL DEFAULT '',
   created_at INTEGER NOT NULL,
   PRIMARY KEY (workspace_id, user_id)
 );
@@ -26,7 +28,7 @@ SELECT 1, u.id,
        NULL, u.created_at
 FROM users u;
 
--- users.role is legacy now; 'none' is someone who exists only because a workspace invited them
+-- users.role is legacy now; everyone existing lands in workspace 1 (last_workspace_id) as before. 'none' is someone who exists only because a workspace invited them
 CREATE TABLE users_new (
   id INTEGER PRIMARY KEY,
   tg_id INTEGER UNIQUE,
@@ -40,7 +42,7 @@ CREATE TABLE users_new (
   last_login_at INTEGER
 );
 INSERT INTO users_new (id, tg_id, tg_username, name, role, username, password_hash, created_at, last_workspace_id, last_login_at)
-SELECT id, tg_id, tg_username, name, role, username, password_hash, created_at, NULL,
+SELECT id, tg_id, tg_username, name, role, username, password_hash, created_at, 1,
        (SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id=users.id)
 FROM users;
 DROP TABLE users;
@@ -106,11 +108,14 @@ CREATE TABLE telegram_channels_new (
   id INTEGER PRIMARY KEY,
   workspace_id INTEGER NOT NULL DEFAULT 1,
   name TEXT NOT NULL,
-  chat_id TEXT NOT NULL,
+  -- one chat belongs to one workspace: the shared bot never posts one tenant's alerts into another's chat
+  chat_id TEXT NOT NULL UNIQUE,
   created_at INTEGER NOT NULL,
-  UNIQUE (workspace_id, chat_id)
+  -- when the bot confirmed it may post there and a manager of the workspace administers the chat
+  verified_at INTEGER
 );
-INSERT INTO telegram_channels_new (id, workspace_id, name, chat_id, created_at) SELECT id, 1, name, chat_id, created_at FROM telegram_channels;
+INSERT INTO telegram_channels_new (id, workspace_id, name, chat_id, created_at, verified_at)
+SELECT id, 1, name, chat_id, created_at, created_at FROM telegram_channels;
 DROP TABLE telegram_channels;
 ALTER TABLE telegram_channels_new RENAME TO telegram_channels;
 

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from ...db import get_db
 from ...deps import Actor, current_workspace, require
 from ...errors import DLError
+from ...workspaces import MAX_DOMAINS
 from . import service as svc
 
 router = APIRouter(tags=["ssl"])
@@ -66,6 +67,8 @@ def _ssl_row(db: sqlite3.Connection, ws: int, domain_id: int) -> Any:
 def add_domain(body: DomainCreate, _: Actor = Depends(require("admin")), ws: int = Depends(current_workspace),
                db: sqlite3.Connection = Depends(get_db)) -> Any:
     host = body.host.lower().strip(".")
+    if svc.domain_count(db, ws) >= MAX_DOMAINS:
+        raise DLError("domain.limit")
     if not svc.is_public_host(host):
         raise DLError("domain.invalid")
     try:
