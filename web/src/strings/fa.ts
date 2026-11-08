@@ -29,7 +29,6 @@ export const fa = {
 	},
 	brand: {
 		name: "DowntimeLess",
-		tagline: "قطعی کمتر",
 		logoAlt: "لوگوی DowntimeLess",
 		githubLabel: "پروژه در گیت‌هاب",
 	},

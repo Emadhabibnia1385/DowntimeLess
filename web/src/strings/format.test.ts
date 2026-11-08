@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	formatBitRate,
 	formatBytes,
+	formatClock,
 	formatDate,
 	formatDateTime,
 	formatDecimal,
@@ -91,5 +92,21 @@ describe("dates", () => {
 		const now = MOMENT * 1000;
 		expect(formatRelativeTime(MOMENT - 7200, now)).toBe("۲ ساعت پیش");
 		expect(formatRelativeTime(MOMENT - 30, now)).toBe("۳۰ ثانیه پیش");
+	});
+});
+
+describe("formatClock", () => {
+	it("gives weekday, time with seconds and both calendars for the given zone", () => {
+		const parts = formatClock(new Date("2026-11-08T14:35:45Z"), "Asia/Tehran");
+		expect(parts).toEqual({
+			weekday: "یکشنبه",
+			time: "۱۸:۰۵:۴۵",
+			gregorian: "۲۰۲۶/۱۱/۰۸",
+			jalali: "۱۴۰۵/۰۸/۱۷",
+		});
+	});
+
+	it("follows the zone, so the same moment reads differently elsewhere", () => {
+		expect(formatClock(new Date("2026-11-08T14:35:45Z"), "UTC").time).toBe("۱۴:۳۵:۴۵");
 	});
 });

@@ -4,7 +4,7 @@ import { GithubIcon } from "@/shared/GithubIcon";
 import { PROJECT_GITHUB_URL } from "@/shared/links";
 import { t } from "@/strings";
 
-// Logo, slogan (sidebar only) and GitHub; the phone top bar swaps GitHub for the theme toggle.
+// The logo and GitHub; the phone top bar swaps GitHub for the theme toggle.
 export function Brand() {
 	const { scheme } = useTheme();
 	return (
@@ -17,9 +17,6 @@ export function Brand() {
 					height={339}
 					className="h-12 w-auto in-[header]:h-10"
 				/>
-				<span className="text-xs text-muted in-[header]:hidden in-[[role=dialog]]:hidden">
-					{t.brand.tagline}
-				</span>
 			</span>
 			<a
 				href={PROJECT_GITHUB_URL}

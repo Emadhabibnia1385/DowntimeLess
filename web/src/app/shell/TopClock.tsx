@@ -1,12 +1,34 @@
 import { useEffect, useState } from "react";
-import { formatDateTime } from "@/strings/format";
+import { formatClock } from "@/strings";
 
-// The date and time in the top bar, like the reference; a minute is as fine as it needs to be.
+const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+// The device's own clock and zone, ticking each second, in the middle of the desktop top bar.
 export function TopClock() {
-	const [now, setNow] = useState(() => Date.now());
+	const [now, setNow] = useState(() => new Date());
 	useEffect(() => {
-		const timer = setInterval(() => setNow(Date.now()), 30_000);
-		return () => clearInterval(timer);
+		const tick = () => setNow(new Date());
+		const timer = setInterval(tick, 1000);
+		document.addEventListener("visibilitychange", tick);
+		return () => {
+			clearInterval(timer);
+			document.removeEventListener("visibilitychange", tick);
+		};
 	}, []);
-	return <span className="hidden text-sm text-muted sm:inline">{formatDateTime(now / 1000)}</span>;
+	const { weekday, time, gregorian, jalali } = formatClock(now);
+	return (
+		<time
+			dir="ltr"
+			dateTime={now.toISOString()}
+			title={zone()}
+			className="hidden tabular-nums lg:absolute lg:inset-x-0 lg:top-1/2 lg:mx-auto lg:flex lg:w-fit lg:-translate-y-1/2 lg:flex-col lg:items-center lg:leading-tight"
+		>
+			<span className="text-lg font-bold">
+				{weekday} {time}
+			</span>
+			<span className="text-sm text-muted">
+				{gregorian} · {jalali}
+			</span>
+		</time>
+	);
 }

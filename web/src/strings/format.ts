@@ -87,6 +87,23 @@ export function formatDateTime(epochSeconds: number, timeZone?: string): string 
 	}).format(new Date(epochSeconds * 1000));
 }
 
+/** Weekday, time with seconds, Gregorian and Jalali dates, in the device's zone unless given. */
+export function formatClock(date: Date, timeZone?: string) {
+	const day = { year: "numeric", month: "2-digit", day: "2-digit", timeZone } as const;
+	return {
+		weekday: new Intl.DateTimeFormat("fa-IR", { weekday: "long", timeZone }).format(date),
+		time: new Intl.DateTimeFormat("fa-IR", {
+			hour: "2-digit",
+			minute: "2-digit",
+			second: "2-digit",
+			hourCycle: "h23",
+			timeZone,
+		}).format(date),
+		gregorian: new Intl.DateTimeFormat("fa-IR-u-ca-gregory", day).format(date),
+		jalali: new Intl.DateTimeFormat("fa-IR-u-ca-persian", day).format(date),
+	};
+}
+
 /** A chart tick: the clock time for short ranges, the Jalali day for long ones. */
 export function formatTick(epochSeconds: number, spanSeconds: number, timeZone?: string): string {
 	const options: Intl.DateTimeFormatOptions =

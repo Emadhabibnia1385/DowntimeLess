@@ -52,12 +52,11 @@ describe("the signed-in shell", () => {
 		expect(within(sidebar).getByRole("button", { name: "روشن" })).toBeTruthy();
 	});
 
-	it("shows the official full logo of the dark theme, with the slogan, as the brand", async () => {
+	it("shows the official full logo of the dark theme as the brand", async () => {
 		signedInRouter("/account");
 		await screen.findAllByText("امید");
 		const logos = document.querySelectorAll("img[src='/brand/logo-dark.webp']");
 		expect(logos.length).toBeGreaterThan(0);
-		expect(screen.getAllByText("قطعی کمتر").length).toBeGreaterThan(0);
 	});
 
 	it("has no install button where the browser offers no install", async () => {
