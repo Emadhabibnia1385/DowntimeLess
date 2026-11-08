@@ -86,3 +86,19 @@ def test_agent_outdated_follows_the_served_agent_version(owner):
 
     report(owner, key, agent_version=service.current_agent_version())
     assert owner.get("/api/v1/servers/%d" % sid).json()["agent_outdated"] is False
+
+
+def test_panel_only_is_a_flag_on_the_panel_role(owner):
+    r = owner.post("/api/v1/servers", json={"name": "p", "role": "panel_only"})
+    assert r.status_code == 201 and r.json()["server"]["role"] == "panel_only"
+    sid = r.json()["server"]["id"]
+    assert owner.patch("/api/v1/servers/%d" % sid, json={"role": "panel"}).json()["role"] == "panel"
+    assert owner.patch("/api/v1/servers/%d" % sid, json={"role": "panel_only"}).json()["role"] == "panel_only"
+    assert owner.patch("/api/v1/servers/%d" % sid, json={"role": "exit"}).json()["role"] == "exit"
+
+
+def test_only_ipv4_is_kept_as_the_public_ip(owner):
+    sid, key = make_server(owner)
+    report(owner, key, public_ip="203.0.113.5")
+    report(owner, key, public_ip="2a14:4f80:800:4::1")
+    assert owner.get("/api/v1/servers/%d" % sid).json()["public_ip"] == "203.0.113.5"

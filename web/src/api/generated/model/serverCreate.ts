@@ -13,6 +13,6 @@ export interface ServerCreate {
 	 * @maxLength 64
 	 */
 	name: string;
-	/** @pattern ^(relay|exit|panel|other)$ */
+	/** @pattern ^(relay|exit|panel|panel_only|other)$ */
 	role?: string;
 }

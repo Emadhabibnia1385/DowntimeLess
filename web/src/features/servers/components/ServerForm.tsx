@@ -5,7 +5,7 @@ import { z } from "zod";
 import { errorMessage } from "@/api/transport";
 import { t } from "@/strings";
 
-const ROLES = ["relay", "exit", "panel", "other"] as const;
+const ROLES = ["exit", "relay", "panel", "panel_only", "other"] as const;
 
 const schema = z.object({
 	name: z

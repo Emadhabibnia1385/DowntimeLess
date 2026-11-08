@@ -64,10 +64,22 @@ def agent_outdated(version: Optional[str]) -> bool:
     return _version_key(version) < _version_key(latest)
 
 
+def role_columns(role: str) -> Dict[str, Any]:
+    """The stored columns for an API role: a panel-only server is 'panel' plus a flag."""
+    if role == "panel_only":
+        return {"role": "panel", "panel_only": 1}
+    return {"role": role, "panel_only": 0}
+
+
+def role_of(row: sqlite3.Row) -> str:
+    return "panel_only" if row["role"] == "panel" and row["panel_only"] else row["role"]
+
+
 def server_out(row: sqlite3.Row) -> Dict[str, Any]:
-    keys = ("id", "name", "alias", "role", "permission", "last_seen", "hostname", "public_ip", "country", "city", "org", "agent_version")
+    keys = ("id", "name", "alias", "permission", "last_seen", "hostname", "public_ip", "country", "city", "org", "agent_version")
     return {
         **{k: row[k] for k in keys},
+        "role": role_of(row),
         "status": status_of(row),
         "agent_outdated": agent_outdated(row["agent_version"]),
         "latest": latest_of(row),

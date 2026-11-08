@@ -9,7 +9,7 @@ import { useRefreshAll } from "@/shared/useRefreshAll";
 import { t } from "@/strings";
 import { ServerForm, type ServerFormValues } from "./ServerForm";
 
-const ROLES = ["relay", "exit", "panel", "other"];
+const ROLES = ["exit", "relay", "panel", "panel_only", "other"];
 
 // Edit and delete for one server, shown in the page header.
 export function ServerActions({ server }: { server: ServerOut }) {

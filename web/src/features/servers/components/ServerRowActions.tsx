@@ -13,7 +13,7 @@ import { useRefreshAll } from "@/shared/useRefreshAll";
 import { t } from "@/strings";
 import { ServerForm, type ServerFormValues } from "./ServerForm";
 
-const ROLES = ["relay", "exit", "panel", "other"];
+const ROLES = ["exit", "relay", "panel", "panel_only", "other"];
 
 // Edit, update agent and delete for one row of the table; delete is how a pending install goes.
 export function ServerRowActions({ server }: { server: ServerOut }) {

@@ -38,13 +38,14 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
     rx_d = rx - server["prev_rx"] if rx is not None and server["prev_rx"] is not None and rx >= server["prev_rx"] else 0
     tx_d = tx - server["prev_tx"] if tx is not None and server["prev_tx"] is not None and tx >= server["prev_tx"] else 0
     geo = body.geo or {}
+    public_ip = body.public_ip if body.public_ip and ":" not in body.public_ip else None  # IPv4 only
     pct = lambda used, total: round(used * 100 / total, 1) if total else None  # noqa: E731
     ram_pct = pct((body.ram_total_mb or 0) - (body.ram_avail_mb or 0), body.ram_total_mb)
     disk_pct = pct(body.disk_used_gb or 0, body.disk_total_gb)
     db.execute(
         "UPDATE servers SET last_seen=?, last_report=?, prev_rx=?, prev_tx=?, agent_version=?, hostname=COALESCE(NULLIF(?,''),hostname), "
         "public_ip=COALESCE(?,public_ip), country=COALESCE(?,country), city=COALESCE(?,city), org=COALESCE(?,org) WHERE id=?",
-        (now, body.model_dump_json(), rx, tx, body.agent_version, body.hostname, body.public_ip,
+        (now, body.model_dump_json(), rx, tx, body.agent_version, body.hostname, public_ip,
          geo.get("country"), geo.get("city"), geo.get("org"), sid),
     )
     db.execute(
@@ -61,7 +62,7 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
         )
     targets = [
         {"target": r["public_ip"], "tcp_port": None}
-        for r in db.execute("SELECT public_ip FROM servers WHERE id<>? AND public_ip IS NOT NULL", (sid,))
+        for r in db.execute("SELECT public_ip FROM servers WHERE id<>? AND public_ip IS NOT NULL AND public_ip NOT LIKE '%:%'", (sid,))
     ]
     jobs = [{"id": r["id"], "kind": r["kind"], "args": json.loads(r["args"])} for r in db.execute("SELECT * FROM jobs WHERE server_id=? AND status='queued' ORDER BY id", (sid,))]
     if jobs:

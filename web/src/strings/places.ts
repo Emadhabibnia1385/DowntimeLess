@@ -1,34 +1,18 @@
-// Persian names for where a server is: country, city and data center, plus the flag.
-const CITIES: Record<string, string> = {
-	Manassas: "مناساس",
-	Amsterdam: "آمستردام",
-	Nuremberg: "نورنبرگ",
-	Falkenstein: "فالکن‌اشتاین",
-	Istanbul: "استانبول",
-	London: "لندن",
-	Helsinki: "هلسینکی",
-	Singapore: "سنگاپور",
-	Tehran: "تهران",
-	Ramshir: "رامشیر",
-	Alvand: "الوند",
-	"Frankfurt am Main": "فرانکفورت",
-	Milan: "میلان",
-	Vienna: "وین",
-};
-
-// First match wins, so the longer or more specific names come first.
+// English names for where a server is (country, city, data center) and its flag.
 const DATACENTERS: [RegExp, string][] = [
-	[/hetzner/i, "هتزنر"],
-	[/netcup/i, "نت‌کاپ"],
-	[/leaseweb/i, "لیزوب"],
-	[/ekiphost/i, "اکیپ‌هاست"],
-	[/sepehr sabz/i, "سپهر سبز"],
-	[/rayaneh gostar/i, "رایانه گستر"],
-	[/taymaz/i, "تیماز گستران"],
-	[/pccw/i, "پی‌سی‌سی‌دابلیو"],
+	[/hetzner/i, "Hetzner"],
+	[/netcup/i, "netcup"],
+	[/leaseweb/i, "Leaseweb"],
+	[/ekiphost/i, "EkipHost"],
+	[/sepehr sabz/i, "Sepehr Sabz"],
+	[/rayaneh gostar/i, "Rayaneh Gostar"],
+	[/taymaz/i, "Taymaz Gostaran"],
+	[/pccw/i, "PCCW Global"],
 ];
 
-const REGIONS = new Intl.DisplayNames(["fa"], { type: "region" });
+const LEGAL_SUFFIX = /[\s,]+(gmbh|b\.v\.|inc\.?|ltd\.?|limited|llc|pte\.?|s\.a\.|ag)\b.*$/i;
+
+const REGIONS = new Intl.DisplayNames(["en"], { type: "region" });
 
 /** The flag emoji of a two-letter country code; empty for anything else. */
 export function flagOf(country: string | null | undefined): string {
@@ -47,21 +31,22 @@ export function countryName(country: string | null | undefined): string {
 	}
 }
 
-export const cityName = (city: string | null | undefined): string =>
-	city ? (CITIES[city] ?? city) : "";
-
 export function datacenterName(org: string | null | undefined): string {
 	if (!org) return "";
-	return DATACENTERS.find(([pattern]) => pattern.test(org))?.[1] ?? org;
+	return DATACENTERS.find(([pattern]) => pattern.test(org))?.[1] ?? org.replace(LEGAL_SUFFIX, "");
 }
 
-/** "آلمان · نورنبرگ · نت‌کاپ": the parts a report gave, in that order. */
+/** "Germany · Nuremberg · netcup": the parts a report gave, in that order. */
 export function placeLine(server: {
 	country?: string | null;
 	city?: string | null;
 	org?: string | null;
 }): string {
-	return [countryName(server.country), cityName(server.city), datacenterName(server.org)]
+	return [countryName(server.country), server.city, datacenterName(server.org)]
 		.filter(Boolean)
 		.join(" · ");
 }
+
+/** The IPv4 address to show; an IPv6 one from an older agent is left out. */
+export const ipv4Of = (ip: string | null | undefined): string =>
+	ip && !ip.includes(":") ? ip : "";

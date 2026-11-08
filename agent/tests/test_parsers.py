@@ -134,3 +134,27 @@ def test_ssl_report_lists_days_left(monkeypatch, tmp_path):
     monkeypatch.setattr(agent, "run_text", lambda argv, timeout=10: "notAfter=Feb  4 12:33:37 2027 GMT\nDNS:x.example.com\n")
     rep = agent.ssl_report(now=1801744417 - 10 * 86400 - 5)
     assert rep["certs"][0]["days_left"] == 10 and rep["certs"][0]["domains"] == ["x.example.com"]
+
+
+def test_own_ipv4_prefers_a_public_local_address(monkeypatch):
+    import agent
+
+    monkeypatch.setattr(agent, "local_ipv4", lambda: "45.144.17.212")
+    assert agent.own_ipv4("205.252.135.59") == "45.144.17.212"
+    monkeypatch.setattr(agent, "local_ipv4", lambda: "10.0.0.5")
+    assert agent.own_ipv4("205.252.135.59") == "205.252.135.59"
+    assert agent.own_ipv4("2a14:4f80::1") is None
+
+
+def test_ipv4_only_restricts_and_restores_lookups(monkeypatch):
+    import socket
+
+    import agent
+
+    seen = []
+    monkeypatch.setattr(socket, "getaddrinfo", lambda host, port, family=0, *a, **k: seen.append(family) or [])
+    real = socket.getaddrinfo
+    with agent.ipv4_only():
+        socket.getaddrinfo("example.com", 443)
+    assert seen == [socket.AF_INET]
+    assert socket.getaddrinfo is real

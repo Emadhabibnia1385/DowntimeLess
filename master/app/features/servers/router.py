@@ -30,9 +30,10 @@ def list_servers(_: Actor = Depends(require("viewer")), db: sqlite3.Connection =
 @router.post("", response_model=ServerCreated, status_code=201, operation_id="servers_create")
 def create_server(body: ServerCreate, _: Actor = Depends(require("admin")), db: sqlite3.Connection = Depends(get_db)):
     token = new_token(24)
+    cols = svc.role_columns(body.role)
     cur = db.execute(
-        "INSERT INTO servers (name, alias, role, enroll_hash, created_at) VALUES (?,?,?,?,?)",
-        (body.name, body.alias, body.role, digest(token), int(time.time())),
+        "INSERT INTO servers (name, alias, role, panel_only, enroll_hash, created_at) VALUES (?,?,?,?,?,?)",
+        (body.name, body.alias, cols["role"], cols["panel_only"], digest(token), int(time.time())),
     )
     return {"server": svc.server_out(_row(db, cur.lastrowid)), "install_command": svc.install_command(token)}
 
@@ -53,7 +54,10 @@ def get_server(server_id: int, _: Actor = Depends(require("viewer")), db: sqlite
 @router.patch("/{server_id}", response_model=ServerOut, operation_id="servers_update")
 def patch_server(server_id: int, body: ServerPatch, _: Actor = Depends(require("admin")), db: sqlite3.Connection = Depends(get_db)):
     _row(db, server_id)
-    for field, value in body.model_dump(exclude_none=True).items():
+    changes = body.model_dump(exclude_none=True)
+    if "role" in changes:
+        changes.update(svc.role_columns(changes["role"]))
+    for field, value in changes.items():
         db.execute("UPDATE servers SET %s=? WHERE id=?" % field, (value, server_id))  # field names come from the model
     return svc.server_out(_row(db, server_id))
 

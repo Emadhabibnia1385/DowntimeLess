@@ -62,7 +62,7 @@ export const serversCreateBodyAliasMax = 64;
 export const serversCreateBodyNameMax = 64;
 
 export const serversCreateBodyRoleDefault = `other`;
-export const serversCreateBodyRoleRegExp = new RegExp("^(relay|exit|panel|other)$");
+export const serversCreateBodyRoleRegExp = new RegExp("^(relay|exit|panel|panel_only|other)$");
 
 export const ServersCreateBody = zod.object({
 	alias: zod.string().max(serversCreateBodyAliasMax).default(serversCreateBodyAliasDefault),
@@ -187,7 +187,7 @@ export const serversUpdateBodyAliasOneMax = 64;
 export const serversUpdateBodyNameOneMax = 64;
 
 export const serversUpdateBodyPermissionOneRegExp = new RegExp("^(read|safe|full)$");
-export const serversUpdateBodyRoleOneRegExp = new RegExp("^(relay|exit|panel|other)$");
+export const serversUpdateBodyRoleOneRegExp = new RegExp("^(relay|exit|panel|panel_only|other)$");
 
 export const ServersUpdateBody = zod.object({
 	alias: zod.union([zod.string().max(serversUpdateBodyAliasOneMax), zod.null()]).optional(),

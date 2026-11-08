@@ -3,7 +3,9 @@
 import argparse
 import calendar
 import concurrent.futures
+import contextlib
 import http.client
+import ipaddress
 import json
 import glob
 import os
@@ -17,7 +19,7 @@ import time
 import urllib.parse
 import urllib.request
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 UA = "DowntimeLess-Agent/" + VERSION
 SELF_PATH = os.path.realpath(__file__)
 GEO_URLS = ("https://ipinfo.io/json", "https://ipwho.is/")
@@ -213,10 +215,47 @@ def fetch_text(url, timeout=10, limit=1 << 16):
 
 # ---- collectors ----
 
+@contextlib.contextmanager
+def ipv4_only():
+    """Name lookups answer IPv4 only inside the block, so a lookup service sees our IPv4 address."""
+    real = socket.getaddrinfo
+
+    def v4(host, port, family=0, *args, **kwargs):
+        return real(host, port, socket.AF_INET, *args, **kwargs)
+
+    socket.getaddrinfo = v4
+    try:
+        yield
+    finally:
+        socket.getaddrinfo = real
+
+
+def local_ipv4():
+    """The IPv4 address the default route leaves from, or None; sends no packet."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("192.0.2.1", 9))
+            return s.getsockname()[0]
+    except OSError:
+        return None
+
+
+def own_ipv4(looked_up):
+    """The server's own address when it is public (that is what people log in to), else the looked-up one."""
+    local = local_ipv4()
+    try:
+        if local and ipaddress.ip_address(local).is_global:
+            return local
+    except ValueError:
+        pass
+    return looked_up if looked_up and ":" not in looked_up else None
+
+
 def lookup_geo():
     for url, parse in zip(GEO_URLS, (parse_ipinfo, parse_ipwho)):
         try:
-            found = parse(json.loads(fetch_text(url)))
+            with ipv4_only():
+                found = parse(json.loads(fetch_text(url)))
         except Exception:
             continue
         if found:
@@ -352,7 +391,8 @@ def build_report(state):
     except OSError:
         pass
     uptime = parse_first_float(read("/proc/uptime"))
-    ip, geo = geo_cached(state)
+    looked_up, geo = geo_cached(state)
+    ip = own_ipv4(looked_up)
 
     return {
         "agent_version": VERSION,

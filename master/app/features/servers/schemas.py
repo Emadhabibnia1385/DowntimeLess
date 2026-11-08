@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-ROLES = "^(relay|exit|panel|other)$"
+ROLES = "^(relay|exit|panel|panel_only|other)$"
 PERMS = "^(read|safe|full)$"
 
 

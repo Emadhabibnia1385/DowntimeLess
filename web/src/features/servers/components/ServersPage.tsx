@@ -26,6 +26,9 @@ const percent = (value: number | null | undefined) =>
 const rate = (value: number | null | undefined) =>
 	value == null ? t.common.none : formatNumber(Math.round(value / 1_000_000));
 
+const bandwidth = (rx: number | null | undefined, tx: number | null | undefined) =>
+	rx == null && tx == null ? t.common.none : rate((rx ?? 0) + (tx ?? 0));
+
 // What a row says about its agent: the version, and whether the panel holds a newer one.
 const agentCell = (server: ServerOut) => {
 	if (!server.agent_version) return t.common.none;
@@ -49,8 +52,8 @@ export function ServersPage() {
 	const onSort = (key: SortKey, first: SortDirection) =>
 		setSort((current) => nextSort(current, key, first));
 	const rows = useMemo(() => sortServers(servers.data ?? [], sort), [servers.data, sort]);
-	const head = (label: string, key: SortKey, first: SortDirection = "desc") => (
-		<SortHeader label={label} sortKey={key} first={first} sort={sort} onSort={onSort} />
+	const head = (label: string, key: SortKey, first: SortDirection = "desc", unit?: string) => (
+		<SortHeader label={label} unit={unit} sortKey={key} first={first} sort={sort} onSort={onSort} />
 	);
 	const columns: DataColumn<ServerOut>[] = [
 		{
@@ -69,15 +72,6 @@ export function ServersPage() {
 			header: head(t.servers.status, "status", "asc"),
 			cell: (server) => <ServerStatusChip status={server.status} />,
 		},
-		{
-			id: "ip",
-			header: t.servers.ip,
-			cell: (server) => (
-				<span dir="ltr" className="font-mono">
-					{server.public_ip ?? t.common.none}
-				</span>
-			),
-		},
 		{ id: "cpu", header: head(t.servers.cpu, "cpu"), cell: (s) => percent(s.latest.cpu_pct) },
 		{ id: "ram", header: head(t.servers.ram, "ram"), cell: (s) => percent(s.latest.ram_pct) },
 		{
@@ -87,18 +81,18 @@ export function ServersPage() {
 		},
 		{
 			id: "download",
-			header: head(t.servers.download, "download"),
+			header: head(t.servers.download, "download", "desc", t.servers.mbps),
 			cell: (s) => rate(s.latest.rx_bps),
 		},
 		{
 			id: "upload",
-			header: head(t.servers.upload, "upload"),
+			header: head(t.servers.upload, "upload", "desc", t.servers.mbps),
 			cell: (s) => rate(s.latest.tx_bps),
 		},
 		{
-			id: "retrans",
-			header: head(t.servers.retrans, "retrans"),
-			cell: (s) => percent(s.latest.tcp_retrans_pct),
+			id: "bandwidth",
+			header: head(t.servers.bandwidth, "bandwidth", "desc", t.servers.mbps),
+			cell: (s) => bandwidth(s.latest.rx_bps, s.latest.tx_bps),
 		},
 		{ id: "agent", header: t.servers.agent, cell: agentCell },
 		...(canManage

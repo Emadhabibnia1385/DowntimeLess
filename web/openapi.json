@@ -1077,7 +1077,7 @@
           },
           "role": {
             "default": "other",
-            "pattern": "^(relay|exit|panel|other)$",
+            "pattern": "^(relay|exit|panel|panel_only|other)$",
             "title": "Role",
             "type": "string"
           }
@@ -1278,7 +1278,7 @@
           "role": {
             "anyOf": [
               {
-                "pattern": "^(relay|exit|panel|other)$",
+                "pattern": "^(relay|exit|panel|panel_only|other)$",
                 "type": "string"
               },
               {
