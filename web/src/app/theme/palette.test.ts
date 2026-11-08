@@ -34,7 +34,7 @@ describe("the panel palette (green on white, soft green on black)", () => {
 		expect(Number.parseInt(palette.dark.background.slice(1, 3), 16)).toBeLessThan(40);
 	});
 
-	it("has no blue anywhere in the dark theme", () => {
+	it("has no blue anywhere in either theme", () => {
 		for (const colour of [
 			palette.dark.accent.fill,
 			palette.dark.info.fill,

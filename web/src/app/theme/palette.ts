@@ -20,7 +20,7 @@ export const palette: Palette = {
 		success: { fill: "#1A6B32", onFill: "#FFFFFF" },
 		warning: { fill: "#8A5A00", onFill: "#FFFFFF" },
 		danger: { fill: "#B42318", onFill: "#FFFFFF" },
-		info: { fill: "#1F5FAA", onFill: "#FFFFFF" },
+		info: { fill: "#556F0F", onFill: "#FFFFFF" },
 	},
 	dark: {
 		background: "#0E1012",

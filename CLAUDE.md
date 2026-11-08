@@ -32,7 +32,7 @@ part of the logo only: it is never a UI colour, and the logo files stay untouche
 | Border | `#D9DFDB` | `#2B3036` |
 | Field border | `#78847D` | `#8A939B` |
 | Accent (buttons, links, focus, tabs, chart highlight) | `#2E6B45` (forest green), tint `#E3F1E8` | `#8BD8A0` (soft green) |
-| Success / warning / danger / info | `#1A6B32` / `#8A5A00` / `#B42318` / `#1F5FAA` | `#5FD08A` / `#FBBF24` / `#FF9C92` / `#C3E26B` (a soft yellow-green, so dark has no blue; it is also the second chart line, apart from the mint accent) |
+| Success / warning / danger / info | `#1A6B32` / `#8A5A00` / `#B42318` / `#556F0F` (olive, so light has no blue either; it is also the second chart line) | `#5FD08A` / `#FBBF24` / `#FF9C92` / `#C3E26B` (a soft yellow-green, so dark has no blue; it is also the second chart line, apart from the mint accent) |
 
 Rules: dark is the default theme (`defaultMode="dark"` in `web/src/app/providers.tsx`) and light is a toggle; a saved choice always wins.
 Dark is a neutral graphite black (not pure #000, not tinted blue or green); no neon and no glow. Use the accent for actions, navigation, tabs, filters and
