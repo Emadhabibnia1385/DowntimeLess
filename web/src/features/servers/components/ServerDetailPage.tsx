@@ -5,15 +5,17 @@ import { useDocumentTitle } from "@/shared/useDocumentTitle";
 import { t } from "@/strings";
 import { useServer } from "../api";
 import type { Range } from "../lib/chart";
-import { displayName, roleLabel } from "../lib/status";
+import { displayName } from "../lib/status";
+import { whereOf } from "../lib/where";
+import { CertsCard } from "./CertsCard";
+import { HistoryCard } from "./HistoryCard";
 import { InstallCommand } from "./InstallCommand";
-import { JobsSection } from "./JobsSection";
 import { LiveTiles } from "./LiveTiles";
-import { MetricsCharts } from "./MetricsCharts";
-import { PermissionSection } from "./PermissionSection";
+import { OperationsCard } from "./OperationsCard";
+import { RelayPingCard } from "./RelayPingCard";
 import { ServerActions } from "./ServerActions";
+import { ServerBadges } from "./ServerBadges";
 import { ServerInfo } from "./ServerInfo";
-import { ServerStatusChip } from "./ServerStatusChip";
 
 export function ServerDetailPage({
 	serverId,
@@ -32,10 +34,9 @@ export function ServerDetailPage({
 			{(data) => (
 				<div className="flex flex-col gap-6">
 					<PageHeader
-						title={displayName(data)}
-						description={roleLabel(data.role)}
+						title={`${whereOf({ ...data, org: null }).flag} ${displayName(data)}`.trim()}
 						backHref="/servers"
-						meta={<ServerStatusChip status={data.status} size="md" />}
+						meta={<ServerBadges server={data} />}
 						actions={canManage ? <ServerActions server={data} /> : undefined}
 					/>
 					{data.status === "pending" && canManage ? (
@@ -45,10 +46,24 @@ export function ServerDetailPage({
 					) : (
 						<LiveTiles server={data} />
 					)}
-					<ServerInfo server={data} />
-					<MetricsCharts serverId={data.id} range={range} onRangeChange={onRangeChange} />
-					<JobsSection server={data} canManage={canManage} />
-					<PermissionSection server={data} canManage={canManage} />
+					<div className="grid items-start gap-6 lg:grid-cols-2">
+						<div className="min-w-0 lg:order-2">
+							<ServerInfo server={data} />
+						</div>
+						<div className="min-w-0 lg:order-1">
+							<OperationsCard server={data} canManage={canManage} />
+						</div>
+					</div>
+					<HistoryCard
+						serverId={data.id}
+						range={range}
+						onRangeChange={onRangeChange}
+						cores={data.system?.cpu_cores ?? data.latest.cpu_cores}
+					/>
+					<div className="grid items-start gap-6 md:grid-cols-2">
+						<CertsCard serverId={data.id} />
+						{data.role === "relay" ? <RelayPingCard serverId={data.id} /> : null}
+					</div>
 				</div>
 			)}
 		</Loadable>

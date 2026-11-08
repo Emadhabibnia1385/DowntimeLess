@@ -8,7 +8,6 @@ const server = (id: number, name: string, cpu: number | null, rx: number | null)
 		name,
 		alias: "",
 		role: "exit",
-		permission: "read",
 		status: "online",
 		latest: { cpu_pct: cpu, rx_bps: rx, failed_units: [], reboot_required: false },
 	}) as unknown as ServerOut;

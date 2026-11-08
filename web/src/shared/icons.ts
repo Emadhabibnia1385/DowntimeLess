@@ -22,3 +22,7 @@ export { default as CheckIcon } from "~icons/solar/check-circle-linear";
 export { default as CloseIcon } from "~icons/solar/close-circle-linear";
 export { default as ArrowDownIcon } from "~icons/solar/arrow-down-linear";
 export { default as ArrowUpIcon } from "~icons/solar/arrow-up-linear";
+export { default as ChartIcon } from "~icons/solar/chart-2-linear";
+export { default as DownloadIcon } from "~icons/solar/download-linear";
+export { default as TableIcon } from "~icons/solar/table-linear";
+export { default as WrenchIcon } from "~icons/solar/tuning-2-linear";

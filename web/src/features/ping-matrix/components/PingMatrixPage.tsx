@@ -1,4 +1,4 @@
-import { EmptyState, PageHeader, StaticTable, StatusChip } from "@nyxon/nasim";
+import { EmptyState, PageHeader, StaticTable } from "@nyxon/nasim";
 import { Link } from "@tanstack/react-router";
 import type { PingCell } from "@/api/generated/model";
 import { useOverviewPingMatrix } from "@/api/generated/overview/overview";
@@ -8,15 +8,8 @@ import { IpText } from "@/shared/IpText";
 import { Loadable } from "@/shared/Loadable";
 import { useDocumentTitle } from "@/shared/useDocumentTitle";
 import { flagOf, formatMs, formatPercent, t } from "@/strings";
-import { buildMatrix, type Health, healthOf, numberOrNull, type Thresholds } from "../lib/matrix";
-
-const TONES = { ok: "success", degraded: "warning", down: "danger", unknown: "neutral" } as const;
-const LABELS: Record<Health, string> = {
-	ok: t.pingMatrix.ok,
-	degraded: t.pingMatrix.degraded,
-	down: t.pingMatrix.down,
-	unknown: t.pingMatrix.unknown,
-};
+import { buildMatrix, healthOf, numberOrNull, type Thresholds } from "../lib/matrix";
+import { HealthChip } from "./HealthChip";
 
 function Cell({ cell, limits }: { cell: PingCell | undefined; limits: Thresholds }) {
 	if (!cell) return <span aria-hidden>{t.pingMatrix.noCell}</span>;
@@ -25,7 +18,7 @@ function Cell({ cell, limits }: { cell: PingCell | undefined; limits: Thresholds
 	const health = healthOf(loss, limits);
 	return (
 		<div className="flex flex-col items-start gap-1">
-			<StatusChip tone={TONES[health]} label={LABELS[health]} size="sm" />
+			<HealthChip health={health} />
 			{loss === null ? null : (
 				<span className="text-xs text-muted">
 					{t.pingMatrix.cell(formatPercent(loss), rtt === null ? t.common.none : formatMs(rtt))}

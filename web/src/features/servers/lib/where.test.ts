@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { whereOf } from "./where";
+import { datacenterOf, whereOf } from "./where";
 
 const reported = { country: "DE", city: "Frankfurt am Main", org: "PCCWG INTERNAL" };
 
@@ -22,5 +22,19 @@ describe("whereOf", () => {
 		expect(w.flag).toBe("🇩🇪");
 		expect(w.place).toContain("Germany");
 		expect(w.place).toContain("Falkenstein");
+	});
+});
+
+describe("datacenterOf", () => {
+	it("names the provider of a server in its own place", () => {
+		expect(datacenterOf({ role: "exit", country: "DE", org: "Hetzner Online GmbH" })).toBe(
+			"Hetzner",
+		);
+	});
+	it("gives a relay that is still placed by its foreign exit no provider", () => {
+		expect(datacenterOf({ role: "relay", ...reported })).toBe("");
+	});
+	it("is empty without an org", () => {
+		expect(datacenterOf({ role: "exit", country: "DE" })).toBe("");
 	});
 });

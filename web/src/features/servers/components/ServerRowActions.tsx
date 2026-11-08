@@ -8,10 +8,11 @@ import {
 	useServersUpdate,
 } from "@/api/generated/servers/servers";
 import { errorMessage } from "@/api/transport";
-import { CheckIcon, CloseIcon, EditIcon, RefreshIcon, TrashIcon } from "@/shared/icons";
+import { EditIcon, RefreshIcon, TrashIcon } from "@/shared/icons";
 import { useRefreshAll } from "@/shared/useRefreshAll";
 import { t } from "@/strings";
 import { categoryValue, toServerPayload } from "../lib/category";
+import { AgentVersionMark } from "./AgentVersionMark";
 import { ServerForm, type ServerFormValues } from "./ServerForm";
 
 const ROLES = ["exit", "relay", "panel", "panel_only", "other"];
@@ -98,17 +99,7 @@ export function ServerRowActions({ server }: { server: ServerOut }) {
 					<span dir="ltr" className="font-mono">
 						{server.agent_version}
 					</span>
-					{server.agent_outdated ? (
-						<span title={t.servers.updateNeeded} className="inline-flex text-danger">
-							<CloseIcon aria-hidden className="size-4" />
-							<span className="sr-only">{t.servers.updateNeeded}</span>
-						</span>
-					) : (
-						<span title={t.servers.upToDate} className="inline-flex text-success">
-							<CheckIcon aria-hidden className="size-4" />
-							<span className="sr-only">{t.servers.upToDate}</span>
-						</span>
-					)}
+					<AgentVersionMark outdated={Boolean(server.agent_outdated)} />
 				</p>
 			) : null}
 			<Modal isOpen={editing} onOpenChange={setEditing} title={t.servers.editRowTitle}>
