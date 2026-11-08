@@ -1,1 +1,0 @@
-import{t as e}from"./settings-C8SNoSL6.js";var t=e;export{t as component};

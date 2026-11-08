@@ -27,10 +27,13 @@ function Shell() {
 			topbar={<TopClock />}
 			sidebarFooter={<SidebarAccount />}
 		>
-			<Outlet />
-			<Footer sidebar />
-			<div aria-hidden className="h-12" />
-			<div aria-hidden className="h-16 lg:hidden" />
+			<div className="flex min-h-full flex-col">
+				<div className="flex-1">
+					<Outlet />
+				</div>
+				<Footer />
+				<div aria-hidden className="h-16 lg:hidden" />
+			</div>
 			<BottomBar />
 		</AppShell>
 	);
