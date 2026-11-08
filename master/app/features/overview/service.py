@@ -2,6 +2,7 @@ import sqlite3
 import time
 from typing import Any, Dict, List
 
+from ..checks import service as checks_svc
 from ..issues import acks
 from ..servers.service import latest_of, status_of
 from ..settings.router import thresholds
@@ -49,6 +50,7 @@ def issues(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
     th, now, out = thresholds(db, ws), int(time.time()), []
     forecasts: List[Any] = []
     servers = db.execute("SELECT * FROM servers WHERE workspace_id=?", (ws,)).fetchall()
+    ctx = checks_svc.context(servers)
     for s in servers:
         st, lt = status_of(s), latest_of(s)
         if st == "pending":
@@ -76,7 +78,10 @@ def issues(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
             found = detectors.quota_issue(s, forecast) if th["on_quota"] else None
             if found:
                 out.append(found)
-        if th["on_reboot"] and lt["reboot_required"]:
+        host = checks_svc.server_issues(db, ws, s, th, now, ctx)
+        out.extend(host)
+        # agent 0.3 names the packages waiting for the reboot; that issue replaces the bare flag
+        if th["on_reboot"] and lt["reboot_required"] and not any(i["code"] == "reboot_pending_pkgs" for i in host):
             out.append(_issue(s, "reboot_required", "info", "سرور برای اعمال آپدیت نیاز به ریبوت دارد", "در ساعت کم‌ترافیک و با تأیید خودتان ریبوت کنید؛ رله‌ها را یکی‌یکی."))
     names = {s["id"]: s for s in servers}
     by_target: Dict[int, List[Dict[str, Any]]] = {}

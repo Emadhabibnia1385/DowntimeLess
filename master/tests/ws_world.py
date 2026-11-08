@@ -9,14 +9,19 @@ from fastapi.testclient import TestClient
 
 from app import bot
 from app.db import connect
+from checks_data import checks as checks_data
+from checks_data import panel as panel_data
 from conftest import report
 
 X_TG, Y_TG, CAROL_TG = 111, 222, 333
 A_IPS = {"alfa-relay": "198.51.100.1", "alfa-exit": "198.51.100.2"}
 B_IPS = {"bee-relay": "203.0.113.1", "bee-exit": "203.0.113.2", "bee-twin": "198.51.100.2"}
-A_MARKS = ("alfa-relay", "alfa-exit", "A-cat", "a-domain.example.com", "A-key", "-1001111111111", "A-incident", "A-chan")
+A_MARKS = ("alfa-relay", "alfa-exit", "A-cat", "a-domain.example.com", "A-key", "-1001111111111", "A-incident", "A-chan",
+           "alfa-node", "alfa-reseller", "alfa-inbound")
 B_MARKS = ("bee-relay", "bee-exit", "bee-twin", "203.0.113.", "B-cat", "b-domain.example.com", "B-key", "-1002222222222",
-           "B-incident", "B-chan")
+           "B-incident", "B-chan", "bee-node", "bee-reseller", "bee-inbound", "bee-box")
+# tables of the host checks and panel truth: every row carries workspace_id
+CHECK_TABLES = ("listener_baseline", "check_state", "check_ignores", "node_usage")
 
 
 def login(app, tg, tg_id) -> TestClient:
@@ -87,6 +92,15 @@ def _fill(client, ws, prefix, ips, chat):
     chan = client.post("/api/v1/telegram/channels", json={"name": prefix + "-chan", "chat_id": chat}).json()["id"]
     assert client.put("/api/v1/telegram/routes", json={"cpu": "channel:%d" % chan}).status_code == 200
     job = client.post("/api/v1/servers/%d/jobs" % ids[exit_], json={"kind": "ping"}).json()["id"]
+    # the relay is also the panel host: host checks, a learned baseline, panel truth and an ignore of each kind
+    tag = "alfa" if prefix == "A" else "bee"
+    pan = panel_data(nodes=[{"id": 1, "name": tag + "-node", "address": "192.0.2.1", "port": 1, "status": "error", "message": ""}],
+                     admins=[{"name": tag + "-reseller", "used": 99, "limit": 100}], inbounds_without_group=[tag + "-inbound"])
+    pan["usage"] = {"hour_start": now // 3600 * 3600 - 3600, "last": [{"node_id": 1, "users": 5, "bytes": 9}], "prev": []}
+    for _ in range(2):
+        report(client, keys[relay], hostname=relay, public_ip=ips[relay], agent_version="0.3.1", uptime_s=1000,
+               checks=checks_data(containers=[dict(checks_data()["containers"][0], name=tag + "-box")]), panel=pan)
+    assert client.patch("/api/v1/servers/%d/ignores" % ids[relay], json={"kind": "container", "name": tag + "-box"}).status_code == 200
     db = connect()
     dom = db.execute(
         "INSERT INTO domains (workspace_id, host, port, note, created_at, last_checked, not_after) VALUES (?,?,443,'',?,?,?)",
@@ -147,6 +161,8 @@ def dump(ws):
         out = {}
         for table in ("servers", "categories", "domains", "settings", "api_keys", "telegram_channels", "rule_routes",
                       "incidents", "events", "alert_state", "flapping", "issue_acks"):
+            out[table] = sorted(tuple(r) for r in db.execute("SELECT * FROM %s WHERE workspace_id=?" % table, (ws,)))
+        for table in CHECK_TABLES:
             out[table] = sorted(tuple(r) for r in db.execute("SELECT * FROM %s WHERE workspace_id=?" % table, (ws,)))
         for table in ("jobs", "metrics", "pings", "link_traffic", "link_prev"):
             out[table] = sorted(tuple(r) for r in db.execute(

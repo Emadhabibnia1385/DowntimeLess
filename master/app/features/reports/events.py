@@ -6,7 +6,7 @@ from typing import Any, Dict, Iterable, Optional
 KINDS = (
     "job_created", "job_done", "agent_updated", "server_added", "server_removed", "server_renamed",
     "acct_toggled", "issue_opened", "issue_closed", "rebooted", "ip_changed", "resized", "settings_changed",
-    "member_added", "member_role_changed", "member_removed", "issue_acked", "issue_unacked",
+    "member_added", "member_role_changed", "member_removed", "issue_acked", "issue_unacked", "check_ack",
 )
 KEEP_S = 180 * 86400
 MAX_TITLE = 200

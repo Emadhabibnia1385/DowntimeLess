@@ -85,6 +85,27 @@ def briefing_md(b: Dict[str, Any]) -> str:
         out.append("\n## Certificates at risk")
         out.append(table(["name", "server", "days", "level", "auto-renew", "error"], (
             [c["name"], c["server"] or "external", c["days_left"] if c["days_left"] is not None else "-", c["level"], c["auto_renew"], _short(c["error"] or "", 60)] for c in b["certs_at_risk"])))
+    hc = b["host_checks"]
+    out.append("\n## Host checks (agent 0.3+: listeners, units, containers, DNAT, conntrack, kernel)")
+    out.append("Reporting: %d online server(s)%s." % (hc["reporting"], "; without checks: " + ", ".join(hc["without"]) if hc["without"] else ""))
+    if hc["problems"]:
+        out.append(table(["server", "code", "sev", "what"], ([p["server"] or "-", p["code"], p["severity"], p["detail"]] for p in hc["problems"])))
+    for p in b["panel"]:
+        out.append("\n## PasarGuard panel on %s (version %s)" % (p["server"], p["version"] or "?"))
+        out.append("Nodes %d: connected %d, disabled %d%s%s. Users last full hour: %s." % (
+            p["nodes_total"], p["connected"], p["disabled"],
+            "; not connected: " + ", ".join(p["not_connected"]) if p["not_connected"] else "",
+            "; usage dropped: " + ", ".join(p["dropped"]) if p["dropped"] else "",
+            p["users_last_hour"] if p["users_last_hour"] is not None else "-"))
+        if p["user_status"]:
+            out.append("User status: " + ", ".join("%s %d" % kvp for kvp in p["user_status"].items()) + ".")
+        if p["resellers_near_quota"]:
+            out.append(table(["reseller", "used", "hours left", "level"], (
+                [r["name"], pct(r["used_pct"]), r["hours_left"] if r["hours_left"] is not None else "-", r["level"]] for r in p["resellers_near_quota"])))
+        if p["inbounds_without_group"]:
+            out.append("Inbounds in no group: " + ", ".join(p["inbounds_without_group"]) + ".")
+        if p["errors"]:
+            out.append("Panel read errors: " + ", ".join(p["errors"]) + ".")
     if b["agents_outdated"]["servers"]:
         out.append("\nAgents outdated (latest %s): %s." % (b["agents_outdated"]["latest"], ", ".join(b["agents_outdated"]["servers"])))
     out.append("\n## Changes in 24h (%d issue open/close events not listed)" % b["issue_events_24h"])

@@ -4,8 +4,14 @@ from app.features.reports import playbooks
 
 SIBLING_CODES = ["quota_pair", "rebooted", "ip_changed", "resized", "blacklisted", "relay_egress", "relay_filtered", "quota", "load_per_core"]
 PLANNED_THEMES = [
-    "listener_missing", "tunnel_unit_inactive", "node_core_stopped", "dnat_table_missing", "conntrack_limits_reset", "quota_exhausted",
-    "panel_path_broken", "db_pool_exhausted", "backup_old", "update_rolled_back", "dns_dead_relay",
+    "quota_exhausted", "panel_path_broken", "db_pool_exhausted", "backup_old", "update_rolled_back", "dns_dead_relay",
+]
+# phase 2 (host checks) and phase 3 (panel truth): live because their codes are in checks/host.py and checks/panel.py
+CHECK_CODES = [
+    "listener_missing", "unit_stopped", "unit_crashloop", "container_down", "container_restarting", "container_unhealthy",
+    "container_revived", "dnat_missing", "ip_forward_off", "conntrack_limits_reset", "conntrack_drops", "oom_kill", "inode_high",
+    "journal_big", "time_unsynced", "reboot_pending_pkgs", "node_down", "node_silent", "node_usage_drop", "inbound_without_group",
+    "reseller_quota", "panel_version_changed", "panel_errors",
 ]
 LIVE = ["offline", "disk", "ram", "cpu", "steal", "retrans", "conntrack", "failed_units", "reboot_required", "ping", "agent_missing", "ssl_expiry", "ssl_auto_renew_off", "ssl_renew_failed"]
 CHANGES_A_SERVER = re.compile(r"(^|[;|]\s*|&&\s*)(rm|reboot|shutdown|kill|pkill)\s|systemctl (restart|stop|start|enable|disable)|sysctl -w|nft (-f|delete|add|flush)|docker (compose|restart|stop|rm|prune)|apt(-get)? (install|upgrade|remove)|certbot renew\b(?! --dry-run)|>\s*/(?!dev/null)")
@@ -26,6 +32,9 @@ def test_required_themes_are_covered_and_flagged():
         assert table[code]["detector"] == "live", code
     for code in PLANNED_THEMES:
         assert table[code]["detector"] == "planned", code
+    for code in CHECK_CODES:
+        assert table[code]["detector"] == "live", code
+        assert code in playbooks.raised_codes(), code
     for code in SIBLING_CODES:
         assert table[code]["detector"] == "live", code  # the detectors are merged: their codes are in the issue source
         assert code in playbooks.raised_codes()

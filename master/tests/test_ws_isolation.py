@@ -80,6 +80,10 @@ def requests_into_b(w):
         ("GET", "/api/v1/reports/capacity"): ("GET", "/api/v1/reports/capacity", None, "list"),
         ("GET", "/api/v1/reports/relays"): ("GET", "/api/v1/reports/relays", None, "list"),
         ("GET", "/api/v1/members"): ("GET", "/api/v1/members", None, "list"),
+        ("GET", "/api/v1/servers/{server_id}/host-health"): ("GET", "/api/v1/servers/%d/host-health" % bs, None, "nf"),
+        ("PATCH", "/api/v1/servers/{server_id}/listeners"): ("PATCH", "/api/v1/servers/%d/listeners" % bs, {"proto": "tcp", "port": 22}, "nf"),
+        ("PATCH", "/api/v1/servers/{server_id}/ignores"): ("PATCH", "/api/v1/servers/%d/ignores" % bs, {"kind": "container", "name": "bee-box", "ignored": False}, "nf"),
+        ("GET", "/api/v1/panel"): ("GET", "/api/v1/panel", None, "list"),
         ("POST", "/api/v1/members"): ("POST", "/api/v1/members", {"tg_id": 909, "role": "viewer"}, (201, None)),
         ("PATCH", "/api/v1/members/{user_id}"): ("PATCH", "/api/v1/members/%d" % w["carol_id"], {"role": "viewer"}, "nf"),
         ("DELETE", "/api/v1/members/{user_id}"): ("DELETE", "/api/v1/members/%d" % w["carol_id"], None, "nf"),
@@ -133,7 +137,7 @@ def test_lists_in_a_do_show_a(world):
     x = world["x"]
     assert {s["name"] for s in x.get("/api/v1/servers").json()} == {"alfa-relay", "alfa-exit"}
     text = "".join(x.get(u).text for u in ("/api/v1/servers", "/api/v1/categories", "/api/v1/ssl", "/api/v1/keys",
-                                           "/api/v1/telegram/channels", "/api/v1/issues/history?range=24h"))
+                                           "/api/v1/telegram/channels", "/api/v1/issues/history?range=24h", "/api/v1/panel", "/api/v1/issues"))
     assert all(m in text for m in A_MARKS), [m for m in A_MARKS if m not in text]
     assert x.get("/api/v1/settings").json()["cpu_warn"] == 77
     links = x.get("/api/v1/links/traffic").json()["links"]
@@ -153,7 +157,8 @@ def test_switching_to_b_shows_only_b_and_a_ids_vanish(world):
                                            "/api/v1/ping-matrix", "/api/v1/reports/briefing?detail=full", "/api/v1/links/traffic",
                                            "/api/v1/traffic/summary", "/api/v1/reports/changes", "/api/v1/issues/history?range=24h",
                                            "/api/v1/reports/traffic", "/api/v1/reports/relays", "/api/v1/reports/health",
-                                           "/api/v1/reports/daily", "/api/v1/reports/capacity", "/api/v1/reports/availability"))
+                                           "/api/v1/reports/daily", "/api/v1/reports/capacity", "/api/v1/reports/availability",
+                                           "/api/v1/panel", "/api/v1/issues"))
     assert not any(m in text for m in A_MARKS), [m for m in A_MARKS if m in text]
     links = {(l["server_name"], l["peer_name"], l["in_bytes"]) for l in x.get("/api/v1/links/traffic").json()["links"]}
     assert links == {("bee-relay", "bee-exit", 111), ("bee-relay", "bee-twin", 5)}
@@ -260,3 +265,15 @@ def test_a_category_filter_only_ever_looks_inside_the_active_workspace(world):
     assert [s["name"] for s in none["servers"]] == ["alfa-relay"]
     theirs = y.get("/api/v1/traffic/summary?category=%d" % b_cat).json()
     assert [s["name"] for s in theirs["servers"]] == ["bee-exit"]
+
+
+def test_both_workspaces_have_rows_in_every_check_table(world):
+    from ws_world import CHECK_TABLES
+    for ws in (world["A"], world["B"]):
+        rows = dump(ws)
+        assert all(rows[t] for t in CHECK_TABLES), {t: len(rows[t]) for t in CHECK_TABLES}
+    # one panel host per workspace, each seeing only its own nodes and resellers
+    a = world["x"].get("/api/v1/panel").json()["panels"]
+    assert [p["server_name"] for p in a] == ["alfa-relay"] and a[0]["nodes"][0]["name"] == "alfa-node"
+    issues = {i["code"] for i in world["x"].get("/api/v1/issues").json()}
+    assert "reseller_quota:alfa-reseller" in issues and "reseller_quota:bee-reseller" not in issues

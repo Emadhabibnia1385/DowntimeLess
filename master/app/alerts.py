@@ -16,7 +16,9 @@ log = logging.getLogger("dl.alerts")
 ADMINS = "admins"
 PANEL = "panel"
 # routes of alerts that were already sent to the admins before routes existed, plus the urgent new ones
-_ADMIN_RULES = ("offline", "ssl", "conntrack", "ping", "disk", "rebooted", "ip_changed", "blacklisted", "quota")
+_ADMIN_RULES = ("offline", "ssl", "conntrack", "ping", "disk", "rebooted", "ip_changed", "blacklisted", "quota",
+                "listener_missing", "unit_stopped", "container_down", "dnat_missing", "ip_forward_off", "conntrack_drops",
+                "node_down", "node_silent")
 DEFAULT_ROUTES: Dict[str, str] = {rule: (ADMINS if rule in _ADMIN_RULES else PANEL) for rule in RULES}
 # sent by their own flow, not from the incident log
 OWN_FLOW = ("offline", "ssl")

@@ -5,7 +5,10 @@ from typing import Any, Dict, List
 from ..issues import acks
 from ..issues import service as incidents_svc
 from ..overview import service as overview
-from ..servers.service import current_agent_version, server_out
+from ..checks import memory as checks_mem
+from ..checks import service as checks_svc
+from ..servers.service import current_agent_version, server_out, status_of
+from ..settings.router import thresholds
 from ..ssl import service as ssl_svc
 from . import health as health_svc
 from . import paths, periodic, playbooks
@@ -20,14 +23,19 @@ SEV = ("critical", "warning", "info")
 # lower runs first; codes not listed go last
 PRIORITY = {
     "offline": 0, "quota_exhausted": 1, "quota": 1, "quota_pair": 2, "blacklisted": 1, "relay_filtered": 1, "relay_egress": 1, "conntrack": 2,
-    "rebooted": 2, "ip_changed": 2, "listener_missing": 2, "ping": 3, "resized": 3, "disk": 4, "failed_units": 4, "ssl_expiry": 4,
+    "rebooted": 2, "ip_changed": 2, "listener_missing": 2, "node_silent": 1, "node_down": 1, "dnat_missing": 1, "unit_stopped": 2,
+    "container_down": 2, "conntrack_drops": 2, "ip_forward_off": 2, "reseller_quota": 3, "node_usage_drop": 3, "ping": 3, "resized": 3, "disk": 4, "failed_units": 4, "ssl_expiry": 4,
     "ram": 5, "retrans": 5, "ssl_renew_failed": 5, "steal": 6, "cpu": 6, "load_per_core": 6, "ssl_auto_renew_off": 7, "reboot_required": 8, "agent_missing": 9,
 }
 NOT_MEASURED = [
-    "listeners and Xray state on exits", "tunnel units enabled but stopped", "docker/node containers", "DNAT table presence",
-    "live conntrack limits vs files", "real-user quality per relay-exit pair (ss -ti)", "panel database, backups, updates, DNS records",
-    "reachability from mobile carriers",
+    "real-user quality per relay-exit pair (ss -ti)", "panel backups and scheduled updates, DNS records", "reachability from mobile carriers",
 ]
+# issue codes of the phase 2 host checks, listed again in their own section
+HOST_CODES = {
+    "listener_missing", "unit_stopped", "unit_crashloop", "container_down", "container_restarting", "container_unhealthy",
+    "container_revived", "dnat_missing", "ip_forward_off", "conntrack_limits_reset", "conntrack_drops", "oom_kill", "inode_high",
+    "journal_big", "time_unsynced", "reboot_pending_pkgs",
+}
 
 
 def _states(servers: List[Dict[str, Any]], key: str) -> List[Dict[str, Any]]:
@@ -81,6 +89,35 @@ def _check_first(issues: List[Dict[str, Any]], outdated: List[str], pair_problem
     return steps
 
 
+def _host_checks(raw_servers, found: List[Dict[str, Any]], limit: int) -> Dict[str, Any]:
+    live = [r for r in raw_servers if status_of(r) == "online"]
+    with_checks = [r for r in live if checks_mem.checks_of(checks_mem.report_of(r)) is not None]
+    problems = [{"server": i["server_name"], "code": i["code"], "severity": i["severity"], "detail": i["title"]}
+                for i in found if playbooks.normalise(i["code"]) in HOST_CODES]
+    return {"reporting": len(with_checks), "without": sorted(name_of(r) for r in live if r not in with_checks)[:20],
+            "problems": problems[:limit]}
+
+
+def _panels(db: sqlite3.Connection, ws: int, now: int) -> List[Dict[str, Any]]:
+    out = []
+    th = thresholds(db, ws)
+    for p in checks_svc.panel_view(db, ws, th, now):
+        nodes = [n for n in p["nodes"] if not n["ignored"]]
+        users = [n["users_last"] for n in nodes if n["users_last"] is not None]
+        out.append({
+            "server": p["server_name"], "version": p["version"], "nodes_total": len(nodes),
+            "connected": sum(1 for n in nodes if n["status"] == checks_mem.NODE_OK),
+            "disabled": sum(1 for n in nodes if not n["enabled"]),
+            "not_connected": [n["name"] for n in nodes if n["enabled"] and n["status"] != checks_mem.NODE_OK][:20],
+            "dropped": [n["name"] for n in nodes if n["dropped"]][:20],
+            "users_last_hour": sum(users) if users else None,
+            "resellers_near_quota": [{k: r[k] for k in ("name", "used_pct", "hours_left", "level")} for r in p["resellers"] if r["level"] != "ok"][:15],
+            "user_status": p["user_status"], "inbounds_without_group": [t["tag"] for t in p["inbounds_without_group"] if not t["ignored"]][:20],
+            "errors": p["errors"] + ([p["panel_error"]] if p["panel_error"] else []),
+        })
+    return out
+
+
 def build(db: sqlite3.Connection, ws: int, detail: str = "brief", now: int = 0) -> Dict[str, Any]:
     now = now or int(time.time())
     lim = LIMITS[detail]
@@ -129,6 +166,7 @@ def build(db: sqlite3.Connection, ws: int, detail: str = "brief", now: int = 0) 
         "SELECT COUNT(*) c FROM events WHERE workspace_id=? AND ts>=? AND kind IN ('issue_opened','issue_closed')", (ws, now - DAY)
     ).fetchone()["c"]
     check = _check_first(found, outdated, from_matrix if not from_issues else [])
+    host, panels = _host_checks(raw_servers, found, lim["issues"]), _panels(db, ws, now)
     return {
         "generated_at": now, "detail": detail, "timezone_note": "today/yesterday are Tehran days (UTC+3:30); other times are UTC",
         "fleet": {
@@ -148,5 +186,9 @@ def build(db: sqlite3.Connection, ws: int, detail: str = "brief", now: int = 0) 
         "issue_events_24h": counted,
         "check_first": check,
         "acknowledged": acks.brief(every)[: lim["issues"]],
-        "not_measured": NOT_MEASURED + (["quota (no quota set on any server)"] if not quota else []),
+        "host_checks": host,
+        "panel": panels,
+        "not_measured": NOT_MEASURED + (["quota (no quota set on any server)"] if not quota else [])
+        + (["host checks on %d online server(s): agent older than 0.3.0" % len(host["without"])] if host["without"] else [])
+        + ([] if panels else ["PasarGuard panel truth (no server reports `panel`)"]),
     }

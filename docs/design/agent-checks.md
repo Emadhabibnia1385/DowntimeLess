@@ -85,3 +85,36 @@ longer, but they run in the background and their result is picked up by the next
 
 `dmesg`/`journalctl -k` "table full" lines, fail2ban banned lists, per-peer `ss -Htin` quality, grub device, cloud-init
 instance id, WireGuard handshake ages, DB dump age, panel failed logins per source, image digests across nodes.
+
+## Master rules on these fields (migration 016)
+
+`app/features/checks/` turns the blocks into issues. Memory between reports lives in four workspace-scoped tables:
+`listener_baseline` (a `(proto, port)` joins after 24 h seen without a gap; UDP >= 32768 and the collapsed port-0 row never
+join), `check_state` (one JSON object per server: restart counters, previous container states, DNAT seen, counter
+increases, first time NTP was off, reseller usage samples, panel version), `check_ignores` (retired containers and nodes,
+inbounds group-less on purpose) and `node_usage` (users and bytes per node and full hour, 8 days). Every rule reads its
+field from the latest report and stays silent when that field is missing or oddly shaped, so an agent that stops sending
+`checks` never raises one.
+
+| Code | Severity | When |
+|---|---|---|
+| `listener_missing` | critical on relay/exit/panel, else warning | a baseline port absent 2 reports in a row (3 right after an agent restart, reboot or silence) |
+| `unit_stopped` | critical | an enabled tunnel/DNAT unit (backpack-, relay-dnat, backhaul, gre-, wattun@, panel-/mobin-dnat, rathole, frp, gost) not active |
+| `unit_crashloop` | warning, critical if it owns forward ports | `auto-restart`, or restarts +3 within 10 minutes |
+| `container_down` | critical | was running and is not; or exited with policy `always`; or `unless-stopped` with a crash exit code |
+| `container_restarting` / `container_unhealthy` / `container_revived` | warning / warning / info | restarts +3 in 10 min / health `unhealthy` / stopped before, running again within 10 min of a boot (kept 30 min) |
+| `dnat_missing` | critical | had `relay_dnat` or DNAT rules, none for 2 reports |
+| `ip_forward_off` | critical on a forwarding relay, else warning | relay with `ip_forward` 0 |
+| `conntrack_limits_reset` | warning | live max below `ct_max_relay` (65536) / `ct_max_exit` (262144), or timeout above `ct_timeout_max` (43200 s) |
+| `conntrack_drops` / `oom_kill` | critical | `insert_failed`/`drop` or `oom_kill` rose between reports (kept 30 min) |
+| `inode_high` / `journal_big` / `time_unsynced` | warning | `inode_warn` 85% / `journal_warn_mb` 1024 / NTP off for `ntp_unsynced_min` 10 min |
+| `reboot_pending_pkgs` | info, warning while `dpkg --audit` is not empty | packages wait for a reboot (replaces `reboot_required`) |
+| `node_down:<id>` | critical | an enabled node not `connected` for `node_down_min` (5) minutes |
+| `node_silent:<id>` | critical | `connected` but its host's node container logged `node_unavailable` (5) Unavailable lines in 10 min, or its last hour fell below half of `node_drop_pct` |
+| `node_usage_drop:<id>` | warning | last hour's users or bytes under `node_drop_pct` (30%) of its own median of the 6 hours before, while the other nodes keep `node_others_pct` (70%) |
+| `inbound_without_group` | warning | `panel.inbounds_without_group` minus inbounds marked deliberate |
+| `reseller_quota:<name>` | warning at `reseller_warn` 85%, critical at `reseller_crit` 95% or when the last hour's burn empties it within `reseller_hours` (24) | resellers with a data limit |
+| `panel_version_changed` / `panel_errors` | info | version differs from the last one (kept 24 h) / `panel.errors` or `panel_error` |
+
+Endpoints: `GET /servers/{id}/host-health` (viewer), `PATCH /servers/{id}/listeners` (admin, drops a port from the
+baseline), `PATCH /servers/{id}/ignores` (admin; `dnat` forgets that the server had DNAT), `GET /panel` (viewer).

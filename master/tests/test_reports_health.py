@@ -21,7 +21,7 @@ def test_a_quiet_relay_is_healthy_with_a_perfect_score(owner):
     report(owner, key)
     h = _health(owner)["ir-1"]
     assert (h["score"], h["band"], h["gates"], h["penalties"]) == (100, "healthy", [], [])
-    assert "forward_integrity (listeners, DNAT table)" in h["not_measured"] and "reachability_from_abroad" in h["not_measured"]
+    assert any(x.startswith("host checks") for x in h["not_measured"]) and "reachability_from_abroad" in h["not_measured"]
 
 
 def test_penalties_move_the_score_into_degraded(owner):
@@ -71,7 +71,7 @@ def test_offline_pending_and_unreachable_exits(owner):
     assert (h["new-1"]["score"], h["new-1"]["band"]) == (None, "unknown")
     assert h["de-1"]["gates"][0]["key"] == "unreachable_from_all_relays" and h["de-1"]["band"] == "failing"
     assert {p["key"] for p in h["de-1"]["penalties"]} == {"relay_reachability"}
-    assert "listener_completeness" in h["de-1"]["not_measured"]
+    assert any(x.startswith("host checks") for x in h["de-1"]["not_measured"])
 
 
 def test_one_relay_failing_is_a_penalty_not_a_gate_for_the_exit(owner):

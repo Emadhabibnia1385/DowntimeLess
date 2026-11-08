@@ -1,4 +1,5 @@
 import json
+import logging
 import sqlite3
 import time
 
@@ -8,6 +9,7 @@ from ...db import get_db
 from ...errors import DLError
 from ...security import digest, new_token
 from ...settings import get_settings
+from ..checks import memory as checks_memory
 from ..servers import events
 from ..servers.service import swap_pct
 from ..links import service as links_svc
@@ -16,6 +18,7 @@ from ..ssl.service import adopt_domains
 from .schemas import EnrollRequest, EnrollResult, Report, ReportResult
 
 router = APIRouter(prefix="/agent/v1", tags=["agent"])
+log = logging.getLogger("dl.agent")
 
 
 @router.post("/enroll", response_model=EnrollResult, operation_id="agent_enroll")
@@ -59,6 +62,10 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
         (now, body.model_dump_json(), rx, tx, body.agent_version, body.hostname, public_ip,
          geo.get("country"), geo.get("city"), geo.get("org"), sid, ws),
     )
+    try:
+        checks_memory.observe(db, server, body.model_dump(), now)
+    except Exception:  # a bad field in the new blocks must never cost the whole report
+        log.exception("check memory of server %d failed", sid)
     extra = body.model_extra or {}
     db.execute(  # ws: agent_server
         "INSERT INTO metrics (server_id, ts, cpu, steal, ram_pct, disk_pct, rx_bps, tx_bps, rx_delta, tx_delta, retrans, conntrack, load1, swap_pct, conns) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",

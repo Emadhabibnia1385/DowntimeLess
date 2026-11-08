@@ -2,6 +2,8 @@ import sqlite3
 import time
 from typing import Any, Dict, List, Optional
 
+from ..checks import memory as m
+from ..checks import service as checks_svc
 from ..issues import acks
 from ..overview import service as overview
 from ..servers.service import latest_of, role_of, status_of
@@ -12,19 +14,44 @@ from .common import name_of
 HEALTHY_AT, DEGRADED_AT = 80, 50
 
 WEIGHTS = {
-    "relay": {"peer_paths": 15, "retrans": 15, "conntrack": 10, "cpu_steal": 8, "quota": 5, "memory": 5, "disk": 10, "units": 5},
-    "exit": {"relay_reachability": 25, "retrans": 15, "conntrack": 10, "cpu_steal": 10, "memory": 5, "disk": 10, "units": 5},
-    "other": {"conntrack": 10, "cpu_steal": 10, "memory": 10, "disk": 10, "units": 5},
+    "relay": {"peer_paths": 15, "retrans": 15, "conntrack": 10, "cpu_steal": 8, "quota": 5, "memory": 5, "disk": 10, "units": 5,
+              "forward_integrity": 20, "kernel": 7},
+    "exit": {"relay_reachability": 25, "retrans": 15, "conntrack": 10, "cpu_steal": 10, "memory": 5, "disk": 10, "units": 5,
+             "listeners": 10, "containers": 7, "kernel": 3},
+    "other": {"conntrack": 10, "cpu_steal": 10, "memory": 10, "disk": 10, "units": 5, "listeners": 10, "containers": 10, "kernel": 5,
+              "panel_nodes": 10},
 }
 # signals the catalog scores that need collectors the agent does not have yet
 NOT_MEASURED = {
-    "relay": ["reachability_from_abroad", "forward_integrity (listeners, DNAT table)", "per_peer_user_quality", "bandwidth_headroom"],
-    "exit": ["listener_completeness", "container_state (node, Xray)", "per_peer_user_quality"],
-    "other": ["listeners", "containers"],
+    "relay": ["reachability_from_abroad", "per_peer_user_quality", "bandwidth_headroom"],
+    "exit": ["per_peer_user_quality"],
+    "other": [],
 }
+# what a server without `checks` (agent older than 0.3.0, or every collector failed) cannot be scored on
+NO_CHECKS = "host checks: listeners, tunnel units, containers, DNAT, live conntrack (agent older than 0.3.0)"
+# issue code -> (penalty key per variant, share of its weight); a code listed in GATES also fails the server
+CHECK_PENALTIES = {
+    "listener_missing": ({"relay": "forward_integrity", "exit": "listeners", "other": "listeners"}, 1.0),
+    "dnat_missing": ({"relay": "forward_integrity"}, 1.0),
+    "ip_forward_off": ({"relay": "forward_integrity"}, 1.0),
+    "unit_stopped": ({"relay": "forward_integrity", "exit": "units", "other": "units"}, 0.6),
+    "unit_crashloop": ({"relay": "forward_integrity", "exit": "units", "other": "units"}, 0.4),
+    "container_down": ({"relay": "units", "exit": "containers", "other": "containers"}, 1.0),
+    "container_restarting": ({"relay": "units", "exit": "containers", "other": "containers"}, 0.5),
+    "container_unhealthy": ({"relay": "units", "exit": "containers", "other": "containers"}, 0.4),
+    "conntrack_drops": ({"relay": "kernel", "exit": "kernel", "other": "kernel"}, 1.0),
+    "conntrack_limits_reset": ({"relay": "kernel", "exit": "kernel", "other": "kernel"}, 0.5),
+    "oom_kill": ({"relay": "memory", "exit": "memory", "other": "memory"}, 1.0),
+    "node_down": ({"other": "panel_nodes"}, 0.34),
+    "node_silent": ({"other": "panel_nodes"}, 0.34),
+    "node_usage_drop": ({"other": "panel_nodes"}, 0.15),
+}
+# critical issues that are hard gates on a relay: a forward port closed, the DNAT table gone, forwarding off
+GATES = {"listener_missing": "forward_port_closed", "dnat_missing": "dnat_missing", "ip_forward_off": "ip_forward_off"}
 DESCRIPTION = (
     "100 minus penalties; bands: healthy >= 80, degraded 50-79, failing < 50 or any hard gate. Hard gates: agent offline, "
-    "conntrack at the critical threshold, relay with >= 50% loss to every exit, exit with >= 50% loss from every relay (2+ relays), quota exhausted."
+    "conntrack at the critical threshold, relay with >= 50% loss to every exit, exit with >= 50% loss from every relay (2+ relays), quota exhausted, "
+    "relay with a baseline forward port not listening, its DNAT table gone or ip_forward off (critical issues)."
 )
 
 
@@ -94,6 +121,25 @@ def _host_penalties(out: List[Dict[str, Any]], lt: Dict[str, Any], w: Dict[str, 
         _pen(out, "units", w["units"], 1.0, "failed units: %s" % ",".join(lt["failed_units"][:3]))
 
 
+def _check_penalties(pens: List[Dict[str, Any]], gates: List[Dict[str, Any]], mine: List[Dict[str, Any]], variant: str,
+                     w: Dict[str, int]) -> None:
+    """Penalties and relay gates from this server's host-check and panel issues."""
+    shares: Dict[str, float] = {}
+    why: Dict[str, List[str]] = {}
+    for i in mine:
+        code = i["code"].split(":")[0]
+        rule = CHECK_PENALTIES.get(code)
+        key = rule[0].get(variant) if rule else None
+        if key and key in w:
+            shares[key] = shares.get(key, 0.0) + rule[1]
+            if code not in why.setdefault(key, []):
+                why[key].append(code)
+        if variant == "relay" and code in GATES and i["severity"] == "critical":
+            gates.append({"key": GATES[code], "detail": i["title"]})
+    for key, share in shares.items():
+        _pen(pens, key, w[key], share, ", ".join(why[key]))
+
+
 def compute(db: sqlite3.Connection, ws: int, found: Optional[List[Dict[str, Any]]] = None, now: Optional[int] = None) -> Dict[str, Any]:
     now = now or int(time.time())
     th = thresholds(db, ws)
@@ -149,10 +195,13 @@ def compute(db: sqlite3.Connection, ws: int, found: Optional[List[Dict[str, Any]
                          "%d relays measure it, worst loss %.0f%%" % (len(paths), max(p["loss"] or 0 for p in paths)))
                     if len(paths) >= 2 and all((p["loss"] or 0) >= th["loss_crit"] for p in paths):
                         gates.append({"key": "unreachable_from_all_relays", "detail": "loss >= %d%% from all %d relays" % (th["loss_crit"], len(paths))})
+            _check_penalties(pens, gates, per_server.get(s["id"], []), variant, w)
             score = max(0, 100 - sum(p["points"] for p in pens))
         mine = per_server.get(s["id"], [])
         score, gates, pens = acks.screen_health(st, score, gates, pens, acks.health_quiet(mine))
         not_measured = list(NOT_MEASURED[variant])
+        if st != "pending" and not checks_svc.has_data(m.report_of(s)):
+            not_measured.append(NO_CHECKS)
         if variant == "relay" and s["id"] not in quota_by:
             not_measured.append("quota (not set for this server)")
         items.append({

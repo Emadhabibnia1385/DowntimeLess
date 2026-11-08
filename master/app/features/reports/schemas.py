@@ -169,6 +169,41 @@ class AckBrief(BaseModel):
     note: Optional[str]
 
 
+class HostProblem(BaseModel):
+    server: Optional[str]
+    code: str
+    severity: str
+    detail: str
+
+
+class HostChecksBrief(BaseModel):
+    reporting: int
+    without: List[str]
+    problems: List[HostProblem]
+
+
+class ResellerBrief(BaseModel):
+    name: str
+    used_pct: float
+    hours_left: Optional[float]
+    level: str
+
+
+class PanelBrief(BaseModel):
+    server: str
+    version: Optional[str]
+    nodes_total: int
+    connected: int
+    disabled: int
+    not_connected: List[str]
+    dropped: List[str]
+    users_last_hour: Optional[int]
+    resellers_near_quota: List[ResellerBrief]
+    user_status: Optional[Dict[str, int]]
+    inbounds_without_group: List[str]
+    errors: List[str]
+
+
 class Briefing(BaseModel):
     generated_at: int
     detail: str
@@ -186,6 +221,8 @@ class Briefing(BaseModel):
     issue_events_24h: int
     check_first: List[CheckStep]
     acknowledged: List[AckBrief] = []
+    host_checks: HostChecksBrief
+    panel: List[PanelBrief]
     not_measured: List[str]
 
 
