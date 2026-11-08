@@ -1,1 +1,0 @@
-import{t as e}from"./issues-CoCC0SfZ.js";var t=e;export{t as component};

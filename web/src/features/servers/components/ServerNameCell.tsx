@@ -1,16 +1,17 @@
 import { Link } from "@tanstack/react-router";
 import type { ServerOut } from "@/api/generated/model";
-import { flagOf, ipv4Of, placeLine } from "@/strings";
+import { ipv4Of } from "@/strings";
 import { displayName } from "../lib/status";
+import { whereOf } from "../lib/where";
 
 // Flag and name (a link), then the IPv4 and the place under it.
 export function ServerNameCell({ server }: { server: ServerOut }) {
-	const place = placeLine(server);
+	const { flag, place } = whereOf(server);
 	const ip = ipv4Of(server.public_ip);
 	return (
 		<div className="flex items-center gap-2">
 			<span aria-hidden className="text-2xl leading-none">
-				{flagOf(server.country)}
+				{flag}
 			</span>
 			<div className="min-w-0 max-w-44">
 				<Link

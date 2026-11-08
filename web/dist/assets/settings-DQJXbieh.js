@@ -1,0 +1,1 @@
+import{t as e}from"./settings-CZK60w7u.js";var t=e;export{t as component};

@@ -5,3 +5,12 @@
 @import "./app/fonts.css";
 /* Tailwind skips node_modules, where the workspace link lives, so it reads the real folder. */
 @source "../vendor/nasim/src";
+
+/* Phone menu: the account block (install, user, theme) rests at the very bottom. */
+[data-slot="drawer-body"] {
+	display: flex;
+	flex-direction: column;
+}
+[data-slot="drawer-body"] > nav + div {
+	margin-top: auto;
+}
