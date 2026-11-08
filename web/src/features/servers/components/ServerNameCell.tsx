@@ -5,16 +5,16 @@ import { ipv4Of } from "@/strings";
 import { displayName } from "../lib/status";
 import { whereOf } from "../lib/where";
 
-// Flag and name (a link), then the IPv4 and the place under it.
+// Flag and name (a link) side by side, then the IPv4 and the place under it.
 export function ServerNameCell({ server }: { server: ServerOut }) {
 	const { flag, place } = whereOf(server);
 	const ip = ipv4Of(server.public_ip);
 	return (
-		<div className="flex w-full items-center gap-2">
-			<span aria-hidden className="text-2xl leading-none">
-				{flag}
-			</span>
-			<div className="min-w-0 flex-1 text-center">
+		<div className="min-w-0 text-center">
+			<div className="flex items-center justify-center gap-1.5">
+				<span aria-hidden className="text-xl leading-none">
+					{flag}
+				</span>
 				<Link
 					to="/servers/$serverId"
 					params={{ serverId: String(server.id) }}
@@ -22,17 +22,17 @@ export function ServerNameCell({ server }: { server: ServerOut }) {
 				>
 					{displayName(server)}
 				</Link>
-				{ip ? (
-					<div>
-						<IpText ip={ip} className="text-xs text-muted" />
-					</div>
-				) : null}
-				{place ? (
-					<p dir="ltr" className="text-xs text-muted">
-						{place}
-					</p>
-				) : null}
 			</div>
+			{ip ? (
+				<div>
+					<IpText ip={ip} className="text-xs text-muted" />
+				</div>
+			) : null}
+			{place ? (
+				<p dir="ltr" className="text-xs text-muted">
+					{place}
+				</p>
+			) : null}
 		</div>
 	);
 }
