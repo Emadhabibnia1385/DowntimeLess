@@ -1,3 +1,4 @@
+import { Chip } from "@nyxon/nasim";
 import type { ReactNode } from "react";
 import type { ServerOut } from "@/api/generated/model";
 import { IpText } from "@/shared/IpText";
@@ -106,5 +107,18 @@ export function infoItems(server: ServerOut, categoryName?: string): (Item | fal
 		},
 		{ label: t.server.role, value: roleLabel(server.role) },
 		!!categoryName && { label: t.server.category, value: categoryName },
+		!!server.quota_gb && {
+			label: t.server.quota,
+			value: (
+				<span className="inline-flex flex-wrap items-center gap-1.5">
+					{t.server.quotaValue(formatNumber(server.quota_gb))}
+					{server.count_upload === false ? (
+						<Chip size="sm" variant="soft">
+							{t.server.uploadFree}
+						</Chip>
+					) : null}
+				</span>
+			),
+		},
 	];
 }

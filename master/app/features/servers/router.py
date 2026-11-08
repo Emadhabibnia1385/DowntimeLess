@@ -65,8 +65,9 @@ def patch_server(server_id: int, body: ServerPatch, _: Actor = Depends(require("
                  db: sqlite3.Connection = Depends(get_db)):
     before = server_row(db, ws, server_id)
     changes = body.model_dump(exclude_none=True)
-    if "acct_on" in changes:
-        changes["acct_on"] = 1 if changes["acct_on"] else 0
+    for flag in ("acct_on", "count_upload"):
+        if flag in changes:
+            changes[flag] = 1 if changes[flag] else 0
     for nullable in ("quota_gb", "quota_reset_day"):  # null clears these; leaving them out keeps them
         if nullable in body.model_fields_set:
             changes[nullable] = getattr(body, nullable)

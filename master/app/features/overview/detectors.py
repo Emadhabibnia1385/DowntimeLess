@@ -15,6 +15,7 @@ EVENT_KEEP_S = DAY
 HOLD = {"cpu": 5, "steal": 3, "conntrack": 3, "load": 5}
 STEAL_STRONG, STEAL_CRIT = 15, 40
 QUOTA_WARN_DAYS, QUOTA_CRIT_DAYS, PAIR_GAP_DAYS = 7, 2, 2
+UPLOAD_FREE_NOTE = "آپلود این سرور رایگان است و فقط دانلود در سهمیه شمرده می‌شود."
 IP_CHECKLIST = (
     "آی‌پی عوض شده؛ این هشت مورد را درست کنید: ۱) GRE local ۲) GRE remote ۳) آدرس dial تونل‌ها ۴) رکوردهای DNS "
     "۵) allowlistها ۶) قوانین nft که آی‌پی قدیمی را دارند ۷) alias اس‌اس‌اچ ۸) اندازه‌گیری دوبارهٔ همهٔ حالت‌ها."
@@ -119,12 +120,19 @@ def quota_period(now: int, reset_day: int) -> Tuple[int, int]:
     return _reset_at(py, pm, reset_day), this
 
 
+def quota_counted(s, th: Dict[str, float]) -> Tuple[str, str]:
+    """The metrics column and basis name a server's quota counts; free upload means only download (rx) counts."""
+    if "count_upload" in s.keys() and not s["count_upload"]:
+        return "rx_delta", "download"
+    return ("rx_delta+tx_delta", "both") if th["quota_basis"] else ("tx_delta", "out")
+
+
 def quota_forecast(db: sqlite3.Connection, s, th: Dict[str, float], now: int) -> Optional[Dict[str, Any]]:
     """Bytes used this billing month, the recent daily rate and the days until the quota is gone."""
     if not s["quota_gb"] or s["quota_gb"] <= 0:
         return None
     start, reset = quota_period(now, s["quota_reset_day"] or 1)
-    expr = "rx_delta+tx_delta" if th["quota_basis"] else "tx_delta"
+    expr, basis = quota_counted(s, th)
     used = db.execute("SELECT COALESCE(SUM(%s),0) FROM metrics WHERE server_id=? AND ts>=?" % expr, (s["id"], start)).fetchone()[0]  # ws: caller_row - the server row of the caller's workspace
     window = min(now - start, 3 * DAY)
     rate = None
@@ -140,23 +148,24 @@ def quota_forecast(db: sqlite3.Connection, s, th: Dict[str, float], now: int) ->
         "used_gb": round(used / GIB, 1), "quota_gb": s["quota_gb"], "used_pct": round(used * 100 / quota, 1),
         "per_day_gb": round(rate / GIB, 2) if rate is not None else None,
         "days_left": round(days_left, 1) if days_left is not None else None,
-        "resets_in_days": round((reset - now) / DAY, 1), "basis": "both" if th["quota_basis"] else "out",
+        "resets_in_days": round((reset - now) / DAY, 1), "basis": basis,
         "runs_out": days_left is not None and days_left < (reset - now) / DAY,
     }
 
 
 def quota_issue(s, f: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     ev = {k: f[k] for k in ("used_gb", "quota_gb", "used_pct", "per_day_gb", "days_left", "resets_in_days", "basis")}
+    note = " " + UPLOAD_FREE_NOTE if f["basis"] == "download" else ""
     if f["used_pct"] >= 100:
-        return make(s, "quota", "critical", "حجم ماهانه تمام شده", "ترافیک را همین حالا به سرور دیگر منتقل کنید یا حجم اضافه بخرید؛ سرور ممکن است محدود یا قطع شود.", **ev)
+        return make(s, "quota", "critical", "حجم ماهانه تمام شده", "ترافیک را همین حالا به سرور دیگر منتقل کنید یا حجم اضافه بخرید؛ سرور ممکن است محدود یا قطع شود." + note, **ev)
     if not f["runs_out"]:
         return None
     if f["days_left"] < QUOTA_CRIT_DAYS:
         return make(s, "quota", "critical", "حجم ماهانه کمتر از دو روز دیگر تمام می‌شود",
-                    "ترافیک را به سرور دیگر منتقل کنید یا حجم اضافه بخرید و DNS را پیش از تمام شدن تغییر دهید.", **ev)
+                    "ترافیک را به سرور دیگر منتقل کنید یا حجم اضافه بخرید و DNS را پیش از تمام شدن تغییر دهید." + note, **ev)
     if f["days_left"] < QUOTA_WARN_DAYS:
         return make(s, "quota", "warning", "حجم ماهانه تا یک هفته دیگر تمام می‌شود",
-                    "مصرف را به رلهٔ دیگر پخش کنید یا حجم اضافه تهیه کنید.", **ev)
+                    "مصرف را به رلهٔ دیگر پخش کنید یا حجم اضافه تهیه کنید." + note, **ev)
     return None
 
 

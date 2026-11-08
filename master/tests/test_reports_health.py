@@ -104,3 +104,31 @@ def test_quota_gate_and_penalty_switch_on_when_quota_columns_exist(owner):
     assert [g["key"] for g in relay["gates"]] == ["quota_exhausted"]
     q = owner.get("/api/v1/reports/briefing").json()["quota"]
     assert q[0]["server_name"] == "ir-1" and q[0]["used_pct"] >= 100
+
+
+def test_free_upload_counts_download_only_in_the_briefing_and_the_health_gate(owner):
+    sid, key = make_server(owner, "ir-1", "relay")
+    report(owner, key)
+    db = connect()
+    db.execute("UPDATE servers SET quota_gb=1 WHERE id=?", (sid,))
+    db.execute("UPDATE metrics SET rx_delta=100000000, tx_delta=1100000000 WHERE server_id=?", (sid,))  # 0.09 GiB down, 1.02 GiB up
+    db.close()
+    assert [g["key"] for g in _health(owner)["ir-1"]["gates"]] == ["quota_exhausted"]
+    owner.patch("/api/v1/servers/%d" % sid, json={"count_upload": False})
+    relay = _health(owner)["ir-1"]
+    assert relay["gates"] == []
+    row = owner.get("/api/v1/reports/briefing").json()["quota"][0]
+    assert row["basis"] == "download" and row["used_pct"] < 10
+    md = owner.get("/api/v1/reports/briefing?format=md").text
+    assert "Upload is free on ir-1" in md
+
+
+def test_free_upload_note_reaches_the_health_detail_when_download_alone_exhausts_it(owner):
+    sid, key = make_server(owner, "ir-1", "relay")
+    report(owner, key)
+    db = connect()
+    db.execute("UPDATE servers SET quota_gb=1, count_upload=0 WHERE id=?", (sid,))
+    db.execute("UPDATE metrics SET rx_delta=1100000000, tx_delta=0 WHERE server_id=?", (sid,))
+    db.close()
+    gate = _health(owner)["ir-1"]["gates"][0]
+    assert gate["key"] == "quota_exhausted" and "upload free, only download counted" in gate["detail"]

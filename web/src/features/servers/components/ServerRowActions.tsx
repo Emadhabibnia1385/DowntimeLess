@@ -57,6 +57,7 @@ export function ServerRowActions({ server }: { server: ServerOut }) {
 		category: categoryValue(server.category_id),
 		quota_gb: server.quota_gb ?? undefined,
 		quota_reset_day: server.quota_reset_day ?? undefined,
+		count_upload: server.count_upload !== false,
 		role: (ROLES.includes(server.role) ? server.role : "other") as ServerFormValues["role"],
 	};
 	const canUpdate = server.status === "online";

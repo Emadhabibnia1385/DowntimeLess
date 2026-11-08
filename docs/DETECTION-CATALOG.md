@@ -36,7 +36,10 @@ Rules that every detector follows:
 5. **More probe pairs**: exit to relay (reverse tunnels depend on it), panel to node, and `1.1.1.1` as an
    anycast control (loss there points at the host or its uplink, not the censor).
 6. **Quota forecast**: days to quota from the daily byte history and a per-server quota and reset day;
-   two relays running out within 48 hours is its own warning.
+   two relays running out within 48 hours is its own warning. What counts follows the workspace setting `quota_basis`
+   (0 = outgoing only, 1 = both directions); a server with `count_upload` off (PATCH `/servers/{id}`, default on) has free
+   upload, so only its download counts whatever the setting says. The issue, the briefing's quota table and the health
+   quota gate all use that one rule and say "upload free, only download counted"; traffic totals and charts stay raw.
 
 ### Phase 2: one new read-only agent block (medium; agent 0.3.0)
 

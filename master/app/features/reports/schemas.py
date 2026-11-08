@@ -123,6 +123,7 @@ class QuotaRow(BaseModel):
     days_left: Optional[float]
     resets_in_days: float
     runs_out: bool
+    basis: str = "out"  # out, both, or download (upload free on this server)
 
 
 class CertRisk(BaseModel):

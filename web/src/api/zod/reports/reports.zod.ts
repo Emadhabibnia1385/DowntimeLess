@@ -59,6 +59,7 @@ export const ReportsBriefingHeader = zod.object({
 });
 
 export const reportsBriefingResponseAcknowledgedDefault = [];
+export const reportsBriefingResponseQuotaOneItemBasisDefault = `out`;
 
 export const ReportsBriefingResponse = zod.object({
 	acknowledged: zod
@@ -179,6 +180,7 @@ export const ReportsBriefingResponse = zod.object({
 	quota: zod.union([
 		zod.array(
 			zod.object({
+				basis: zod.string().default(reportsBriefingResponseQuotaOneItemBasisDefault),
 				days_left: zod.union([zod.number(), zod.null()]),
 				per_day_gb: zod.union([zod.number(), zod.null()]),
 				quota_gb: zod.number(),

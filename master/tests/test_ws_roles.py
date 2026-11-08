@@ -63,6 +63,7 @@ MATRIX = [
     ("POST", "/api/v1/servers/{sid}/jobs", {"kind": "vacuum_logs"}, "admin"),
     ("POST", "/api/v1/servers", {"name": "n"}, "admin"),
     ("PATCH", "/api/v1/servers/{sid}", {"alias": "x"}, "admin"),
+    ("PATCH", "/api/v1/servers/{sid}", {"count_upload": False}, "admin"),
     ("DELETE", "/api/v1/servers/{sid}", None, "admin"),
     ("POST", "/api/v1/servers/{sid}/enroll-token", None, "admin"),
     ("POST", "/api/v1/categories", {"name": "new-cat"}, "admin"),

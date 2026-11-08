@@ -1,5 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FormRoot, Notice, NumberField, SelectField, SubmitButton, TextField } from "@nyxon/nasim";
+import {
+	FormRoot,
+	Notice,
+	NumberField,
+	SelectField,
+	SubmitButton,
+	SwitchField,
+	TextField,
+} from "@nyxon/nasim";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { errorMessage } from "@/api/transport";
@@ -29,6 +37,7 @@ const schema = z.object({
 		.min(1, { error: t.servers.quotaDayRange })
 		.max(31, { error: t.servers.quotaDayRange })
 		.optional(),
+	count_upload: z.boolean().optional(),
 });
 export type ServerFormValues = z.output<typeof schema>;
 
@@ -82,6 +91,11 @@ export function ServerForm({
 						maxValue={31}
 						formatOptions={{ useGrouping: false }}
 						hideSteppers
+					/>
+					<SwitchField
+						name="count_upload"
+						label={t.servers.countUpload}
+						description={t.servers.countUploadHint}
 					/>
 				</>
 			) : null}

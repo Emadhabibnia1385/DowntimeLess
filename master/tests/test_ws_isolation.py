@@ -32,7 +32,7 @@ def requests_into_b(w):
         ("POST", "/api/v1/servers"): ("POST", "/api/v1/servers", {"name": "a-new", "category_id": b["category"]}, (404, "category.not_found")),
         ("POST", "/api/v1/servers/{server_id}/enroll-token"): ("POST", s + "/enroll-token", None, "nf"),
         ("GET", "/api/v1/servers/{server_id}"): ("GET", s, None, "nf"),
-        ("PATCH", "/api/v1/servers/{server_id}"): ("PATCH", s, {"name": "stolen"}, "nf"),
+        ("PATCH", "/api/v1/servers/{server_id}"): ("PATCH", s, {"name": "stolen", "count_upload": False}, "nf"),
         ("DELETE", "/api/v1/servers/{server_id}"): ("DELETE", s, None, "nf"),
         ("GET", "/api/v1/servers/{server_id}/metrics"): ("GET", s + "/metrics", None, "nf"),
         ("GET", "/api/v1/servers/{server_id}/jobs"): ("GET", s + "/jobs", None, "nf"),

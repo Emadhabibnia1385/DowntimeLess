@@ -110,6 +110,7 @@ const oneCert = {
 };
 let certRows: unknown[] = [oneCert];
 let currentRole = "owner";
+let sent: { method: string; path: string; body: unknown }[] = [];
 
 function answer(url: string, data: ServerOut): Response {
 	const path = url.replace(/^.*\/api\/v1/, "").replace(/\?.*$/, "");
@@ -134,9 +135,17 @@ function answer(url: string, data: ServerOut): Response {
 }
 
 async function open(data: ServerOut) {
+	sent = [];
 	vi.stubGlobal(
 		"fetch",
-		vi.fn(async (input: RequestInfo | URL) => answer(String(input), data)),
+		vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+			const method = init?.method ?? "GET";
+			if (method !== "GET") {
+				const body = init?.body ? JSON.parse(String(init.body)) : null;
+				sent.push({ method, path: String(input), body });
+			}
+			return answer(String(input), data);
+		}),
 	);
 	const router = createRouter({
 		routeTree,
@@ -236,6 +245,45 @@ describe("ServerDetailPage", () => {
 		await userEvent.click(screen.getByRole("button", { name: "صفحه بعد" }));
 		expect(await screen.findByText("c05.example.com")).toBeTruthy();
 		expect(screen.queryByText("c00.example.com")).toBeNull();
+	});
+
+	it("shows the quota with a free-upload chip only when upload is not counted", async () => {
+		await open(server({ quota_gb: 500 }));
+		const details = await screen.findByRole("region", { name: "مشخصات" });
+		expect(within(details).getByText("۵۰۰ گیگابایت")).toBeTruthy();
+		expect(within(details).queryByText("آپلود رایگان")).toBeNull();
+	});
+
+	it("marks free upload next to the quota", async () => {
+		await open(server({ quota_gb: 500, count_upload: false }));
+		const details = await screen.findByRole("region", { name: "مشخصات" });
+		expect(within(details).getByText("آپلود رایگان")).toBeTruthy();
+	});
+
+	it("offers the upload switch on by default and saves it off in the PATCH body", async () => {
+		await open(server({ quota_gb: 500, count_upload: true }));
+		await userEvent.click(await screen.findByRole("button", { name: "ویرایش" }));
+		const dialog = await screen.findByRole("dialog");
+		const option = within(dialog).getByRole("switch", { name: "آپلود این سرور در سهمیه حساب شود" });
+		expect((option as HTMLInputElement).checked).toBe(true);
+		await userEvent.click(option);
+		await userEvent.click(within(dialog).getByRole("button", { name: "ذخیره" }));
+		await vi.waitFor(() => expect(sent).toHaveLength(1));
+		expect(sent[0].method).toBe("PATCH");
+		expect(sent[0].path).toContain("/servers/1");
+		expect(sent[0].body).toMatchObject({ count_upload: false, quota_gb: 500 });
+	});
+
+	it("shows the switch off for a server whose upload is free and sends true when switched on", async () => {
+		await open(server({ count_upload: false }));
+		await userEvent.click(await screen.findByRole("button", { name: "ویرایش" }));
+		const dialog = await screen.findByRole("dialog");
+		const option = within(dialog).getByRole("switch", { name: "آپلود این سرور در سهمیه حساب شود" });
+		expect((option as HTMLInputElement).checked).toBe(false);
+		await userEvent.click(option);
+		await userEvent.click(within(dialog).getByRole("button", { name: "ذخیره" }));
+		await vi.waitFor(() => expect(sent).toHaveLength(1));
+		expect(sent[0].body).toMatchObject({ count_upload: true });
 	});
 
 	it.each([

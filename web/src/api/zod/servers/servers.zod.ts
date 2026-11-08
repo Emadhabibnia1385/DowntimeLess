@@ -15,6 +15,7 @@ export const ServersListHeader = zod.object({
 
 export const serversListResponseAcctOnDefault = false;
 export const serversListResponseAgentOutdatedDefault = false;
+export const serversListResponseCountUploadDefault = true;
 export const serversListResponseLatestFailedUnitsDefault = [];
 export const serversListResponseLatestRebootRequiredDefault = false;
 export const serversListResponseSystemDefault = {};
@@ -26,6 +27,7 @@ export const ServersListResponseItem = zod.object({
 	alias: zod.string(),
 	category_id: zod.union([zod.int(), zod.null()]).optional(),
 	city: zod.union([zod.string(), zod.null()]),
+	count_upload: zod.boolean().default(serversListResponseCountUploadDefault),
 	country: zod.union([zod.string(), zod.null()]),
 	hostname: zod.union([zod.string(), zod.null()]),
 	id: zod.int(),
@@ -100,6 +102,7 @@ export const ServersCreateBody = zod.object({
 
 export const serversCreateResponseServerAcctOnDefault = false;
 export const serversCreateResponseServerAgentOutdatedDefault = false;
+export const serversCreateResponseServerCountUploadDefault = true;
 export const serversCreateResponseServerLatestFailedUnitsDefault = [];
 export const serversCreateResponseServerLatestRebootRequiredDefault = false;
 export const serversCreateResponseServerSystemDefault = {};
@@ -113,6 +116,7 @@ export const ServersCreateResponse = zod.object({
 		alias: zod.string(),
 		category_id: zod.union([zod.int(), zod.null()]).optional(),
 		city: zod.union([zod.string(), zod.null()]),
+		count_upload: zod.boolean().default(serversCreateResponseServerCountUploadDefault),
 		country: zod.union([zod.string(), zod.null()]),
 		hostname: zod.union([zod.string(), zod.null()]),
 		id: zod.int(),
@@ -193,6 +197,7 @@ export const ServersGetHeader = zod.object({
 
 export const serversGetResponseAcctOnDefault = false;
 export const serversGetResponseAgentOutdatedDefault = false;
+export const serversGetResponseCountUploadDefault = true;
 export const serversGetResponseLatestFailedUnitsDefault = [];
 export const serversGetResponseLatestRebootRequiredDefault = false;
 export const serversGetResponseSystemDefault = {};
@@ -204,6 +209,7 @@ export const ServersGetResponse = zod.object({
 	alias: zod.string(),
 	category_id: zod.union([zod.int(), zod.null()]).optional(),
 	city: zod.union([zod.string(), zod.null()]),
+	count_upload: zod.boolean().default(serversGetResponseCountUploadDefault),
 	country: zod.union([zod.string(), zod.null()]),
 	hostname: zod.union([zod.string(), zod.null()]),
 	id: zod.int(),
@@ -280,6 +286,7 @@ export const ServersUpdateBody = zod.object({
 	acct_on: zod.union([zod.boolean(), zod.null()]).optional(),
 	alias: zod.union([zod.string().max(serversUpdateBodyAliasOneMax), zod.null()]).optional(),
 	category_id: zod.union([zod.int(), zod.null()]).optional(),
+	count_upload: zod.union([zod.boolean(), zod.null()]).optional(),
 	name: zod.union([zod.string().min(1).max(serversUpdateBodyNameOneMax), zod.null()]).optional(),
 	permission: zod
 		.union([zod.string().regex(serversUpdateBodyPermissionOneRegExp), zod.null()])
@@ -298,6 +305,7 @@ export const ServersUpdateBody = zod.object({
 
 export const serversUpdateResponseAcctOnDefault = false;
 export const serversUpdateResponseAgentOutdatedDefault = false;
+export const serversUpdateResponseCountUploadDefault = true;
 export const serversUpdateResponseLatestFailedUnitsDefault = [];
 export const serversUpdateResponseLatestRebootRequiredDefault = false;
 export const serversUpdateResponseSystemDefault = {};
@@ -309,6 +317,7 @@ export const ServersUpdateResponse = zod.object({
 	alias: zod.string(),
 	category_id: zod.union([zod.int(), zod.null()]).optional(),
 	city: zod.union([zod.string(), zod.null()]),
+	count_upload: zod.boolean().default(serversUpdateResponseCountUploadDefault),
 	country: zod.union([zod.string(), zod.null()]),
 	hostname: zod.union([zod.string(), zod.null()]),
 	id: zod.int(),
@@ -371,6 +380,7 @@ export const ServersNewEnrollTokenHeader = zod.object({
 
 export const serversNewEnrollTokenResponseServerAcctOnDefault = false;
 export const serversNewEnrollTokenResponseServerAgentOutdatedDefault = false;
+export const serversNewEnrollTokenResponseServerCountUploadDefault = true;
 export const serversNewEnrollTokenResponseServerLatestFailedUnitsDefault = [];
 export const serversNewEnrollTokenResponseServerLatestRebootRequiredDefault = false;
 export const serversNewEnrollTokenResponseServerSystemDefault = {};
@@ -384,6 +394,7 @@ export const ServersNewEnrollTokenResponse = zod.object({
 		alias: zod.string(),
 		category_id: zod.union([zod.int(), zod.null()]).optional(),
 		city: zod.union([zod.string(), zod.null()]),
+		count_upload: zod.boolean().default(serversNewEnrollTokenResponseServerCountUploadDefault),
 		country: zod.union([zod.string(), zod.null()]),
 		hostname: zod.union([zod.string(), zod.null()]),
 		id: zod.int(),

@@ -60,6 +60,7 @@ class ServerOut(BaseModel):
     acct_on: bool = False
     quota_gb: Optional[float] = None
     quota_reset_day: Optional[int] = None
+    count_upload: bool = True
     latest: Latest
     system: SystemInfo = SystemInfo()
 
@@ -80,6 +81,7 @@ class ServerPatch(BaseModel):
     acct_on: Optional[bool] = None
     quota_gb: Optional[float] = Field(default=None, gt=0, le=1_000_000)  # null clears it
     quota_reset_day: Optional[int] = Field(default=None, ge=1, le=31)  # null clears it
+    count_upload: Optional[bool] = None  # false = upload is free, only download counts toward the quota
 
 
 class ServerCreated(BaseModel):

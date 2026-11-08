@@ -14,6 +14,7 @@ export interface ServerOut {
 	alias: string;
 	category_id?: number | null;
 	city: string | null;
+	count_upload?: boolean;
 	country: string | null;
 	hostname: string | null;
 	id: number;

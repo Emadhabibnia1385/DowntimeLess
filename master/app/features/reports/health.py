@@ -135,12 +135,13 @@ def compute(db: sqlite3.Connection, ws: int, found: Optional[List[Dict[str, Any]
                         gates.append({"key": "all_exits_lossy", "detail": "loss >= %d%% to all %d exits" % (th["loss_crit"], len(paths))})
                 q = quota_by.get(s["id"])
                 if q:
+                    free = " (upload free, only download counted)" if q["basis"] == "download" else ""
                     if q["used_pct"] >= 100:
-                        gates.append({"key": "quota_exhausted", "detail": "%.0f%% of quota used" % q["used_pct"]})
+                        gates.append({"key": "quota_exhausted", "detail": "%.0f%% of quota used%s" % (q["used_pct"], free)})
                     elif q["used_pct"] >= 90 or (q["days_left"] is not None and q["days_left"] <= 3):
-                        _pen(pens, "quota", w["quota"], 1.0, "quota %.0f%%, days left %s" % (q["used_pct"], q["days_left"]))
+                        _pen(pens, "quota", w["quota"], 1.0, "quota %.0f%%, days left %s%s" % (q["used_pct"], q["days_left"], free))
                     elif q["used_pct"] >= 75 or (q["days_left"] is not None and q["days_left"] <= 7):
-                        _pen(pens, "quota", w["quota"], 0.5, "quota %.0f%%, days left %s" % (q["used_pct"], q["days_left"]))
+                        _pen(pens, "quota", w["quota"], 0.5, "quota %.0f%%, days left %s%s" % (q["used_pct"], q["days_left"], free))
             elif variant == "exit":
                 paths = by_exit.get(s["id"], [])
                 if paths:

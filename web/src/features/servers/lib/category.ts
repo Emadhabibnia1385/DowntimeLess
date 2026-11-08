@@ -8,7 +8,7 @@ export const categoryValue = (id: number | null | undefined): string =>
 
 /** The form's fields as the API wants them: the category as a number, or null for none. */
 export function toServerPayload(values: ServerFormValues) {
-	const { category, quota_gb: _gb, quota_reset_day: _day, ...rest } = values;
+	const { category, quota_gb: _gb, quota_reset_day: _day, count_upload: _up, ...rest } = values;
 	return { ...rest, category_id: category === NO_CATEGORY ? null : Number(category) };
 }
 
@@ -18,5 +18,6 @@ export function toServerPatch(values: ServerFormValues) {
 		...toServerPayload(values),
 		quota_gb: values.quota_gb ?? null,
 		quota_reset_day: values.quota_reset_day ?? null,
+		count_upload: values.count_upload ?? true,
 	};
 }

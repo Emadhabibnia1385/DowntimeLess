@@ -9,6 +9,7 @@ export interface ServerPatch {
 	acct_on?: boolean | null;
 	alias?: string | null;
 	category_id?: number | null;
+	count_upload?: boolean | null;
 	name?: string | null;
 	permission?: string | null;
 	quota_gb?: number | null;

@@ -78,6 +78,9 @@ def briefing_md(b: Dict[str, Any]) -> str:
         out.append(table(["server", "used", "of", "pct", "per day", "days left", "resets in"], (
             [q["server_name"], q["used_gb"], q["quota_gb"], pct(q["used_pct"]), q["per_day_gb"] if q["per_day_gb"] is not None else "-",
              q["days_left"] if q["days_left"] is not None else "-", "%sd" % q["resets_in_days"]] for q in b["quota"])))
+        free = [q["server_name"] for q in b["quota"] if q["basis"] == "download"]
+        if free:
+            out.append("Upload is free on %s: only download is counted toward their quota." % ", ".join(free))
     if b["certs_at_risk"]:
         out.append("\n## Certificates at risk")
         out.append(table(["name", "server", "days", "level", "auto-renew", "error"], (

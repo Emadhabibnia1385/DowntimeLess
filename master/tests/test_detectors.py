@@ -401,3 +401,47 @@ def test_the_billing_period_follows_the_reset_day():
     assert detectors.quota_period(ts(2026, 1, 2), 5) == (ts(2025, 12, 5, 0), ts(2026, 1, 5, 0))
     assert detectors.quota_period(ts(2026, 12, 20), 5) == (ts(2026, 12, 5, 0), ts(2027, 1, 5, 0))
     assert detectors.quota_period(ts(2026, 2, 28, 12), 31) == (ts(2026, 2, 28, 0), ts(2026, 3, 31, 0))  # short month clamps
+
+
+# ---- free upload: count_upload off means only download (rx) counts ----------------------------------
+
+def test_count_upload_defaults_on_and_patch_toggles_it(owner):
+    sid, _ = make_server(owner)
+    assert owner.get("/api/v1/servers/%d" % sid).json()["count_upload"] is True
+    assert owner.patch("/api/v1/servers/%d" % sid, json={"count_upload": False}).json()["count_upload"] is False
+    assert owner.patch("/api/v1/servers/%d" % sid, json={"alias": "x"}).json()["count_upload"] is False  # untouched by other edits
+    assert owner.patch("/api/v1/servers/%d" % sid, json={"count_upload": True}).json()["count_upload"] is True
+    assert [s["count_upload"] for s in owner.get("/api/v1/servers").json()] == [True]
+
+
+@pytest.mark.parametrize("basis", [0, 1])
+def test_free_upload_counts_download_only_under_both_bases(owner, basis):
+    sid = quota_server(owner, quota=100)
+    put_traffic(sid, int(time.time()), 72, 20 * GIB // 24, 1 * GIB // 24)  # 60 up (out) but only 3 down in
+    switch(owner, quota_basis=basis)
+    owner.patch("/api/v1/servers/%d" % sid, json={"count_upload": False})
+    assert "quota" not in codes(owner)  # 3 GiB of 100, 1 a day: nowhere near
+    owner.patch("/api/v1/servers/%d" % sid, json={"quota_gb": 5})  # 3 used of 5 at 1 a day: 2 days left
+    issue = one(owner, "quota")
+    ev = issue["evidence"]
+    assert ev["basis"] == "download" and ev["used_gb"] == 3.0 and ev["per_day_gb"] == 1.0
+    assert "فقط دانلود" in issue["suggestion"]
+    owner.patch("/api/v1/servers/%d" % sid, json={"count_upload": True})
+    assert one(owner, "quota")["evidence"]["basis"] == ("both" if basis else "out")
+
+
+def test_free_upload_server_drops_out_of_the_quota_pair(owner):
+    a = quota_server(owner, "iran-1")
+    b = quota_server(owner, "iran-2")
+    for sid in (a, b):
+        put_traffic(sid, int(time.time()), 72, 15 * GIB // 24, 0)
+    assert one(owner, "quota_pair")
+    owner.patch("/api/v1/servers/%d" % a, json={"count_upload": False})  # only download counts, and there is none
+    assert "quota_pair" not in codes(owner) and codes(owner).count("quota") == 1
+
+
+def test_forecast_reads_the_count_upload_column_directly():
+    th = {"quota_basis": 1}
+    assert detectors.quota_counted({"count_upload": 0}, th) == ("rx_delta", "download")
+    assert detectors.quota_counted({"count_upload": 1}, th) == ("rx_delta+tx_delta", "both")
+    assert detectors.quota_counted({"count_upload": 1}, {"quota_basis": 0}) == ("tx_delta", "out")

@@ -6,6 +6,7 @@
  */
 
 export interface QuotaRow {
+	basis?: string;
 	days_left: number | null;
 	per_day_gb: number | null;
 	quota_gb: number;
