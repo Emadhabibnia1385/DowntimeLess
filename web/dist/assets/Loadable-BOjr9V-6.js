@@ -1,1 +1,0 @@
-import{C as e,O as t,Tr as n,zn as r}from"./useDocumentTitle-DxsN5MYI.js";var i=n();function a({query:n,children:a,skeleton:o=(0,i.jsx)(e,{})}){return n.isPending?o:n.isError?(0,i.jsx)(t,{message:r(n.error),onRetry:()=>void n.refetch()}):a(n.data)}export{a as t};
