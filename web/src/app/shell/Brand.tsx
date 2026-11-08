@@ -4,12 +4,12 @@ import { GithubIcon } from "@/shared/GithubIcon";
 import { PROJECT_GITHUB_URL } from "@/shared/links";
 import { t } from "@/strings";
 
-// The sidebar's top block: shield mark, project name, the slogan, and the project's GitHub circle.
+// One node serves the sidebar, the phone top bar and its menu; `in-[...]` styles each place.
 export function Brand() {
 	const { scheme } = useTheme();
 	return (
-		<span className="flex w-full items-center justify-between gap-3">
-			<span className="flex items-center gap-3">
+		<span className="flex w-full items-center justify-between gap-3 in-[header]:contents in-[[role=dialog]]:pb-6">
+			<span className="flex items-center gap-3 in-[header]:absolute in-[header]:inset-x-0 in-[header]:top-1/2 in-[header]:mx-auto in-[header]:w-fit in-[header]:-translate-y-1/2">
 				<img
 					src={brandMark(scheme)}
 					alt=""
@@ -29,7 +29,7 @@ export function Brand() {
 				rel="noopener noreferrer"
 				aria-label={t.brand.githubLabel}
 				title={t.brand.githubLabel}
-				className="grid size-10 shrink-0 place-items-center rounded-full text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent"
+				className="grid size-10 shrink-0 place-items-center rounded-full text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent in-[header]:absolute in-[header]:end-3 in-[header]:top-1/2 in-[header]:-translate-y-1/2 in-[header]:sm:hidden in-[[role=dialog]]:translate-y-6"
 			>
 				<GithubIcon className="size-6" />
 			</a>

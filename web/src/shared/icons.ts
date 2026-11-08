@@ -21,3 +21,5 @@ export { default as ForwardIcon } from "~icons/solar/alt-arrow-right-linear";
 export { default as InstallIcon } from "~icons/solar/download-minimalistic-linear";
 export { default as CheckIcon } from "~icons/solar/check-circle-linear";
 export { default as CloseIcon } from "~icons/solar/close-circle-linear";
+export { default as ArrowDownIcon } from "~icons/solar/arrow-down-linear";
+export { default as ArrowUpIcon } from "~icons/solar/arrow-up-linear";

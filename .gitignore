@@ -9,3 +9,4 @@ graft/
 
 # symlinks named venv are not matched by the "venv/" pattern above
 venv
+node_modules

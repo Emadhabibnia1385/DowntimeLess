@@ -3,7 +3,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import type { ServerOut } from "@/api/generated/model";
 import { useCanManage } from "@/features/auth";
 import { CategoryManager, useCategories } from "@/features/categories";
-import { AddIcon } from "@/shared/icons";
+import { AddIcon, ArrowDownIcon, ArrowUpIcon } from "@/shared/icons";
 import { useDocumentTitle } from "@/shared/useDocumentTitle";
 import { formatNumber, formatPercent, t } from "@/strings";
 import { useServers } from "../api";
@@ -27,8 +27,27 @@ const percent = (value: number | null | undefined) =>
 	value == null ? t.common.none : formatPercent(value);
 const rate = (value: number | null | undefined) =>
 	value == null ? t.common.none : formatNumber(Math.round(value / 1_000_000));
-const bandwidth = (rx: number | null | undefined, tx: number | null | undefined) =>
-	rx == null && tx == null ? t.common.none : rate((rx ?? 0) + (tx ?? 0));
+
+// Download and upload side by side, then "=" and their sum.
+function TrafficCell({ rx, tx }: { rx: number | null | undefined; tx: number | null | undefined }) {
+	if (rx == null && tx == null) return t.common.none;
+	return (
+		<div className="flex items-center gap-2 whitespace-nowrap">
+			<span title={t.servers.download} className="inline-flex items-center gap-0.5">
+				<ArrowDownIcon aria-hidden className="size-3.5 text-muted" />
+				{rate(rx)}
+			</span>
+			<span title={t.servers.upload} className="inline-flex items-center gap-0.5">
+				<ArrowUpIcon aria-hidden className="size-3.5 text-muted" />
+				{rate(tx)}
+			</span>
+			<span className="inline-flex items-center gap-1 font-semibold">
+				<span aria-hidden>=</span>
+				{rate((rx ?? 0) + (tx ?? 0))}
+			</span>
+		</div>
+	);
+}
 
 // A level as its percent with, under it, what that means in cores or gigabytes.
 const usageCell = (usage: Usage | null): ReactNode =>
@@ -126,19 +145,9 @@ export function ServersPage() {
 			cell: (s) => percent(s.latest.steal_pct),
 		},
 		{
-			id: "download",
-			header: head(t.servers.download, "download", "desc", t.servers.mbps),
-			cell: (s) => rate(s.latest.rx_bps),
-		},
-		{
-			id: "upload",
-			header: head(t.servers.upload, "upload", "desc", t.servers.mbps),
-			cell: (s) => rate(s.latest.tx_bps),
-		},
-		{
-			id: "bandwidth",
+			id: "traffic",
 			header: head(t.servers.bandwidth, "bandwidth", "desc", t.servers.mbps),
-			cell: (s) => bandwidth(s.latest.rx_bps, s.latest.tx_bps),
+			cell: (s) => <TrafficCell rx={s.latest.rx_bps} tx={s.latest.tx_bps} />,
 		},
 		{
 			id: "retrans",
@@ -195,7 +204,6 @@ export function ServersPage() {
 				onRetry={() => void servers.refetch()}
 				emptyTitle={t.servers.emptyTitle}
 				empty={t.servers.empty}
-				cards="md"
 			/>
 			<AddServerDialog isOpen={adding} onOpenChange={setAdding} />
 			<CategoryManager isOpen={managing} onOpenChange={setManaging} />
