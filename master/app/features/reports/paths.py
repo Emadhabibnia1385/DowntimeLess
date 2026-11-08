@@ -8,16 +8,17 @@ from ..settings.router import thresholds
 PATH_VERDICTS = ("blacklisted", "relay_egress", "relay_filtered")
 
 
-def classify(db: sqlite3.Connection) -> List[Dict[str, Any]]:
+def classify(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
     """Latest relay-to-exit pings with a verdict. ICMP only: a verdict is a hypothesis to confirm with a data test.
 
     exit_down: the exit's agent is silent; blacklisted: every measuring relay (2+) fails; relay_filtered: this relay
     fails to 2+ exits; relay_egress: only this relay fails to this exit; unconfirmed: a single relay measures the exit.
     """
-    th = thresholds(db)
-    windows = overview.ping_windows(db)
-    status = {r["id"]: status_of(r) for r in db.execute("SELECT * FROM servers")}
-    names = {r["id"]: r["alias"] or r["name"] for r in db.execute("SELECT * FROM servers")}
+    th = thresholds(db, ws)
+    windows = overview.ping_windows(db, ws)
+    servers = db.execute("SELECT * FROM servers WHERE workspace_id=?", (ws,)).fetchall()
+    status = {r["id"]: status_of(r) for r in servers}
+    names = {r["id"]: r["alias"] or r["name"] for r in servers}
     by_exit: Dict[int, List[Dict[str, Any]]] = {}
     for w in windows:
         w["bad"] = w["loss"] is not None and w["loss"] >= th["loss_warn"]

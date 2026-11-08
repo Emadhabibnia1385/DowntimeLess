@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from ...db import get_db
-from ...deps import Actor, require
+from ...deps import Actor, current_workspace, require
 from ...errors import DLError
 from . import service as svc
 
@@ -57,8 +57,9 @@ class IssuesHistory(BaseModel):
 
 
 @router.get("/issues/history", response_model=IssuesHistory, operation_id="issues_history")
-def history(range: str = "24h", _: Actor = Depends(require("viewer")), db: sqlite3.Connection = Depends(get_db)):
+def history(range: str = "24h", _: Actor = Depends(require("viewer")), ws: int = Depends(current_workspace),
+            db: sqlite3.Connection = Depends(get_db)):
     """Every issue that was active during the range, with how often and how long, and each separate occurrence."""
     if range not in svc.RANGES:
         raise DLError("range.invalid")
-    return svc.history(db, range, int(time.time()))
+    return svc.history(db, ws, range, int(time.time()))

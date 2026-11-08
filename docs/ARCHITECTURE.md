@@ -20,11 +20,18 @@ The agent only makes outbound HTTPS calls to the master, so no SSH key or root c
 | `install.sh` | Master manager menu: install, update, edit env, status, logs, restart, uninstall (fa/en) |
 | `docs/` | Architecture, API, roadmap |
 
-## Roles
+## Workspaces and roles (see `docs/design/workspaces.md`)
 
-- `owner`: the first person who opens the one-time claim link printed by the installer.
-- `admin`: invited by the owner; everything except managing admins and tokens.
+A workspace is one account's whole fleet; a person can belong to several and switches in the header
+(`GET /auth/workspaces`, `POST /auth/workspace`). Everything (servers, categories, domains, settings, keys, channels, routes,
+incidents, change log) is scoped to the active workspace; another workspace's ids are 404. Roles are per workspace:
+
+- `owner`: the person whose workspace it is (workspace 1: whoever opened the installer's claim link); manages members and keys.
+- `admin`: added by the owner (`/members`, by Telegram id); everything except members and API keys.
+- `operator`: viewer plus safe and diagnostic jobs (ping, TCP, speed tests, processes, ports, journal, traceroute...).
 - `viewer`: read-only.
+
+Only Telegram ids that are a member of some workspace can sign in; the first sign-in creates the person's own empty workspace.
 
 ## Login (modelled on KasbBook)
 
@@ -88,7 +95,9 @@ The agent only makes outbound HTTPS calls to the master, so no SSH key or root c
 | `GET /servers/{id}/metrics?range=1h|24h|7d|30d` | time series |
 | `GET /servers/{id}/jobs`, `POST /servers/{id}/jobs` | whitelisted actions |
 | `GET /overview`, `GET /issues`, `GET /ping-matrix`, `GET /snapshot` | counts; current problems with evidence and a suggested next step; link matrix; the whole fleet in one secret-free JSON |
-| `GET/POST/DELETE /keys` | API keys (owner, session only). Token shown once, only a SHA-256 is stored |
+| `GET /auth/workspaces`, `POST /auth/workspace` | my workspaces with my role; switch the session's workspace |
+| `GET/POST /members`, `PATCH/DELETE /members/{user_id}` | members of the current workspace (owner, signed in) |
+| `GET/POST/DELETE /keys` | API keys of the current workspace (owner). Token shown once, only a SHA-256 is stored |
 | `GET /settings`, `PUT /settings` | alert thresholds, intervals |
 | `POST /agent/v1/enroll`, `POST /agent/v1/report` | agent side (agent key header `X-Agent-Key`) |
 | `GET /agent/install.sh`, `GET /agent/agent.py` | served by master, unauthenticated |

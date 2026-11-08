@@ -6,12 +6,12 @@ MAX_PEERS = 64
 
 
 def peers_for(db: sqlite3.Connection, server: sqlite3.Row) -> List[str]:
-    """The addresses a server should count traffic to and from: every other server with a known IPv4."""
+    """The addresses a server should count traffic to and from: every other server of its workspace with a known IPv4."""
     if not server["acct_on"]:
         return []
     rows = db.execute(
-        "SELECT public_ip FROM servers WHERE id<>? AND public_ip IS NOT NULL AND public_ip NOT LIKE '%:%' ORDER BY id",
-        (server["id"],),
+        "SELECT public_ip FROM servers WHERE workspace_id=? AND id<>? AND public_ip IS NOT NULL AND public_ip NOT LIKE '%:%' ORDER BY id",
+        (server["workspace_id"], server["id"]),
     ).fetchall()
     out: List[str] = []
     for r in rows:
@@ -42,26 +42,28 @@ def record(db: sqlite3.Connection, server_id: int, acct: Any, now: int) -> None:
         if not isinstance(c, dict):
             continue
         cur_in, cur_out = _count(c.get("in")), _count(c.get("out"))
-        prev = db.execute("SELECT in_bytes, out_bytes FROM link_prev WHERE server_id=? AND peer_ip=?", (server_id, ip)).fetchone()
+        prev = db.execute(
+            "SELECT in_bytes, out_bytes FROM link_prev WHERE server_id=? AND peer_ip=?", (server_id, ip)  # ws: the agent's own server
+        ).fetchone()
         d_in = cur_in - prev["in_bytes"] if prev and cur_in >= prev["in_bytes"] else 0
         d_out = cur_out - prev["out_bytes"] if prev and cur_out >= prev["out_bytes"] else 0
-        db.execute(
+        db.execute(  # ws: the agent's own server
             "INSERT INTO link_prev (server_id, peer_ip, in_bytes, out_bytes) VALUES (?,?,?,?) "
             "ON CONFLICT(server_id, peer_ip) DO UPDATE SET in_bytes=excluded.in_bytes, out_bytes=excluded.out_bytes",
             (server_id, ip, cur_in, cur_out),
         )
         if d_in or d_out:
-            db.execute(
+            db.execute(  # ws: the agent's own server
                 "INSERT INTO link_traffic (server_id, peer_ip, hour, in_bytes, out_bytes) VALUES (?,?,?,?,?) "
                 "ON CONFLICT(server_id, peer_ip, hour) DO UPDATE SET in_bytes=in_bytes+excluded.in_bytes, out_bytes=out_bytes+excluded.out_bytes",
                 (server_id, ip, hour, d_in, d_out),
             )
         seen.append(ip)
     # a peer that is no longer counted must not keep an old baseline that would fake a jump when it returns
-    for r in db.execute("SELECT peer_ip FROM link_prev WHERE server_id=?", (server_id,)).fetchall():
+    for r in db.execute("SELECT peer_ip FROM link_prev WHERE server_id=?", (server_id,)).fetchall():  # ws: the agent's own server
         if r["peer_ip"] not in seen:
-            db.execute("DELETE FROM link_prev WHERE server_id=? AND peer_ip=?", (server_id, r["peer_ip"]))
+            db.execute("DELETE FROM link_prev WHERE server_id=? AND peer_ip=?", (server_id, r["peer_ip"]))  # ws: the agent's own server
 
 
 def prune(db: sqlite3.Connection, now: int) -> None:
-    db.execute("DELETE FROM link_traffic WHERE hour<?", (now - 90 * 86400,))
+    db.execute("DELETE FROM link_traffic WHERE hour<?", (now - 90 * 86400,))  # ws: retention by age, every workspace alike

@@ -13,6 +13,8 @@ MUTATING_KINDS = {"apt_upgrade_safe", "reboot", "self_update", "cert_renew", "ce
 # diagnostics return text for the panel to show; actions change a service or free space; neither is for a read key
 DIAG_KINDS = {"processes", "ports", "disk_usage", "journal", "traceroute", "http_check", "dns_check"}
 ACTION_KINDS = {"service_restart", "vacuum_logs"}
+# what an operator may queue: measurements and read-only diagnostics, nothing that changes the server
+OPERATOR_KINDS = SAFE_KINDS | DIAG_KINDS
 CERT_KINDS = {"cert_renew", "cert_delete"}
 # the agent replacing its own file from this master changes nothing else on the server
 ANY_LEVEL_KINDS = {"self_update"}

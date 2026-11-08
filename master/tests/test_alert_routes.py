@@ -117,15 +117,15 @@ def test_notify_resolves_panel_admins_and_channel_routes(owner, tg):
     named = add_channel(owner, "نام", "@alerts_channel").json()
     owner.put(API + "/routes", json={"cpu": "panel", "ram": "admins", "disk": "channel:%d" % ch["id"], "steal": "channel:%d" % named["id"]})
     before = len(tg.sent)
-    alerts.notify(tg, "cpu", "x")
+    alerts.notify(tg, 1, "cpu", "x")
     assert len(tg.sent) == before  # panel: nothing is sent
-    alerts.notify(tg, "ram", "to admins")
+    alerts.notify(tg, 1, "ram", "to admins")
     assert tg.sent[before][:2] == (111, "to admins")
-    alerts.notify(tg, "disk", "to channel")
+    alerts.notify(tg, 1, "disk", "to channel")
     assert tg.sent[-1][:2] == (-1001234567890, "to channel") and tg.threads[-1] is None
-    alerts.notify(tg, "steal", "to username", thread=7)
+    alerts.notify(tg, 1, "steal", "to username", thread=7)
     assert tg.sent[-1][:2] == ("@alerts_channel", "to username") and tg.threads[-1] == 7
-    alerts.notify(tg, "no_such_rule", "ignored")  # an unknown rule is a panel-only one
+    alerts.notify(tg, 1, "no_such_rule", "ignored")  # an unknown rule is a panel-only one
     assert tg.sent[-1][1] == "to username"
 
 
@@ -136,17 +136,17 @@ def test_a_failing_send_never_raises_into_the_monitor(owner):
 
     ch = add_channel(owner).json()
     owner.put(API + "/routes", json={"disk": "channel:%d" % ch["id"], "ram": "admins"})
-    alerts.notify(Exploding(), "disk", "x")
-    alerts.notify(Exploding(), "ram", "x")
+    alerts.notify(Exploding(), 1, "disk", "x")
+    alerts.notify(Exploding(), 1, "ram", "x")
 
 
 def test_a_route_to_a_vanished_channel_falls_back_instead_of_breaking(owner, tg):
     db = connect()
     db.execute("INSERT INTO rule_routes (rule, route) VALUES ('disk', 'channel:77')")
-    assert alerts.routes(db)["disk"] == "admins"
+    assert alerts.routes(db, 1)["disk"] == "admins"
     db.close()
     before = len(tg.sent)
-    alerts.notify(tg, "disk", "x")
+    alerts.notify(tg, 1, "disk", "x")
     assert tg.sent[before][0] == 111
 
 

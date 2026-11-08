@@ -41,6 +41,9 @@ def _message(tg: Telegram, db, msg: Dict[str, Any]) -> None:
             tg.send(chat, "⛔ این حساب تلگرام در پنل ثبت نشده است. از مالک پنل بخواهید شما را اضافه کند.")
         else:
             ch = res[0]
+            # someone added by Telegram id alone gets the name Telegram knows, for the member list and their own workspace
+            db.execute("UPDATE users SET name=? WHERE id=? AND name=''", (_name(frm)[:64], res[1]["id"]))
+            db.execute("UPDATE users SET tg_username=? WHERE id=? AND tg_username IS NULL", (frm.get("username"), res[1]["id"]))
             tg.send(
                 chat,
                 "🔐 <b>درخواست ورود به پنل</b>\nآی‌پی: <code>%s</code>\nمرورگر: %s\n\nخودتان بودید؟" % (escape(ch["ip"] or "?"), escape((ch["ua"] or "?")[:80])),
@@ -48,7 +51,9 @@ def _message(tg: Telegram, db, msg: Dict[str, Any]) -> None:
             )
     else:
         s = get_settings()
-        tg.send(chat, "🛡 <b>DowntimeLess</b>\nمانیتور و مدیریت سرورهای VPN\n\nتوسعه‌دهنده: @%s\nGitHub: github.com/%s" % (s.dev_telegram, s.dev_github))
+        # the numeric id is what an owner needs to add this person as a member
+        tg.send(chat, "🛡 <b>DowntimeLess</b>\nمانیتور و مدیریت سرورهای VPN\n\nشناسهٔ عددی تلگرام شما: <code>%d</code>\n\nتوسعه‌دهنده: @%s\nGitHub: github.com/%s"
+                % (frm["id"], s.dev_telegram, s.dev_github))
 
 
 def _callback(tg: Telegram, db, cb: Dict[str, Any]) -> None:
@@ -62,13 +67,19 @@ def _callback(tg: Telegram, db, cb: Dict[str, Any]) -> None:
         tg.edit(cb["message"]["chat"]["id"], cb["message"]["message_id"], label)
 
 
-def notify_admins(tg: Telegram, text: str) -> None:
+def notify_admins(tg: Telegram, ws: int, text: str) -> None:
+    """A private message to the owner and admins of one workspace; nobody else hears about its fleet."""
     db = connect()
     try:
-        for r in db.execute("SELECT tg_id FROM users WHERE tg_id IS NOT NULL AND role IN ('owner','admin')"):
-            tg.send(r["tg_id"], text)
+        rows = db.execute(
+            "SELECT u.tg_id FROM workspace_members m JOIN users u ON u.id=m.user_id "
+            "WHERE m.workspace_id=? AND m.role IN ('owner','admin') AND u.tg_id IS NOT NULL ORDER BY u.id",
+            (ws,),
+        ).fetchall()
     finally:
         db.close()
+    for r in rows:
+        tg.send(r["tg_id"], text)
 
 
 def poll_forever(tg: Telegram, stop: threading.Event) -> None:

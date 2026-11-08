@@ -27,31 +27,31 @@ def rows(db):
 
 def test_lifecycle_open_update_close(owner):
     db = connect()
-    svc.record(db, NOW, [issue(disk_pct=91)])
+    svc.record(db, 1, NOW, [issue(disk_pct=91)])
     (r,) = rows(db)
     assert (r["key"], r["opened_at"], r["last_seen"], r["closed_at"], r["severity"]) == ("server:1:disk", NOW, NOW, None, "warning")
-    svc.record(db, NOW + 15, [issue(severity="critical", title="دیسک پر", disk_pct=97)])
+    svc.record(db, 1, NOW + 15, [issue(severity="critical", title="دیسک پر", disk_pct=97)])
     (r,) = rows(db)
     assert r["last_seen"] == NOW + 15 and r["severity"] == "critical" and r["title"] == "دیسک پر"
     assert json.loads(r["evidence"]) == {"disk_pct": 97}
-    svc.record(db, NOW + 30, [issue(severity="warning", disk_pct=85)])  # severity only goes up
+    svc.record(db, 1, NOW + 30, [issue(severity="warning", disk_pct=85)])  # severity only goes up
     assert rows(db)[0]["severity"] == "critical" and len(rows(db)) == 1
-    svc.record(db, NOW + 45, [])
+    svc.record(db, 1, NOW + 45, [])
     assert rows(db)[0]["closed_at"] is None  # absent for one sweep: still open
-    svc.record(db, NOW + 60, [])
+    svc.record(db, 1, NOW + 60, [])
     (r,) = rows(db)
     assert r["closed_at"] == NOW + 30  # ends at the last sweep that saw it
-    svc.record(db, NOW + 75, [issue()])
+    svc.record(db, 1, NOW + 75, [issue()])
     assert len(rows(db)) == 2 and rows(db)[1]["closed_at"] is None  # a new occurrence, not a reopen
     db.close()
 
 
 def test_a_blink_of_one_sweep_is_one_incident(owner):
     db = connect()
-    svc.record(db, NOW, [issue()])
-    svc.record(db, NOW + 15, [])
-    svc.record(db, NOW + 30 - 1, [issue()])
-    svc.record(db, NOW + 45, [issue()])
+    svc.record(db, 1, NOW, [issue()])
+    svc.record(db, 1, NOW + 15, [])
+    svc.record(db, 1, NOW + 30 - 1, [issue()])
+    svc.record(db, 1, NOW + 45, [issue()])
     (r,) = rows(db)
     assert r["closed_at"] is None and r["last_seen"] == NOW + 45
     db.close()
@@ -59,10 +59,10 @@ def test_a_blink_of_one_sweep_is_one_incident(owner):
 
 def test_info_issues_are_recorded_and_issues_are_independent(owner):
     db = connect()
-    svc.record(db, NOW, [issue("server:1:agent_missing", "info"), issue("server:1:reboot_required", "info"), issue()])
+    svc.record(db, 1, NOW, [issue("server:1:agent_missing", "info"), issue("server:1:reboot_required", "info"), issue()])
     assert {r["key"] for r in rows(db)} == {"server:1:agent_missing", "server:1:reboot_required", "server:1:disk"}
-    svc.record(db, NOW + 15, [issue("server:1:reboot_required", "info"), issue()])
-    svc.record(db, NOW + 50, [issue()])
+    svc.record(db, 1, NOW + 15, [issue("server:1:reboot_required", "info"), issue()])
+    svc.record(db, 1, NOW + 50, [issue()])
     closed = {r["key"] for r in rows(db) if r["closed_at"]}
     assert closed == {"server:1:agent_missing", "server:1:reboot_required"}
     db.close()
@@ -74,7 +74,7 @@ def test_incidents_of_a_deleted_server_close_at_once(owner):
     put(db, "server:%d:disk" % sid, NOW - 100, last_seen=NOW - 5, server_id=sid)
     put(db, "server:999:disk", NOW - 100, last_seen=NOW - 5, server_id=999)
     put(db, "ssl:x", NOW - 100, last_seen=NOW - 5, server_id=None)
-    svc.record(db, NOW, [])
+    svc.record(db, 1, NOW, [])
     state = {r["key"]: r["closed_at"] for r in rows(db)}
     assert state["server:999:disk"] == NOW - 5
     assert state["server:%d:disk" % sid] is None and state["ssl:x"] is None  # still inside the grace period
@@ -86,7 +86,7 @@ def test_pruning_drops_only_old_closed_incidents(owner):
     put(db, "old", NOW - 100 * 86400, NOW - 95 * 86400)
     put(db, "recent", NOW - 80 * 86400, NOW - 79 * 86400)
     put(db, "open-old", NOW - 120 * 86400, None, last_seen=NOW)
-    svc.record(db, NOW, [issue("open-old")])
+    svc.record(db, 1, NOW, [issue("open-old")])
     assert {r["key"] for r in rows(db)} == {"recent", "open-old"}
     db.close()
 

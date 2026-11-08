@@ -69,9 +69,9 @@ def seed_fleet(owner):
     inc("server:%d:disk" % ids["nl-1"], "disk", "nl-1", "critical", now - 30 * 3600, now - 26 * 3600)
     # events
     from app.features.reports import events
-    events.record(db, "agent_updated", "fr-1: agent 0.2.7 -> 0.2.8", ids["fr-1"], {"old": "0.2.7", "new": "0.2.8"}, ts=now - 3600)
-    events.record(db, "rebooted", "ir-2: rebooted (uptime 40s)", ids["ir-2"], ts=now - 7200)
-    events.record(db, "job_created", "de-1: reboot", ids["de-1"], {"job_kind": "reboot"}, ts=now - 9000)
-    events.record(db, "settings_changed", "settings: cpu_warn", None, {"keys": ["cpu_warn"]}, ts=now - 20000)
+    events.record(db, 1, "agent_updated", "fr-1: agent 0.2.7 -> 0.2.8", ids["fr-1"], {"old": "0.2.7", "new": "0.2.8"}, ts=now - 3600)
+    events.record(db, 1, "rebooted", "ir-2: rebooted (uptime 40s)", ids["ir-2"], ts=now - 7200)
+    events.record(db, 1, "job_created", "de-1: reboot", ids["de-1"], {"job_kind": "reboot"}, ts=now - 9000)
+    events.record(db, 1, "settings_changed", "settings: cpu_warn", None, {"keys": ["cpu_warn"]}, ts=now - 20000)
     db.close()
     return ids, keys

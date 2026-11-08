@@ -22,7 +22,7 @@ router = APIRouter(prefix="/agent/v1", tags=["agent"])
 def enroll(body: EnrollRequest, db: sqlite3.Connection = Depends(get_db)):
     key = new_token(32)
     # the one-time token is burned in the same statement that issues the key
-    won = db.execute(
+    won = db.execute(  # ws: the one-time token names exactly one server, whatever its workspace
         "UPDATE servers SET agent_hash=?, enroll_hash=NULL, hostname=? WHERE enroll_hash=?",
         (digest(key), body.hostname, digest(body.token)),
     ).rowcount
@@ -33,10 +33,12 @@ def enroll(body: EnrollRequest, db: sqlite3.Connection = Depends(get_db)):
 
 @router.post("/report", response_model=ReportResult, operation_id="agent_report")
 def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Connection = Depends(get_db)):
-    server = db.execute("SELECT * FROM servers WHERE agent_hash=?", (digest(x_agent_key),)).fetchone() if x_agent_key else None
+    server = db.execute(  # ws: the agent key names exactly one server; everything below stays in its workspace
+        "SELECT * FROM servers WHERE agent_hash=?", (digest(x_agent_key),)
+    ).fetchone() if x_agent_key else None
     if not server:
         raise DLError("agent.invalid")
-    now, sid = int(time.time()), server["id"]
+    now, sid, ws = int(time.time()), server["id"], server["workspace_id"]
     net = body.net or {}
     rx, tx = net.get("rx_bytes"), net.get("tx_bytes")
     # monotonic counters: a drop means reboot or reset, so count that sample as zero
@@ -49,16 +51,16 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
     disk_pct = pct(body.disk_used_gb or 0, body.disk_total_gb)
     changes = events.detect(server, body, public_ip, now)
     for column, value in changes.items():
-        db.execute("UPDATE servers SET %s=? WHERE id=?" % column, (value, sid))  # column names come from detect()
+        db.execute("UPDATE servers SET %s=? WHERE id=? AND workspace_id=?" % column, (value, sid, ws))  # column names come from detect()
     changelog.report_changes(db, server, body, now, changes)
     db.execute(
         "UPDATE servers SET last_seen=?, last_report=?, prev_rx=?, prev_tx=?, agent_version=?, hostname=COALESCE(NULLIF(?,''),hostname), "
-        "public_ip=COALESCE(?,public_ip), country=COALESCE(?,country), city=COALESCE(?,city), org=COALESCE(?,org) WHERE id=?",
+        "public_ip=COALESCE(?,public_ip), country=COALESCE(?,country), city=COALESCE(?,city), org=COALESCE(?,org) WHERE id=? AND workspace_id=?",
         (now, body.model_dump_json(), rx, tx, body.agent_version, body.hostname, public_ip,
-         geo.get("country"), geo.get("city"), geo.get("org"), sid),
+         geo.get("country"), geo.get("city"), geo.get("org"), sid, ws),
     )
     extra = body.model_extra or {}
-    db.execute(
+    db.execute(  # ws: the agent's own server
         "INSERT INTO metrics (server_id, ts, cpu, steal, ram_pct, disk_pct, rx_bps, tx_bps, rx_delta, tx_delta, retrans, conntrack, load1, swap_pct, conns) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (sid, now, body.cpu_pct, body.steal_pct, ram_pct, disk_pct, net.get("rx_bps"), net.get("tx_bps"), rx_d, tx_d, body.tcp_retrans_pct, body.conntrack_pct,
          extra.get("load1"), swap_pct(extra), extra.get("tcp_established")),
@@ -66,23 +68,30 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
     links_svc.record(db, sid, extra.get("acct"), now)
     found = ((body.model_extra or {}).get("ssl") or {}).get("domains")
     if isinstance(found, list):
-        adopt_domains(db, sid, found)
+        adopt_domains(db, server, found)
     for p in body.ping:
         if "target" in p:
-            db.execute("INSERT INTO pings (server_id, ts, target, loss, rtt) VALUES (?,?,?,?,?)", (sid, now, str(p["target"]), p.get("loss_pct"), p.get("rtt_ms")))
+            db.execute(  # ws: the agent's own server; readers join targets inside the same workspace
+                "INSERT INTO pings (server_id, ts, target, loss, rtt) VALUES (?,?,?,?,?)", (sid, now, str(p["target"]), p.get("loss_pct"), p.get("rtt_ms"))
+            )
     for j in body.jobs_done:
-        changelog.job_done(db, sid, j.id, j.status)
-        db.execute(
+        changelog.job_done(db, server, j.id, j.status)
+        db.execute(  # ws: only the agent's own jobs (server_id)
             "UPDATE jobs SET status=?, result=?, error=?, done_at=? WHERE id=? AND server_id=?",
             (j.status if j.status in ("ok", "error", "rejected") else "error", json.dumps(j.result) if j.result is not None else None, j.error, now, j.id, sid),
         )
     # only Iran relays measure, and only towards foreign servers: foreign-to-foreign pings are noise
+    # and only towards servers of their own workspace
     targets = [
         {"target": r["public_ip"], "tcp_port": None}
-        for r in db.execute("SELECT public_ip FROM servers WHERE role<>'relay' AND public_ip IS NOT NULL AND public_ip NOT LIKE '%:%'")
+        for r in db.execute(
+            "SELECT public_ip FROM servers WHERE workspace_id=? AND role<>'relay' AND public_ip IS NOT NULL AND public_ip NOT LIKE '%:%'",
+            (ws,),
+        )
     ] if server["role"] == "relay" else []
-    jobs = [{"id": r["id"], "kind": r["kind"], "args": json.loads(r["args"])} for r in db.execute("SELECT * FROM jobs WHERE server_id=? AND status='queued' ORDER BY id", (sid,))]
+    jobs = [{"id": r["id"], "kind": r["kind"], "args": json.loads(r["args"])} for r in db.execute(
+        "SELECT * FROM jobs WHERE server_id=? AND status='queued' ORDER BY id", (sid,))]  # ws: the agent's own jobs
     if jobs:
-        db.execute("UPDATE jobs SET status='sent' WHERE server_id=? AND status='queued'", (sid,))
+        db.execute("UPDATE jobs SET status='sent' WHERE server_id=? AND status='queued'", (sid,))  # ws: the agent's own jobs
     return {"interval_s": get_settings().interval_s, "permission": "full", "ping_targets": targets, "jobs": jobs,
             "acct_peers": links_svc.peers_for(db, server)}

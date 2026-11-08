@@ -80,48 +80,52 @@ def _check_first(issues: List[Dict[str, Any]], outdated: List[str], pair_problem
     return steps
 
 
-def build(db: sqlite3.Connection, detail: str = "brief", now: int = 0) -> Dict[str, Any]:
+def build(db: sqlite3.Connection, ws: int, detail: str = "brief", now: int = 0) -> Dict[str, Any]:
     now = now or int(time.time())
     lim = LIMITS[detail]
-    rows = [dict(server_out(r), _category=None) for r in db.execute("SELECT * FROM servers")]
-    cats = {r["id"]: r["name"] for r in db.execute("SELECT id, name FROM categories")}
-    for r, raw in zip(rows, db.execute("SELECT category_id FROM servers")):
+    raw_servers = db.execute("SELECT * FROM servers WHERE workspace_id=?", (ws,)).fetchall()
+    rows = [dict(server_out(r), _category=None) for r in raw_servers]
+    cats = {r["id"]: r["name"] for r in db.execute("SELECT id, name FROM categories WHERE workspace_id=?", (ws,))}
+    for r, raw in zip(rows, raw_servers):
         r["_category"] = cats.get(raw["category_id"], "-")
-    found = overview.issues(db)
-    recent = incidents_svc.recent_counts(db, now)
+    found = overview.issues(db, ws)
+    recent = incidents_svc.recent_counts(db, ws, now)
     sev_counts = {s: sum(1 for i in found if i["severity"] == s) for s in SEV}
     issue_items = [{
         "severity": i["severity"], "server_id": i["server_id"], "server": i["server_name"], "code": i["code"], "title": i["title"],
         "evidence": i["evidence"], "suggestion": i["suggestion"], "recent_24h": recent.get(i["id"], 0),
     } for i in found]
-    hist = incidents_svc.history(db, "24h", now)
+    hist = incidents_svc.history(db, ws, "24h", now)
     recurring = [{"server": s["server_name"], "code": s["code"], "occurrences": s["occurrences"], "total_s": s["total_s"],
                   "active_now": s["active_now"], "flapping": s["flapping"]} for s in hist["summary"] if s["occurrences"] >= 2]
-    matrix = paths.classify(db)
+    matrix = paths.classify(db, ws)
     from_issues = [{"kind": i["code"], "server": i["server_name"], "detail": i["title"], "source": "issue"} for i in found if i["code"] in paths.PATH_VERDICTS]
     from_matrix = _group_matrix([p for p in matrix if p["verdict"] in paths.PATH_VERDICTS])
     problems = from_issues or from_matrix
-    hs = health_svc.compute(db, found, now)
+    hs = health_svc.compute(db, ws, found, now)
     attention = [{
         "server_id": h["server_id"], "name": h["name"], "role": h["role"], "score": h["score"], "band": h["band"],
         "gates": [g["key"] for g in h["gates"]], "top_penalty": h["penalties"][0]["detail"] if h["penalties"] else None,
     } for h in hs["servers"] if h["band"] in ("failing", "degraded")]
     today = day_start(now)
     t = {
-        "today": periodic.fleet_bytes(db, today, now), "yesterday": periodic.fleet_bytes(db, today - DAY, today),
-        "last_7d": periodic.fleet_bytes(db, now - 7 * DAY, now),
+        "today": periodic.fleet_bytes(db, ws, today, now), "yesterday": periodic.fleet_bytes(db, ws, today - DAY, today),
+        "last_7d": periodic.fleet_bytes(db, ws, now - 7 * DAY, now),
     }
-    pairs = periodic.link_pairs(db, now - 7 * DAY, now, lim["pairs"])
+    pairs = periodic.link_pairs(db, ws, now - 7 * DAY, now, lim["pairs"])
     certs = [{
         "name": c["name"], "server": c["server_name"], "days_left": c["days_left"], "level": c["level"], "auto_renew": c["auto_renew"], "error": c["error"],
-    } for c in ssl_svc.rows(db) if not c["stale"] and (c["level"] != "ok" or (c["kind"] == "file" and c["auto_renew"] == "off" and c["days_left"] is not None and c["days_left"] <= 45))]
+    } for c in ssl_svc.rows(db, ws) if not c["stale"] and (c["level"] != "ok" or (c["kind"] == "file" and c["auto_renew"] == "off" and c["days_left"] is not None and c["days_left"] <= 45))]
     outdated = [r["name"] if not r["alias"] else r["alias"] for r in rows if r["agent_outdated"]]
-    quota = quota_svc.forecast(db, now)
+    quota = quota_svc.forecast(db, ws, now)
     changes = db.execute(
-        "SELECT ts, server_id, kind, title FROM events WHERE ts>=? AND kind NOT IN ('issue_opened','issue_closed') ORDER BY ts DESC, id DESC LIMIT ?",
-        (now - DAY, lim["changes"] + 1)).fetchall()
-    names = {r["id"]: name_of(r) for r in db.execute("SELECT * FROM servers")}
-    counted = db.execute("SELECT COUNT(*) c FROM events WHERE ts>=? AND kind IN ('issue_opened','issue_closed')", (now - DAY,)).fetchone()["c"]
+        "SELECT ts, server_id, kind, title FROM events WHERE workspace_id=? AND ts>=? AND kind NOT IN ('issue_opened','issue_closed') "
+        "ORDER BY ts DESC, id DESC LIMIT ?",
+        (ws, now - DAY, lim["changes"] + 1)).fetchall()
+    names = {r["id"]: name_of(r) for r in raw_servers}
+    counted = db.execute(
+        "SELECT COUNT(*) c FROM events WHERE workspace_id=? AND ts>=? AND kind IN ('issue_opened','issue_closed')", (ws, now - DAY)
+    ).fetchone()["c"]
     check = _check_first(found, outdated, from_matrix if not from_issues else [])
     return {
         "generated_at": now, "detail": detail, "timezone_note": "today/yesterday are Tehran days (UTC+3:30); other times are UTC",
@@ -133,8 +137,8 @@ def build(db: sqlite3.Connection, detail: str = "brief", now: int = 0) -> Dict[s
         "recurring_24h": recurring[: lim["recurring"]],
         "path_problems": problems,
         "health": {"counts": hs["counts"], "attention": attention[: lim["attention"]], "truncated": len(attention) > lim["attention"]},
-        "traffic": {**t, "top_servers": periodic.server_bytes(db, now - 7 * DAY, now, lim["servers"]), "pairs_7d": pairs,
-                    "link_counting": bool(db.execute("SELECT 1 FROM servers WHERE acct_on=1").fetchone())},
+        "traffic": {**t, "top_servers": periodic.server_bytes(db, ws, now - 7 * DAY, now, lim["servers"]), "pairs_7d": pairs,
+                    "link_counting": any(r["acct_on"] for r in raw_servers)},
         "quota": quota,
         "certs_at_risk": certs[: lim["certs"]],
         "agents_outdated": {"latest": current_agent_version(), "servers": outdated},

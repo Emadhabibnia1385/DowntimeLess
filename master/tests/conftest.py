@@ -48,10 +48,17 @@ def tg():
     return FakeTelegram()
 
 
-def add_user(tg_id=111, role="owner", name="Emad"):
+def add_user(tg_id=111, role="owner", name="Emad", ws=1):
+    """A user who is a member of workspace `ws` (the owner of workspace 1 by default)."""
     db = connect()
-    db.execute("INSERT INTO users (tg_id, name, role, created_at) VALUES (?,?,?,?)", (tg_id, name, role, int(time.time())))
+    now = int(time.time())
+    uid = db.execute("INSERT INTO users (tg_id, name, role, created_at) VALUES (?,?,?,?)",
+                     (tg_id, name, role if role in ("owner", "admin", "viewer") else "none", now)).lastrowid
+    if role == "owner":
+        db.execute("UPDATE workspaces SET owner_user_id=? WHERE id=? AND owner_user_id IS NULL", (uid, ws))
+    db.execute("INSERT INTO workspace_members (workspace_id, user_id, role, created_at) VALUES (?,?,?,?)", (ws, uid, role, now))
     db.close()
+    return uid
 
 
 @pytest.fixture

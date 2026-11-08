@@ -18,28 +18,29 @@ HOST_RE = re.compile(r"^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z
 MAX_NEW_PER_REPORT = 20
 
 
-def adopt_domains(db: sqlite3.Connection, server_id: int, names: List[Any]) -> None:
-    """Domains an agent found in its web server's config join the list; ones seen again are kept fresh."""
+def adopt_domains(db: sqlite3.Connection, server: sqlite3.Row, names: List[Any]) -> None:
+    """Domains an agent found in its web server's config join its workspace's list; ones seen again are kept fresh."""
     now, added = int(time.time()), 0
+    ws, server_id = server["workspace_id"], server["id"]
     for raw in sorted({str(n).lower().strip() for n in names})[:200]:
         if not HOST_RE.match(raw):
             continue
-        row = db.execute("SELECT id, source FROM domains WHERE host=? AND port=443", (raw,)).fetchone()
+        row = db.execute("SELECT id, source FROM domains WHERE workspace_id=? AND host=? AND port=443", (ws, raw)).fetchone()
         if row:
             if row["source"] == "auto":
-                db.execute("UPDATE domains SET seen_at=?, server_id=? WHERE id=?", (now, server_id, row["id"]))
+                db.execute("UPDATE domains SET seen_at=?, server_id=? WHERE id=? AND workspace_id=?", (now, server_id, row["id"], ws))
             continue
         if added >= MAX_NEW_PER_REPORT or not is_public_host(raw):  # a name that does not resolve has nothing to probe
             continue
         db.execute(
-            "INSERT INTO domains (host, port, note, source, server_id, seen_at, created_at) VALUES (?,?,?,?,?,?,?)",
-            (raw, 443, "", "auto", server_id, now, now),
+            "INSERT INTO domains (workspace_id, host, port, note, source, server_id, seen_at, created_at) VALUES (?,?,?,?,?,?,?,?)",
+            (ws, raw, 443, "", "auto", server_id, now, now),
         )
         added += 1
 
 
 def drop_stale_auto(db: sqlite3.Connection) -> None:
-    db.execute("DELETE FROM domains WHERE source='auto' AND seen_at<?", (int(time.time()) - STALE_AUTO_S,))
+    db.execute("DELETE FROM domains WHERE source='auto' AND seen_at<?", (int(time.time()) - STALE_AUTO_S,))  # ws: by age, every workspace alike
 
 
 def is_public_host(host: str) -> bool:
@@ -69,20 +70,29 @@ def probe(host: str, port: int) -> Dict[str, Any]:
         return {"not_after": None, "issuer": None, "error": "اتصال ممکن نشد: %s" % (exc.__class__.__name__)}
 
 
-def probe_due(db: sqlite3.Connection, limit: int = 5, force_id: Optional[int] = None) -> None:
+def probe_due(db: sqlite3.Connection, limit: int = 5) -> None:
+    """The monitor's round over the domains of every workspace; each result goes back to its own row only."""
     now = int(time.time())
-    if force_id is not None:
-        rows = db.execute("SELECT * FROM domains WHERE id=?", (force_id,)).fetchall()
-    else:
-        rows = db.execute(
-            "SELECT * FROM domains WHERE last_checked IS NULL OR last_checked<? ORDER BY last_checked LIMIT ?", (now - RECHECK_S, limit)
-        ).fetchall()
+    rows = db.execute(
+        "SELECT * FROM domains WHERE last_checked IS NULL OR last_checked<? ORDER BY last_checked LIMIT ?",  # ws: each row probed for itself
+        (now - RECHECK_S, limit),
+    ).fetchall()
     for r in rows:
-        res = probe(r["host"], r["port"])
-        db.execute(
-            "UPDATE domains SET not_after=?, issuer=?, error=?, last_checked=? WHERE id=?",
-            (res["not_after"], res["issuer"], res["error"], int(time.time()), r["id"]),
-        )
+        _store(db, r)
+
+
+def probe_one(db: sqlite3.Connection, ws: int, domain_id: int) -> None:
+    r = db.execute("SELECT * FROM domains WHERE id=? AND workspace_id=?", (domain_id, ws)).fetchone()
+    if r:
+        _store(db, r)
+
+
+def _store(db: sqlite3.Connection, r: sqlite3.Row) -> None:
+    res = probe(r["host"], r["port"])
+    db.execute(
+        "UPDATE domains SET not_after=?, issuer=?, error=?, last_checked=? WHERE id=? AND workspace_id=?",
+        (res["not_after"], res["issuer"], res["error"], int(time.time()), r["id"], r["workspace_id"]),
+    )
 
 
 def level(days_left: Optional[int], error: Optional[str], th: Dict[str, float]) -> str:
@@ -103,9 +113,9 @@ def _auto_renew(cert: Dict[str, Any], renew: Dict[str, Any]) -> str:
     return "on" if (renew.get("certbot_timer_enabled") and renew.get("certbot_timer_active")) or renew.get("certbot_cron") else "off"
 
 
-def rows(db: sqlite3.Connection) -> List[Dict[str, Any]]:
-    th, now, out = thresholds(db), time.time(), []
-    for s in db.execute("SELECT * FROM servers WHERE last_report IS NOT NULL"):
+def rows(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
+    th, now, out = thresholds(db, ws), time.time(), []
+    for s in db.execute("SELECT * FROM servers WHERE workspace_id=? AND last_report IS NOT NULL", (ws,)):
         ssl_rep = (json.loads(s["last_report"]) or {}).get("ssl")
         if not ssl_rep:
             continue
@@ -124,8 +134,10 @@ def rows(db: sqlite3.Connection) -> List[Dict[str, Any]]:
                 "auto": False, "can_renew": certbot, "can_delete": certbot,
             })
     probes = db.execute(
-        "SELECT d.*, s.name AS sname, s.alias AS salias FROM domains d LEFT JOIN servers s ON s.id=d.server_id "
-        "WHERE d.ignored=0 ORDER BY d.host"
+        "SELECT d.*, s.name AS sname, s.alias AS salias FROM domains d "
+        "LEFT JOIN servers s ON s.id=d.server_id AND s.workspace_id=d.workspace_id "
+        "WHERE d.workspace_id=? AND d.ignored=0 ORDER BY d.host",
+        (ws,),
     )
     for d in probes:
         days = int((d["not_after"] - now) // 86400) if d["not_after"] else None
@@ -146,11 +158,11 @@ def rows(db: sqlite3.Connection) -> List[Dict[str, Any]]:
     return sorted(out, key=lambda r: (order[r["level"]], r["days_left"] if r["days_left"] is not None else -1))
 
 
-def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
+def issues(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     off: Dict[int, List[Dict[str, Any]]] = {}
     failed: Dict[int, Dict[str, Any]] = {}
-    for r in rows(db):
+    for r in rows(db, ws):
         if r["stale"] or (r.get("auto") and r["error"]):
             continue
         base = {"server_id": r["server_id"], "server_name": r["server_name"] or "SSL"}

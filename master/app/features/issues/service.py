@@ -14,14 +14,14 @@ MAX_INCIDENTS = 300
 FLAPPING_AT = 3
 
 
-def record(db: sqlite3.Connection, now: int, found: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
-    """Diff the current issues against the open incidents: open, refresh or close, then prune old rows.
+def record(db: sqlite3.Connection, ws: int, now: int, found: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+    """Diff the workspace's current issues against its open incidents: open, refresh or close, then prune old rows.
 
     Returns what happened as events ({"type": "open"|"close", ...}) so the caller can tell people."""
     events: List[Dict[str, Any]] = []
-    found = overview.issues(db) if found is None else found
+    found = overview.issues(db, ws) if found is None else found
     present = {i["id"]: i for i in found}
-    open_rows = db.execute("SELECT * FROM incidents WHERE closed_at IS NULL").fetchall()
+    open_rows = db.execute("SELECT * FROM incidents WHERE workspace_id=? AND closed_at IS NULL", (ws,)).fetchall()
     open_keys = set()
     for row in open_rows:
         issue = present.get(row["key"])
@@ -30,19 +30,22 @@ def record(db: sqlite3.Connection, now: int, found: Optional[List[Dict[str, Any]
         open_keys.add(row["key"])
         worst = issue["severity"] if RANK.get(issue["severity"], 0) > RANK.get(row["severity"], 0) else row["severity"]
         db.execute(
-            "UPDATE incidents SET last_seen=?, severity=?, title=?, evidence=?, code=?, server_name=? WHERE id=?",
-            (now, worst, issue["title"], json.dumps(issue["evidence"], ensure_ascii=False), issue["code"], issue["server_name"], row["id"]),
+            "UPDATE incidents SET last_seen=?, severity=?, title=?, evidence=?, code=?, server_name=? WHERE id=? AND workspace_id=?",
+            (now, worst, issue["title"], json.dumps(issue["evidence"], ensure_ascii=False), issue["code"], issue["server_name"], row["id"], ws),
         )
     for key, issue in present.items():
         if key not in open_keys:
             cur = db.execute(
-                "INSERT INTO incidents (key, code, server_id, server_name, severity, title, evidence, opened_at, last_seen) VALUES (?,?,?,?,?,?,?,?,?)",
-                (key, issue["code"], issue["server_id"], issue["server_name"], issue["severity"], issue["title"],
+                "INSERT INTO incidents (workspace_id, key, code, server_id, server_name, severity, title, evidence, opened_at, last_seen) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (ws, key, issue["code"], issue["server_id"], issue["server_name"], issue["severity"], issue["title"],
                  json.dumps(issue["evidence"], ensure_ascii=False), now, now),
             )
-            changelog.record(db, "issue_opened", "%s: %s" % (issue["server_name"] or "-", issue["code"]), issue["server_id"],
+            changelog.record(db, ws, "issue_opened", "%s: %s" % (issue["server_name"] or "-", issue["code"]), issue["server_id"],
                              {"key": key, "code": issue["code"], "severity": issue["severity"]}, now)
-            role = db.execute("SELECT role FROM servers WHERE id=?", (issue["server_id"],)).fetchone() if issue["server_id"] else None
+            role = db.execute(
+                "SELECT role FROM servers WHERE id=? AND workspace_id=?", (issue["server_id"], ws)
+            ).fetchone() if issue["server_id"] else None
             events.append({
                 "type": "open", "incident_id": cur.lastrowid, "key": key, "code": issue["code"], "server_id": issue["server_id"],
                 "server_name": issue["server_name"], "severity": issue["severity"], "title": issue["title"],
@@ -50,30 +53,32 @@ def record(db: sqlite3.Connection, now: int, found: Optional[List[Dict[str, Any]
             })
     # the end of an incident is the last sweep that still saw it, not the sweep that noticed it was gone
     for row in db.execute(
-        "SELECT * FROM incidents WHERE closed_at IS NULL AND last_seen<=? AND (server_id IS NULL OR server_id IN (SELECT id FROM servers))",
-        (now - GRACE_S,),
+        "SELECT * FROM incidents WHERE workspace_id=? AND closed_at IS NULL AND last_seen<=? "
+        "AND (server_id IS NULL OR server_id IN (SELECT id FROM servers WHERE workspace_id=?))",
+        (ws, now - GRACE_S, ws),
     ).fetchall():
-        changelog.record(db, "issue_closed", "%s: %s" % (row["server_name"] or "-", row["code"]), row["server_id"],
+        changelog.record(db, ws, "issue_closed", "%s: %s" % (row["server_name"] or "-", row["code"]), row["server_id"],
                          {"key": row["key"], "code": row["code"], "severity": row["severity"], "duration_s": max(0, row["last_seen"] - row["opened_at"])}, row["last_seen"])
         events.append({
             "type": "close", "incident_id": row["id"], "key": row["key"], "code": row["code"], "server_id": row["server_id"],
             "server_name": row["server_name"], "severity": row["severity"], "title": row["title"], "evidence": _evidence(row["evidence"]),
             "notified_at": row["notified_at"], "duration_s": max(0, row["last_seen"] - row["opened_at"]),
         })
-    db.execute("UPDATE incidents SET closed_at=last_seen WHERE closed_at IS NULL AND last_seen<=?", (now - GRACE_S,))
+    db.execute("UPDATE incidents SET closed_at=last_seen WHERE workspace_id=? AND closed_at IS NULL AND last_seen<=?", (ws, now - GRACE_S))
     db.execute(
-        "UPDATE incidents SET closed_at=last_seen WHERE closed_at IS NULL AND server_id IS NOT NULL "
-        "AND server_id NOT IN (SELECT id FROM servers)"
+        "UPDATE incidents SET closed_at=last_seen WHERE workspace_id=? AND closed_at IS NULL AND server_id IS NOT NULL "
+        "AND server_id NOT IN (SELECT id FROM servers WHERE workspace_id=?)",
+        (ws, ws),
     )
-    db.execute("DELETE FROM incidents WHERE closed_at IS NOT NULL AND closed_at<?", (now - KEEP_S,))
+    db.execute("DELETE FROM incidents WHERE workspace_id=? AND closed_at IS NOT NULL AND closed_at<?", (ws, now - KEEP_S))
     return events
 
 
-def recent_counts(db: sqlite3.Connection, now: int, span: int = 86400) -> Dict[str, int]:
+def recent_counts(db: sqlite3.Connection, ws: int, now: int, span: int = 86400) -> Dict[str, int]:
     """How many incidents of each issue overlap the last `span` seconds, in one grouped query."""
     rows = db.execute(
-        "SELECT key, COUNT(*) AS n FROM incidents WHERE opened_at<=? AND (closed_at IS NULL OR closed_at>=?) GROUP BY key",
-        (now, now - span),
+        "SELECT key, COUNT(*) AS n FROM incidents WHERE workspace_id=? AND opened_at<=? AND (closed_at IS NULL OR closed_at>=?) GROUP BY key",
+        (ws, now, now - span),
     ).fetchall()
     return {r["key"]: r["n"] for r in rows}
 
@@ -86,11 +91,11 @@ def _evidence(raw: Optional[str]) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def history(db: sqlite3.Connection, range_: str, now: int) -> Dict[str, Any]:
+def history(db: sqlite3.Connection, ws: int, range_: str, now: int) -> Dict[str, Any]:
     since = now - RANGES[range_]
     rows = db.execute(
-        "SELECT * FROM incidents WHERE opened_at<=? AND (closed_at IS NULL OR closed_at>=?) ORDER BY opened_at DESC, id DESC",
-        (now, since),
+        "SELECT * FROM incidents WHERE workspace_id=? AND opened_at<=? AND (closed_at IS NULL OR closed_at>=?) ORDER BY opened_at DESC, id DESC",
+        (ws, now, since),
     ).fetchall()
     by_key: Dict[str, Dict[str, Any]] = {}
     for r in rows:  # newest first, so the first row of a key carries its latest title and evidence

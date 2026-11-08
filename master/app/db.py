@@ -18,13 +18,31 @@ def connect() -> sqlite3.Connection:
     return db
 
 
+def _fk_problems(db: sqlite3.Connection) -> set:
+    return {tuple(r) for r in db.execute("PRAGMA foreign_key_check")}
+
+
 def migrate(db: sqlite3.Connection) -> None:
     db.execute("CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY)")
     done = {r["name"] for r in db.execute("SELECT name FROM schema_migrations")}
     for f in sorted(MIGRATIONS.glob("*.sql")):
         if f.name in done:
             continue
-        db.executescript("BEGIN;\n" + f.read_text(encoding="utf-8") + "\nINSERT INTO schema_migrations VALUES ('" + f.name + "');\nCOMMIT;")
+        # SQLite's table-rebuild procedure: foreign keys off around the script, checked before the commit
+        db.execute("PRAGMA foreign_keys=OFF")
+        try:
+            before = _fk_problems(db)
+            db.executescript("BEGIN;\n" + f.read_text(encoding="utf-8") + "\nINSERT INTO schema_migrations VALUES ('" + f.name + "');")
+            if _fk_problems(db) - before:
+                db.execute("ROLLBACK")
+                raise RuntimeError("migration %s breaks a foreign key" % f.name)
+            db.execute("COMMIT")
+        except Exception:
+            if db.in_transaction:
+                db.execute("ROLLBACK")
+            raise
+        finally:
+            db.execute("PRAGMA foreign_keys=ON")
 
 
 def get_db() -> Iterator[sqlite3.Connection]:

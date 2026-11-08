@@ -13,7 +13,7 @@ def issue(code="cpu", key=None, severity="warning", server_id=None, name="de-1",
 
 
 def step(db, tg, found, now):
-    alerts.dispatch(db, tg, svc.record(db, now, found), now)
+    alerts.dispatch(db, tg, 1, svc.record(db, 1, now, found), now)
 
 
 def sent(tg):
@@ -245,6 +245,6 @@ def test_ssl_alerts_follow_the_ssl_route(owner, tg):
     sid, key = make_server(owner)
     report(owner, key, ssl={"certs": [cert("x.example.com", 3)], "renew": {"certbot_installed": True}})
     db = connect()
-    monitor._ssl_alerts(db, tg)
+    monitor._ssl_alerts(db, tg, 1)
     db.close()
     assert [m[0] for m in tg.sent if "x.example.com" in m[1]] == ["@ssl_alerts"]

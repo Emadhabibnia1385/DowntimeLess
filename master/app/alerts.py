@@ -36,38 +36,41 @@ def rule_of(code: Optional[str]) -> Optional[str]:
     return base if base in RULES else None
 
 
-def valid_route(db: sqlite3.Connection, route: str) -> bool:
+def valid_route(db: sqlite3.Connection, ws: int, route: str) -> bool:
+    """Panel, admins, or a channel of this workspace; another workspace's channel is not a route here."""
     if route in (PANEL, ADMINS):
         return True
     if route.startswith("channel:") and route[8:].isdigit():
-        return db.execute("SELECT 1 FROM telegram_channels WHERE id=?", (int(route[8:]),)).fetchone() is not None
+        return db.execute("SELECT 1 FROM telegram_channels WHERE id=? AND workspace_id=?", (int(route[8:]), ws)).fetchone() is not None
     return False
 
 
-def routes(db: sqlite3.Connection) -> Dict[str, str]:
+def routes(db: sqlite3.Connection, ws: int) -> Dict[str, str]:
     """The route of every rule: what the owner chose, else the default; a route to a deleted channel falls back."""
     out = dict(DEFAULT_ROUTES)
-    for r in db.execute("SELECT rule, route FROM rule_routes"):
-        if r["rule"] in out and valid_route(db, r["route"]):
+    for r in db.execute("SELECT rule, route FROM rule_routes WHERE workspace_id=?", (ws,)):
+        if r["rule"] in out and valid_route(db, ws, r["route"]):
             out[r["rule"]] = r["route"]
     return out
 
 
-def notify(tg: Telegram, rule: str, text: str, thread: Optional[int] = None) -> None:
-    """Send `text` where `rule` is routed. Never raises: a failed send must not stop the monitor."""
+def notify(tg: Telegram, ws: int, rule: str, text: str, thread: Optional[int] = None) -> None:
+    """Send `text` where `rule` is routed in workspace `ws`. Never raises: a failed send must not stop the monitor."""
     try:
         db = connect()
         try:
-            route = routes(db).get(rule, PANEL)
+            route = routes(db, ws).get(rule, PANEL)
             channel = None
             if route.startswith("channel:"):
-                channel = db.execute("SELECT chat_id FROM telegram_channels WHERE id=?", (int(route[8:]),)).fetchone()
+                channel = db.execute(
+                    "SELECT chat_id FROM telegram_channels WHERE id=? AND workspace_id=?", (int(route[8:]), ws)
+                ).fetchone()
         finally:
             db.close()
         if route == PANEL or (route.startswith("channel:") and not channel):
             return
         if route == ADMINS:
-            notify_admins(tg, text)
+            notify_admins(tg, ws, text)
         else:
             chat = int(channel["chat_id"]) if channel["chat_id"].lstrip("-").isdigit() else channel["chat_id"]
             if thread is None:
@@ -115,38 +118,43 @@ def flapping_message(event: Dict[str, Any], count: int) -> str:
 
 # ---- incident events -----------------------------------------------------------------------------
 
-def dispatch(db: sqlite3.Connection, tg: Telegram, events: List[Dict[str, Any]], now: int) -> None:
+def dispatch(db: sqlite3.Connection, tg: Telegram, ws: int, events: List[Dict[str, Any]], now: int) -> None:
     """One message when an incident opens and one when it closes, with flapping squashed into a single note."""
-    th = thresholds(db)
+    th = thresholds(db, ws)
+    chosen = routes(db, ws)
     for ev in events:
         rule = rule_of(ev["code"])
         if rule is None or rule in OWN_FLOW or not th.get("on_" + rule, 1):
             continue
         if rule in ONLY_ROLES and ev.get("role") not in ONLY_ROLES[rule]:
             continue
-        if routes(db)[rule] == PANEL:
+        if chosen[rule] == PANEL:
             continue
         if ev["type"] == "open":
-            _open(db, tg, ev, rule, now)
+            _open(db, tg, ws, ev, rule, now)
         elif ev["type"] == "close" and ev.get("notified_at"):
-            notify(tg, rule, close_message(ev))
-    _forget_stable(db, now)
+            notify(tg, ws, rule, close_message(ev))
+    _forget_stable(db, ws, now)
 
 
-def _open(db: sqlite3.Connection, tg: Telegram, ev: Dict[str, Any], rule: str, now: int) -> None:
-    if db.execute("SELECT 1 FROM flapping WHERE key=?", (ev["key"],)).fetchone():
+def _open(db: sqlite3.Connection, tg: Telegram, ws: int, ev: Dict[str, Any], rule: str, now: int) -> None:
+    if db.execute("SELECT 1 FROM flapping WHERE workspace_id=? AND key=?", (ws, ev["key"])).fetchone():
         return
-    opened = db.execute("SELECT COUNT(*) FROM incidents WHERE key=? AND opened_at>=?", (ev["key"], now - FLAP_WINDOW_S)).fetchone()[0]
+    opened = db.execute(
+        "SELECT COUNT(*) FROM incidents WHERE workspace_id=? AND key=? AND opened_at>=?", (ws, ev["key"], now - FLAP_WINDOW_S)
+    ).fetchone()[0]
     if opened >= FLAP_AT:
-        db.execute("INSERT OR REPLACE INTO flapping (key, since) VALUES (?,?)", (ev["key"], now))
-        notify(tg, rule, flapping_message(ev, opened))
+        db.execute("INSERT OR REPLACE INTO flapping (workspace_id, key, since) VALUES (?,?,?)", (ws, ev["key"], now))
+        notify(tg, ws, rule, flapping_message(ev, opened))
         return
-    db.execute("UPDATE incidents SET notified_at=? WHERE id=?", (now, ev["incident_id"]))
-    notify(tg, rule, open_message(ev))
+    db.execute("UPDATE incidents SET notified_at=? WHERE id=? AND workspace_id=?", (now, ev["incident_id"], ws))
+    notify(tg, ws, rule, open_message(ev))
 
 
-def _forget_stable(db: sqlite3.Connection, now: int) -> None:
+def _forget_stable(db: sqlite3.Connection, ws: int, now: int) -> None:
     """A flapping key is quiet again once it has not opened a new incident for an hour."""
-    for row in db.execute("SELECT key FROM flapping").fetchall():
-        if not db.execute("SELECT 1 FROM incidents WHERE key=? AND opened_at>=?", (row["key"], now - FLAP_WINDOW_S)).fetchone():
-            db.execute("DELETE FROM flapping WHERE key=?", (row["key"],))
+    for row in db.execute("SELECT key FROM flapping WHERE workspace_id=?", (ws,)).fetchall():
+        if not db.execute(
+            "SELECT 1 FROM incidents WHERE workspace_id=? AND key=? AND opened_at>=?", (ws, row["key"], now - FLAP_WINDOW_S)
+        ).fetchone():
+            db.execute("DELETE FROM flapping WHERE workspace_id=? AND key=?", (ws, row["key"]))

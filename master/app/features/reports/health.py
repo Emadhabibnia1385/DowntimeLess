@@ -93,23 +93,23 @@ def _host_penalties(out: List[Dict[str, Any]], lt: Dict[str, Any], w: Dict[str, 
         _pen(out, "units", w["units"], 1.0, "failed units: %s" % ",".join(lt["failed_units"][:3]))
 
 
-def compute(db: sqlite3.Connection, found: Optional[List[Dict[str, Any]]] = None, now: Optional[int] = None) -> Dict[str, Any]:
+def compute(db: sqlite3.Connection, ws: int, found: Optional[List[Dict[str, Any]]] = None, now: Optional[int] = None) -> Dict[str, Any]:
     now = now or int(time.time())
-    th = thresholds(db)
-    found = overview.issues(db) if found is None else found
+    th = thresholds(db, ws)
+    found = overview.issues(db, ws) if found is None else found
     per_server: Dict[int, List[Dict[str, Any]]] = {}
     for i in found:
         if i["server_id"] is not None:
             per_server.setdefault(i["server_id"], []).append(i)
     by_relay: Dict[int, List[Dict[str, Any]]] = {}
     by_exit: Dict[int, List[Dict[str, Any]]] = {}
-    for w in overview.ping_windows(db):
+    for w in overview.ping_windows(db, ws):
         by_relay.setdefault(w["server_id"], []).append(w)
         by_exit.setdefault(w["to_id"], []).append(w)
-    quotas = quota_svc.forecast(db, now)
+    quotas = quota_svc.forecast(db, ws, now)
     quota_by = {q["server_id"]: q for q in quotas or []}
     items: List[Dict[str, Any]] = []
-    for s in db.execute("SELECT * FROM servers ORDER BY role, name"):
+    for s in db.execute("SELECT * FROM servers WHERE workspace_id=? ORDER BY role, name", (ws,)):
         variant = variant_of(s["role"])
         st, w = status_of(s), WEIGHTS[variant]
         gates: List[Dict[str, Any]] = []

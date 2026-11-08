@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from ...db import get_db
-from ...deps import Actor, require
+from ...deps import Actor, current_workspace, require
 from ...errors import DLError
 from ...security import digest, new_token
 
@@ -36,22 +36,24 @@ def _owner(actor: Actor = Depends(require("owner"))) -> Actor:
 
 
 @router.get("", response_model=List[KeyOut], operation_id="keys_list")
-def list_keys(_: Actor = Depends(_owner), db: sqlite3.Connection = Depends(get_db)):
-    return [dict(r) for r in db.execute("SELECT id, name, prefix, scope, created_at, last_used FROM api_keys ORDER BY id")]
+def list_keys(_: Actor = Depends(_owner), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
+    return [dict(r) for r in db.execute(
+        "SELECT id, name, prefix, scope, created_at, last_used FROM api_keys WHERE workspace_id=? ORDER BY id", (ws,))]
 
 
 @router.post("", response_model=KeyCreated, status_code=201, operation_id="keys_create")
-def create_key(body: KeyCreate, actor: Actor = Depends(_owner), db: sqlite3.Connection = Depends(get_db)):
+def create_key(body: KeyCreate, actor: Actor = Depends(_owner), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
+    """A key that acts only inside the current workspace."""
     token = "dl_" + new_token(32)
     now = int(time.time())
     cur = db.execute(
-        "INSERT INTO api_keys (name, prefix, token_hash, scope, created_by, created_at) VALUES (?,?,?,?,?,?)",
-        (body.name, token[:8], digest(token), body.scope, actor.user_id, now),
+        "INSERT INTO api_keys (workspace_id, name, prefix, token_hash, scope, created_by, created_at) VALUES (?,?,?,?,?,?,?)",
+        (ws, body.name, token[:8], digest(token), body.scope, actor.user_id, now),
     )
     return {"id": cur.lastrowid, "name": body.name, "prefix": token[:8], "scope": body.scope, "created_at": now, "last_used": None, "token": token}
 
 
 @router.delete("/{key_id}", status_code=204, operation_id="keys_delete")
-def delete_key(key_id: int, _: Actor = Depends(_owner), db: sqlite3.Connection = Depends(get_db)):
-    if not db.execute("DELETE FROM api_keys WHERE id=?", (key_id,)).rowcount:
+def delete_key(key_id: int, _: Actor = Depends(_owner), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
+    if not db.execute("DELETE FROM api_keys WHERE id=? AND workspace_id=?", (key_id, ws)).rowcount:
         raise DLError("key.not_found")

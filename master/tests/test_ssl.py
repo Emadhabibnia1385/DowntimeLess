@@ -50,8 +50,8 @@ def test_alert_sent_once_per_level_change(owner, tg):
     sid, key = make_server(owner)
     report(owner, key, ssl={"certs": [cert("x.example.com", 3)], "renew": {"certbot_installed": True}})
     db = connect()
-    monitor._ssl_alerts(db, tg)
-    monitor._ssl_alerts(db, tg)
+    monitor._ssl_alerts(db, tg, 1)
+    monitor._ssl_alerts(db, tg, 1)
     sent = [m[1] for m in tg.sent if "گواهی" in m[1]]  # the default route of ssl is the admins' private chat
     assert len(sent) == 1 and "x.example.com" in sent[0]
     db.close()

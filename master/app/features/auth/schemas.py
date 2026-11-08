@@ -3,13 +3,25 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class WorkspaceOut(BaseModel):
+    id: int
+    name: str
+    role: str  # my role in it: viewer, operator, admin or owner
+    is_personal: bool  # the one I own
+
+
 class UserOut(BaseModel):
     id: int
     name: str
     username: Optional[str]
-    role: str
+    role: str  # my role in the active workspace
     has_password: bool
     tg_username: Optional[str]
+    workspace: WorkspaceOut  # the workspace this session acts in
+
+
+class SwitchWorkspace(BaseModel):
+    workspace_id: int
 
 
 class StartResult(BaseModel):

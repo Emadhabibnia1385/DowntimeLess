@@ -12,16 +12,16 @@ from .common import DAY, TEHRAN_OFFSET_S, cap, clip, name_of
 MAX_ROWS = 100
 
 
-def _servers(db: sqlite3.Connection) -> Dict[int, sqlite3.Row]:
-    return {r["id"]: r for r in db.execute("SELECT * FROM servers")}
+def _servers(db: sqlite3.Connection, ws: int) -> Dict[int, sqlite3.Row]:
+    return {r["id"]: r for r in db.execute("SELECT * FROM servers WHERE workspace_id=?", (ws,))}
 
 
 # ---------- incidents ----------
 
-def incidents_report(db: sqlite3.Connection, since: int, until: int) -> Dict[str, Any]:
+def incidents_report(db: sqlite3.Connection, ws: int, since: int, until: int) -> Dict[str, Any]:
     rows = db.execute(
-        "SELECT * FROM incidents WHERE opened_at<? AND (closed_at IS NULL OR closed_at>=?) ORDER BY opened_at DESC, id DESC",
-        (until, since),
+        "SELECT * FROM incidents WHERE workspace_id=? AND opened_at<? AND (closed_at IS NULL OR closed_at>=?) ORDER BY opened_at DESC, id DESC",
+        (ws, until, since),
     ).fetchall()
     opened = [r for r in rows if r["opened_at"] >= since]
     closed = [r for r in rows if r["closed_at"] is not None and r["closed_at"] < until]
@@ -74,18 +74,21 @@ def incidents_report(db: sqlite3.Connection, since: int, until: int) -> Dict[str
 
 # ---------- availability ----------
 
-def availability_report(db: sqlite3.Connection, since: int, until: int) -> Dict[str, Any]:
+def availability_report(db: sqlite3.Connection, ws: int, since: int, until: int) -> Dict[str, Any]:
     s = get_settings()
     interval, gap = s.interval_s, s.interval_s * s.offline_after
-    servers = _servers(db)
-    first = {r["server_id"]: r["f"] for r in db.execute("SELECT server_id, MIN(ts) f FROM metrics GROUP BY server_id")}
+    servers = _servers(db, ws)
+    first = {r["server_id"]: r["f"] for r in db.execute(
+        "SELECT m.server_id, MIN(m.ts) f FROM metrics m JOIN servers s ON s.id=m.server_id WHERE s.workspace_id=? GROUP BY m.server_id", (ws,))}
     ends = {r["server_id"]: r for r in db.execute(
-        "SELECT server_id, COUNT(*) n, MIN(ts) lo, MAX(ts) hi FROM metrics WHERE ts>=? AND ts<? GROUP BY server_id", (since, until))}
+        "SELECT m.server_id, COUNT(*) n, MIN(m.ts) lo, MAX(m.ts) hi FROM metrics m JOIN servers s ON s.id=m.server_id WHERE s.workspace_id=? AND m.ts>=? AND m.ts<? GROUP BY m.server_id", (ws, since, until))}
     gaps = {r["server_id"]: r for r in db.execute(
         "SELECT server_id, SUM(ts-prev-?) down, COUNT(*) n FROM ("
-        "SELECT server_id, ts, LAG(ts) OVER (PARTITION BY server_id ORDER BY ts) prev FROM metrics WHERE ts>=? AND ts<?) "
-        "WHERE prev IS NOT NULL AND ts-prev>? GROUP BY server_id", (interval, since, until, gap))}
-    off = db.execute("SELECT server_id, opened_at, closed_at FROM incidents WHERE code='offline' AND opened_at<? AND (closed_at IS NULL OR closed_at>=?)", (until, since)).fetchall()
+        "SELECT m.server_id, m.ts, LAG(m.ts) OVER (PARTITION BY m.server_id ORDER BY m.ts) prev FROM metrics m JOIN servers s ON s.id=m.server_id WHERE s.workspace_id=? AND m.ts>=? AND m.ts<?) "
+        "WHERE prev IS NOT NULL AND ts-prev>? GROUP BY server_id", (interval, ws, since, until, gap))}
+    off = db.execute(
+        "SELECT server_id, opened_at, closed_at FROM incidents WHERE workspace_id=? AND code='offline' AND opened_at<? "
+        "AND (closed_at IS NULL OR closed_at>=?)", (ws, until, since)).fetchall()
     out: List[Dict[str, Any]] = []
     for sid, srv in servers.items():
         if sid not in first:
@@ -123,16 +126,17 @@ def availability_report(db: sqlite3.Connection, since: int, until: int) -> Dict[
 
 # ---------- traffic ----------
 
-def _bytes(db: sqlite3.Connection, since: int, until: int) -> Dict[int, Dict[str, int]]:
+def _bytes(db: sqlite3.Connection, ws: int, since: int, until: int) -> Dict[int, Dict[str, int]]:
     return {r["server_id"]: {"rx": r["rx"], "tx": r["tx"]} for r in db.execute(
-        "SELECT server_id, COALESCE(SUM(rx_delta),0) rx, COALESCE(SUM(tx_delta),0) tx FROM metrics WHERE ts>=? AND ts<? GROUP BY server_id", (since, until))}
+        "SELECT m.server_id, COALESCE(SUM(m.rx_delta),0) rx, COALESCE(SUM(m.tx_delta),0) tx "
+        "FROM metrics m JOIN servers s ON s.id=m.server_id WHERE s.workspace_id=? AND m.ts>=? AND m.ts<? GROUP BY m.server_id", (ws, since, until))}
 
 
-def fleet_bytes(db: sqlite3.Connection, since: int, until: int) -> Dict[str, Any]:
+def fleet_bytes(db: sqlite3.Connection, ws: int, since: int, until: int) -> Dict[str, Any]:
     """NIC bytes in a window, summed over the fleet and split by server role (a relay's NIC sees each user byte twice)."""
-    servers = _servers(db)
+    servers = _servers(db, ws)
     out = {"rx": 0, "tx": 0, "total": 0, "relay": 0, "exit": 0, "other": 0}
-    for sid, b in _bytes(db, since, until).items():
+    for sid, b in _bytes(db, ws, since, until).items():
         role = servers[sid]["role"] if sid in servers else "other"
         out["rx"] += b["rx"]
         out["tx"] += b["tx"]
@@ -141,44 +145,45 @@ def fleet_bytes(db: sqlite3.Connection, since: int, until: int) -> Dict[str, Any
     return out
 
 
-def server_bytes(db: sqlite3.Connection, since: int, until: int, limit: int) -> List[Dict[str, Any]]:
-    servers = _servers(db)
+def server_bytes(db: sqlite3.Connection, ws: int, since: int, until: int, limit: int) -> List[Dict[str, Any]]:
+    servers = _servers(db, ws)
     rows = [
         {"server_id": sid, "server": name_of(servers[sid]), "role": servers[sid]["role"], "rx": b["rx"], "tx": b["tx"], "total": b["rx"] + b["tx"]}
-        for sid, b in _bytes(db, since, until).items() if sid in servers
+        for sid, b in _bytes(db, ws, since, until).items() if sid in servers
     ]
     rows.sort(key=lambda r: -r["total"])
     return rows[:limit]
 
 
-def link_pairs(db: sqlite3.Connection, since: int, until: int, limit: int) -> List[Dict[str, Any]]:
+def link_pairs(db: sqlite3.Connection, ws: int, since: int, until: int, limit: int) -> List[Dict[str, Any]]:
     rows = db.execute(
         "SELECT COALESCE(NULLIF(s.alias,''), s.name) AS server, s.role AS server_role, l.peer_ip, "
         "COALESCE(NULLIF(p.alias,''), p.name) AS peer, SUM(l.in_bytes) AS in_bytes, SUM(l.out_bytes) AS out_bytes "
-        "FROM link_traffic l JOIN servers s ON s.id=l.server_id LEFT JOIN servers p ON p.public_ip=l.peer_ip "
-        "WHERE l.hour>=? AND l.hour<? GROUP BY l.server_id, l.peer_ip ORDER BY SUM(l.in_bytes)+SUM(l.out_bytes) DESC LIMIT ?",
-        (since - since % 3600, until, limit),
+        "FROM link_traffic l JOIN servers s ON s.id=l.server_id LEFT JOIN servers p ON p.public_ip=l.peer_ip AND p.workspace_id=s.workspace_id "
+        "WHERE s.workspace_id=? AND l.hour>=? AND l.hour<? GROUP BY l.server_id, l.peer_ip ORDER BY SUM(l.in_bytes)+SUM(l.out_bytes) DESC LIMIT ?",
+        (ws, since - since % 3600, until, limit),
     ).fetchall()
     return [{"server": r["server"], "server_role": r["server_role"], "peer": r["peer"] or r["peer_ip"], "in_bytes": r["in_bytes"], "out_bytes": r["out_bytes"]} for r in rows]
 
 
-def traffic_report(db: sqlite3.Connection, since: int, until: int) -> Dict[str, Any]:
-    total = fleet_bytes(db, since, until)
+def traffic_report(db: sqlite3.Connection, ws: int, since: int, until: int) -> Dict[str, Any]:
+    total = fleet_bytes(db, ws, since, until)
     daily = db.execute(
-        "SELECT (ts+?)/? AS d, SUM(rx_delta) rx, SUM(tx_delta) tx FROM metrics WHERE ts>=? AND ts<? GROUP BY d ORDER BY d",
-        (TEHRAN_OFFSET_S, DAY, since, until),
+        "SELECT (m.ts+?)/? AS d, SUM(m.rx_delta) rx, SUM(m.tx_delta) tx FROM metrics m JOIN servers s ON s.id=m.server_id WHERE s.workspace_id=? AND m.ts>=? AND m.ts<? GROUP BY d ORDER BY d",
+        (TEHRAN_OFFSET_S, DAY, ws, since, until),
     ).fetchall()
     days = [{"day_start": r["d"] * DAY - TEHRAN_OFFSET_S, "rx": r["rx"], "tx": r["tx"], "total": r["rx"] + r["tx"]} for r in daily]
     hour = db.execute(
-        "SELECT (ts/3600)*3600 AS h, SUM(rx_delta+tx_delta) b FROM metrics WHERE ts>=? AND ts<? GROUP BY h ORDER BY b DESC LIMIT 1", (since, until)).fetchone()
+        "SELECT (m.ts/3600)*3600 AS h, SUM(m.rx_delta+m.tx_delta) b FROM metrics m JOIN servers s ON s.id=m.server_id WHERE s.workspace_id=? AND m.ts>=? AND m.ts<? GROUP BY h ORDER BY b DESC LIMIT 1",
+        (ws, since, until)).fetchone()
     peak_day = max(days, key=lambda d: d["total"]) if days else None
     series, truncated = cap(days, 120)
     return {
         "since": since, "until": until, "fleet": total,
-        "servers": server_bytes(db, since, until, 30), "daily": series,
+        "servers": server_bytes(db, ws, since, until, 30), "daily": series,
         "peak_day": {"day_start": peak_day["day_start"], "bytes": peak_day["total"]} if peak_day else None,
         "peak_hour": {"hour_start": hour["h"], "bytes": hour["b"]} if hour else None,
-        "link_pairs": link_pairs(db, since, until, 20), "truncated": truncated,
+        "link_pairs": link_pairs(db, ws, since, until, 20), "truncated": truncated,
         "note": "NIC bytes (rx+tx); a relay's NIC carries each user byte twice. Days are Tehran days (UTC+3:30). Metrics are kept 90 days.",
     }
 
@@ -189,17 +194,18 @@ def pct_change(cur: float, prev: float) -> Optional[float]:
 
 # ---------- capacity ----------
 
-def capacity_report(db: sqlite3.Connection, since: int, until: int) -> Dict[str, Any]:
-    servers = _servers(db)
+def capacity_report(db: sqlite3.Connection, ws: int, since: int, until: int) -> Dict[str, Any]:
+    servers = _servers(db, ws)
     hourly: Dict[int, List[sqlite3.Row]] = {}
     for r in db.execute(
-        "SELECT server_id, (ts/3600)*3600 AS h, AVG(cpu) cpu, AVG(steal) steal, AVG(load1) load1, AVG(conntrack) ct, AVG(ram_pct) ram "
-        "FROM metrics WHERE ts>=? AND ts<? GROUP BY server_id, h", (since, until)):
+        "SELECT m.server_id, (m.ts/3600)*3600 AS h, AVG(m.cpu) cpu, AVG(m.steal) steal, AVG(m.load1) load1, AVG(m.conntrack) ct, "
+        "AVG(m.ram_pct) ram FROM metrics m JOIN servers s ON s.id=m.server_id WHERE s.workspace_id=? AND m.ts>=? AND m.ts<? GROUP BY m.server_id, h", (ws, since, until)):
         hourly.setdefault(r["server_id"], []).append(r)
     span = until - since
-    now_b, prev_b = _bytes(db, since, until), _bytes(db, since - span, since)
-    prev_cpu = {r["server_id"]: r["c"] for r in db.execute("SELECT server_id, AVG(cpu) c FROM metrics WHERE ts>=? AND ts<? GROUP BY server_id", (since - span, since))}
-    cur_cpu = {r["server_id"]: r["c"] for r in db.execute("SELECT server_id, AVG(cpu) c FROM metrics WHERE ts>=? AND ts<? GROUP BY server_id", (since, until))}
+    now_b, prev_b = _bytes(db, ws, since, until), _bytes(db, ws, since - span, since)
+    cpu_sql = "SELECT m.server_id, AVG(m.cpu) c FROM metrics m JOIN servers s ON s.id=m.server_id WHERE s.workspace_id=? AND m.ts>=? AND m.ts<? GROUP BY m.server_id"
+    prev_cpu = {r["server_id"]: r["c"] for r in db.execute(cpu_sql, (ws, since - span, since))}  # ws: cpu_sql joins servers by workspace_id
+    cur_cpu = {r["server_id"]: r["c"] for r in db.execute(cpu_sql, (ws, since, until))}  # ws: cpu_sql joins servers by workspace_id
     items = []
     for sid, rows in hourly.items():
         srv = servers.get(sid)
@@ -248,9 +254,9 @@ def _r(v: Optional[float]) -> Optional[float]:
 
 # ---------- relays ----------
 
-def relays_report(db: sqlite3.Connection, since: int, until: int) -> Dict[str, Any]:
-    pairs = paths.classify(db)
-    bytes_by = {(r["server"], r["peer"]): r for r in link_pairs(db, since, until, 200)}
+def relays_report(db: sqlite3.Connection, ws: int, since: int, until: int) -> Dict[str, Any]:
+    pairs = paths.classify(db, ws)
+    bytes_by = {(r["server"], r["peer"]): r for r in link_pairs(db, ws, since, until, 200)}
     for p in pairs:
         b = bytes_by.get((p["relay"], p["exit"]))
         p["in_bytes"], p["out_bytes"] = (b["in_bytes"], b["out_bytes"]) if b else (None, None)
@@ -264,18 +270,19 @@ def relays_report(db: sqlite3.Connection, since: int, until: int) -> Dict[str, A
 
 # ---------- daily digest ----------
 
-def daily_report(db: sqlite3.Connection, since: int, until: int, health_counts: Dict[str, int]) -> Dict[str, Any]:
+def daily_report(db: sqlite3.Connection, ws: int, since: int, until: int, health_counts: Dict[str, int]) -> Dict[str, Any]:
     span = until - since
     prev_since = since - span
-    cur_i, prev_i = incidents_report(db, since, until), incidents_report(db, prev_since, since)
-    cur_t, prev_t = fleet_bytes(db, since, until), fleet_bytes(db, prev_since, since)
-    avail = availability_report(db, since, until)
+    cur_i, prev_i = incidents_report(db, ws, since, until), incidents_report(db, ws, prev_since, since)
+    cur_t, prev_t = fleet_bytes(db, ws, since, until), fleet_bytes(db, ws, prev_since, since)
+    avail = availability_report(db, ws, since, until)
     top = sorted(({"server": k["server"], "code": k["code"], "occurrences": k["occurrences"], "total_s": k["total_s"], "active_now": k["active_now"]}
-                  for k in _top_keys(db, since, until)), key=lambda k: (-k["occurrences"], -k["total_s"]))[:8]
+                  for k in _top_keys(db, ws, since, until)), key=lambda k: (-k["occurrences"], -k["total_s"]))[:8]
     changes = db.execute(
-        "SELECT ts, server_id, kind, title FROM events WHERE ts>=? AND ts<? AND kind NOT IN ('issue_opened','issue_closed') ORDER BY ts DESC, id DESC LIMIT 20",
-        (since, until)).fetchall()
-    names = {sid: name_of(r) for sid, r in _servers(db).items()}
+        "SELECT ts, server_id, kind, title FROM events WHERE workspace_id=? AND ts>=? AND ts<? AND kind NOT IN ('issue_opened','issue_closed') "
+        "ORDER BY ts DESC, id DESC LIMIT 20",
+        (ws, since, until)).fetchall()
+    names = {sid: name_of(r) for sid, r in _servers(db, ws).items()}
     worst = [a for a in avail["servers"] if a["availability_pct"] < 100][:10]
     return {
         "since": since, "until": until, "previous_since": prev_since,
@@ -290,10 +297,10 @@ def daily_report(db: sqlite3.Connection, since: int, until: int, health_counts: 
     }
 
 
-def _top_keys(db: sqlite3.Connection, since: int, until: int) -> List[Dict[str, Any]]:
+def _top_keys(db: sqlite3.Connection, ws: int, since: int, until: int) -> List[Dict[str, Any]]:
     rows = db.execute(
         "SELECT key, code, server_name, severity, COUNT(*) n, SUM(MIN(COALESCE(closed_at, ?), ?) - MAX(opened_at, ?)) AS t, MAX(closed_at IS NULL) AS act "
-        "FROM incidents WHERE opened_at<? AND (closed_at IS NULL OR closed_at>=?) GROUP BY key",
-        (until, until, since, until, since),
+        "FROM incidents WHERE workspace_id=? AND opened_at<? AND (closed_at IS NULL OR closed_at>=?) GROUP BY key",
+        (until, until, since, ws, until, since),
     ).fetchall()
     return [{"key": r["key"], "code": (r["code"] or "?").split(":")[0], "server": r["server_name"] or "-", "occurrences": r["n"], "total_s": max(0, r["t"] or 0), "active_now": bool(r["act"])} for r in rows]

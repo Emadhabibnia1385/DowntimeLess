@@ -3,31 +3,41 @@ import hmac
 import json
 import sqlite3
 import time
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 from urllib.parse import parse_qsl
 
 from ...errors import DLError
 from ...security import check_password, digest, hash_password, new_token, same
+from ...workspaces import default_workspace, ensure_personal, is_member_anywhere, workspace_out
 
 CHALLENGE_TTL = 300
 SESSION_TTL = 30 * 24 * 3600
 
 
-def user_out(row: sqlite3.Row) -> Dict[str, object]:
+def user_out(db: sqlite3.Connection, row: sqlite3.Row, ws: int) -> Dict[str, object]:
+    """The person plus the workspace they act in; `role` is their role there, not the legacy users.role."""
+    workspace = workspace_out(db, ws, row["id"])
     return {
-        "id": row["id"], "name": row["name"], "username": row["username"], "role": row["role"],
-        "has_password": bool(row["password_hash"]), "tg_username": row["tg_username"],
+        "id": row["id"], "name": row["name"], "username": row["username"], "role": workspace["role"],
+        "has_password": bool(row["password_hash"]), "tg_username": row["tg_username"], "workspace": workspace,
     }
 
 
-def create_session(db: sqlite3.Connection, user_id: int, ip: str, ua: str) -> str:
+def create_session(db: sqlite3.Connection, user_id: int, ip: str, ua: str) -> Tuple[str, int]:
+    """A new session in the person's default workspace; the first sign-in also creates their own workspace."""
+    user = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    if not user or not is_member_anywhere(db, user_id):
+        raise DLError("auth.not_registered")
+    ensure_personal(db, user)
+    ws = default_workspace(db, user_id)
     token = new_token()
     now = int(time.time())
     db.execute(
-        "INSERT INTO sessions (user_id, token_hash, ip, ua, created_at, expires_at) VALUES (?,?,?,?,?,?)",
-        (user_id, digest(token), ip, ua[:200], now, now + SESSION_TTL),
+        "INSERT INTO sessions (user_id, token_hash, ip, ua, created_at, expires_at, active_workspace_id) VALUES (?,?,?,?,?,?,?)",
+        (user_id, digest(token), ip, ua[:200], now, now + SESSION_TTL, ws),
     )
-    return token
+    db.execute("UPDATE users SET last_login_at=? WHERE id=?", (now, user_id))
+    return token, ws
 
 
 def start_challenge(db: sqlite3.Connection, ip: str, ua: str) -> Dict[str, object]:
@@ -57,6 +67,12 @@ def poll_challenge(db: sqlite3.Connection, challenge_id: int, secret: str, ip: s
     return "approved", user, create_session(db, user["id"], ip, ua)
 
 
+def registered(db: sqlite3.Connection, tg_id: int) -> Optional[sqlite3.Row]:
+    """A Telegram account may sign in only while it is a member of some workspace; registration stays closed."""
+    user = db.execute("SELECT * FROM users WHERE tg_id=?", (tg_id,)).fetchone()
+    return user if user and is_member_anywhere(db, user["id"]) else None
+
+
 def link_challenge(db: sqlite3.Connection, token: str, tg_id: int):
     """Bot side: bind a pending challenge to a registered user. Returns (challenge, user) or None."""
     ch = db.execute(
@@ -65,7 +81,7 @@ def link_challenge(db: sqlite3.Connection, token: str, tg_id: int):
     ).fetchone()
     if not ch:
         return None
-    user = db.execute("SELECT * FROM users WHERE tg_id=?", (tg_id,)).fetchone()
+    user = registered(db, tg_id)
     if not user:
         db.execute("UPDATE login_challenges SET status='denied' WHERE id=?", (ch["id"],))
         return ch, None
@@ -88,11 +104,21 @@ def claim_owner(db: sqlite3.Connection, token: str, tg_id: int, name: str, tg_us
     ).rowcount
     if not won:
         return False
+    now = int(time.time())
     db.execute(
         "INSERT INTO users (tg_id, tg_username, name, role, created_at) VALUES (?,?,?,'owner',?) "
         "ON CONFLICT(tg_id) DO UPDATE SET role='owner'",
-        (tg_id, tg_username, name, int(time.time())),
+        (tg_id, tg_username, name, now),
     )
+    uid = db.execute("SELECT id FROM users WHERE tg_id=?", (tg_id,)).fetchone()["id"]
+    # the claimer owns workspace 1, the panel's original fleet
+    db.execute("UPDATE workspaces SET owner_user_id=? WHERE id=1 AND owner_user_id IS NULL", (uid,))
+    if db.execute("SELECT 1 FROM workspaces WHERE id=1 AND owner_user_id=?", (uid,)).fetchone():
+        db.execute(
+            "INSERT INTO workspace_members (workspace_id, user_id, role, added_by, created_at) VALUES (1,?,'owner',?,?) "
+            "ON CONFLICT(workspace_id, user_id) DO UPDATE SET role='owner'",
+            (uid, uid, now),
+        )
     return True
 
 
@@ -100,6 +126,8 @@ def password_login(db: sqlite3.Connection, username: str, password: str):
     row = db.execute("SELECT * FROM users WHERE username=?", (username.strip().lower(),)).fetchone()
     # same error for unknown user and wrong password
     if not row or not row["password_hash"] or not check_password(row["password_hash"], password):
+        raise DLError("auth.invalid")
+    if not is_member_anywhere(db, row["id"]):
         raise DLError("auth.invalid")
     return row
 

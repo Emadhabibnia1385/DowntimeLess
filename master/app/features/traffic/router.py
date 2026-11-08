@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from ...db import get_db
-from ...deps import Actor, require
+from ...deps import Actor, current_workspace, require
 from ...errors import DLError
+from ...workspaces import server_row
 from . import service as svc
 
 router = APIRouter(prefix="/traffic", tags=["traffic"])
@@ -113,7 +114,7 @@ class TrafficSeries(BaseModel):
 def summary(
     since: Optional[int] = None, until: Optional[int] = None, tz_offset_min: int = DEFAULT_TZ_MIN,
     category: Optional[str] = None,
-    _: Actor = Depends(require("viewer")), db: sqlite3.Connection = Depends(get_db),
+    _: Actor = Depends(require("viewer")), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db),
 ):
     """Traffic per server and for the fleet (only one category when `category` is an id or 'none') over a window [since, until) in unix seconds (default: the last 30 days).
 
@@ -123,14 +124,14 @@ def summary(
     """
     window = _window(since, until)
     tz = _tz(tz_offset_min)
-    return svc.summary(db, _now(), tz, *(window or (None, None)), category=_category(category))
+    return svc.summary(db, ws, _now(), tz, *(window or (None, None)), category=_category(category))
 
 
 @router.get("/series", response_model=TrafficSeries, operation_id="traffic_series")
 def series(
     since: Optional[int] = None, until: Optional[int] = None, range: Optional[str] = None,
     server_id: Optional[int] = None, tz_offset_min: int = DEFAULT_TZ_MIN, category: Optional[str] = None,
-    _: Actor = Depends(require("viewer")), db: sqlite3.Connection = Depends(get_db),
+    _: Actor = Depends(require("viewer")), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db),
 ):
     """Traffic over time for a window [since, until) or a preset range (24h, 7d, 30d, 90d), with the busiest days and hours.
 
@@ -142,6 +143,6 @@ def series(
         if range is not None and range not in svc.PRESETS:
             raise DLError("traffic.range_invalid")
         window = svc.preset_window(range or "24h", _now(), tz * 60)
-    if server_id is not None and not db.execute("SELECT 1 FROM servers WHERE id=?", (server_id,)).fetchone():
-        raise DLError("server.not_found")
-    return svc.series(db, _now(), window[0], window[1], tz, server_id, _category(category))
+    if server_id is not None:
+        server_row(db, ws, server_id)
+    return svc.series(db, ws, _now(), window[0], window[1], tz, server_id, _category(category))

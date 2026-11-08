@@ -16,6 +16,7 @@ from .features.auth.router import router as auth_router
 from .features.categories.router import router as categories_router
 from .features.keys.router import router as keys_router
 from .features.links.router import router as links_router
+from .features.members.router import router as members_router
 from .features.issues.router import router as issues_router
 from .features.overview.router import router as overview_router
 from .features.reports.router import router as reports_router
@@ -36,7 +37,7 @@ def _prepare_claim(username: str) -> None:
     s = get_settings()
     db = connect()
     try:
-        if db.execute("SELECT 1 FROM users WHERE role='owner'").fetchone():
+        if db.execute("SELECT 1 FROM workspaces WHERE id=1 AND owner_user_id IS NOT NULL").fetchone():
             s.claim_file.unlink(missing_ok=True)
             return
         if s.claim_file.exists():  # keep the pending link stable across restarts
@@ -79,7 +80,7 @@ def create_app() -> FastAPI:
     s = get_settings()
     app = FastAPI(title="DowntimeLess", version="0.1.0", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json")
     app.add_exception_handler(DLError, dl_error_handler)
-    for r in (auth_router, servers_router, categories_router, overview_router, issues_router, settings_router, keys_router, ssl_router, links_router, traffic_router, telegram_router, reports_router):
+    for r in (auth_router, servers_router, categories_router, overview_router, issues_router, settings_router, keys_router, ssl_router, links_router, traffic_router, telegram_router, reports_router, members_router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(agent_router, prefix="/api")
 
@@ -100,6 +101,9 @@ def create_app() -> FastAPI:
         return PlainTextResponse(
             "# DowntimeLess\n> VPN fleet monitoring. JSON API for humans and AI agents; the server already computed the analysis, read it before gathering anything yourself.\n\n"
             "Auth: `Authorization: Bearer dl_...` (create a key in the panel: owner > API keys). A `read` key is enough for every report.\n"
+            "Workspaces: a key belongs to the workspace it was created in and sees and changes only that workspace's fleet"
+            " (servers, domains, settings, channels, incidents, change log). A signed-in person lists theirs with GET /api/v1/auth/workspaces"
+            " and switches with POST /api/v1/auth/workspace; a key cannot switch. Another workspace's ids answer 404.\n"
             "START: GET /api/v1/reports/briefing?format=md (detail=full lifts the caps). One dense document: fleet status, open issues with evidence, health, traffic, certificates, recent changes and an ordered 'check first' list.\n"
             "THEN: GET /api/v1/reports/playbooks/{code} for each issue code in it (ping:<ip> works): likely causes, read-only checks, safe fixes, never-do rules. Unknown codes get a generic guide.\n"
             "Reports (GET; add format=md for Markdown; since/until are unix seconds, at most 366 days apart):\n"
@@ -120,7 +124,7 @@ def create_app() -> FastAPI:
             "- GET /api/v1/links/traffic?since=&until=: bytes each server exchanged with each peer server (relay to exit), per window; /links/traffic/series adds the hourly series. Needs counting switched on per server (PATCH acct_on).\n"
             "- GET /api/v1/traffic/summary?since=&until=, /api/v1/traffic/series?range=24h|7d|30d|90d or since=&until=&server_id=: download/upload per server (total, peak day, share) and by hour or day.\n"
             "- GET /api/v1/servers, /api/v1/servers/{id}/metrics?range=24h, /api/v1/ping-matrix, /api/v1/overview\n"
-            "- A `read` key only reads. A `full` key may do everything the owner does: POST /api/v1/servers/{id}/jobs"
+            "- A `read` key only reads. A `full` key may do everything the owner does inside its workspace (not members): POST /api/v1/servers/{id}/jobs"
             " (ping, tcp_check, speedtest_down/up, apt_upgrade_safe, reboot, self_update, cert_renew, cert_delete, processes, ports, disk_usage, journal, traceroute, http_check, dns_check, service_restart, vacuum_logs), manage servers, domains, settings and keys.\n"
             "- Treat a `full` key like a root password.\n"
             "- Full schema: /api/openapi.json\n"

@@ -31,7 +31,7 @@ def make(row, code: str, severity: str, title: str, suggestion: str, **evidence:
 def recent_metrics(db: sqlite3.Connection, server_id: int, n: int = 5) -> List[sqlite3.Row]:
     """The last n report rows of a server, newest first."""
     return db.execute(
-        "SELECT cpu, steal, conntrack, load1 FROM metrics WHERE server_id=? ORDER BY ts DESC, rowid DESC LIMIT ?",
+        "SELECT cpu, steal, conntrack, load1 FROM metrics WHERE server_id=? ORDER BY ts DESC, rowid DESC LIMIT ?",  # ws: caller's server row
         (server_id, n),
     ).fetchall()
 
@@ -125,11 +125,11 @@ def quota_forecast(db: sqlite3.Connection, s, th: Dict[str, float], now: int) ->
         return None
     start, reset = quota_period(now, s["quota_reset_day"] or 1)
     expr = "rx_delta+tx_delta" if th["quota_basis"] else "tx_delta"
-    used = db.execute("SELECT COALESCE(SUM(%s),0) FROM metrics WHERE server_id=? AND ts>=?" % expr, (s["id"], start)).fetchone()[0]
+    used = db.execute("SELECT COALESCE(SUM(%s),0) FROM metrics WHERE server_id=? AND ts>=?" % expr, (s["id"], start)).fetchone()[0]  # ws: caller's server row
     window = min(now - start, 3 * DAY)
     rate = None
     if window >= 6 * 3600:  # a rate over a few hours would be noise
-        got = db.execute("SELECT COALESCE(SUM(%s),0) FROM metrics WHERE server_id=? AND ts>=?" % expr, (s["id"], now - window)).fetchone()[0]
+        got = db.execute("SELECT COALESCE(SUM(%s),0) FROM metrics WHERE server_id=? AND ts>=?" % expr, (s["id"], now - window)).fetchone()[0]  # ws: caller's server row
         rate = got * DAY / window
     quota = s["quota_gb"] * GIB
     if used >= quota:

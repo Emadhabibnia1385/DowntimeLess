@@ -4,7 +4,7 @@ from typing import Dict
 from fastapi import APIRouter, Depends
 
 from ...db import get_db
-from ...deps import Actor, require
+from ...deps import Actor, current_workspace, require
 from ..reports import events as changelog
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -24,27 +24,33 @@ RULES = (
 DEFAULTS.update({"on_" + r: 1 for r in RULES})
 
 
-def thresholds(db: sqlite3.Connection) -> Dict[str, float]:
+def thresholds(db: sqlite3.Connection, ws: int) -> Dict[str, float]:
+    """The workspace's thresholds and switches; a key it never set keeps the default."""
     out = dict(DEFAULTS)
-    for r in db.execute("SELECT key, value FROM settings"):
+    for r in db.execute("SELECT key, value FROM settings WHERE workspace_id=?", (ws,)):
         if r["key"] in out:
             out[r["key"]] = float(r["value"])
     return out
 
 
 @router.get("", response_model=Dict[str, float], operation_id="settings_get")
-def get_settings_(_: Actor = Depends(require("viewer")), db: sqlite3.Connection = Depends(get_db)):
-    return thresholds(db)
+def get_settings_(_: Actor = Depends(require("viewer")), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
+    return thresholds(db, ws)
 
 
 @router.put("", response_model=Dict[str, float], operation_id="settings_put")
-def put_settings(body: Dict[str, float], _: Actor = Depends(require("admin")), db: sqlite3.Connection = Depends(get_db)):
-    before = thresholds(db)
+def put_settings(body: Dict[str, float], _: Actor = Depends(require("admin")), ws: int = Depends(current_workspace),
+                 db: sqlite3.Connection = Depends(get_db)):
+    before = thresholds(db, ws)
     for k, v in body.items():
         if k in DEFAULTS:
             if k.startswith("on_") or k == "quota_basis":
                 v = 1 if v else 0
-            db.execute("INSERT INTO settings (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (k, str(v)))
-    after = thresholds(db)
-    changelog.settings_changed(db, before, after)
+            db.execute(
+                "INSERT INTO settings (workspace_id, key, value) VALUES (?,?,?) "
+                "ON CONFLICT(workspace_id, key) DO UPDATE SET value=excluded.value",
+                (ws, k, str(v)),
+            )
+    after = thresholds(db, ws)
+    changelog.settings_changed(db, ws, before, after)
     return after

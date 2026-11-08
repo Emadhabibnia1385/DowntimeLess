@@ -9,14 +9,14 @@ from . import detectors
 from .detectors import make as _issue
 
 
-def ping_matrix(db: sqlite3.Connection) -> List[Dict[str, Any]]:
-    """Latest ping from each Iran relay to each foreign server; foreign-to-foreign and inbound pings do not matter."""
+def ping_matrix(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
+    """Latest ping from each Iran relay to each foreign server of the same workspace; other pings do not matter."""
     rows = db.execute(
         "SELECT p.server_id, s.name AS from_name, t.id AS to_id, t.name AS to_name, p.target, p.loss, p.rtt, p.ts "
-        "FROM pings p JOIN servers s ON s.id=p.server_id JOIN servers t ON t.public_ip=p.target "
-        "WHERE s.role='relay' AND t.role<>'relay' "
+        "FROM pings p JOIN servers s ON s.id=p.server_id JOIN servers t ON t.public_ip=p.target AND t.workspace_id=s.workspace_id "
+        "WHERE s.workspace_id=? AND s.role='relay' AND t.role<>'relay' "
         "AND p.ts=(SELECT MAX(ts) FROM pings q WHERE q.server_id=p.server_id AND q.target=p.target) AND p.ts>=?",
-        (int(time.time()) - 600,),
+        (ws, int(time.time()) - 600),
     ).fetchall()
     return [
         {
@@ -33,21 +33,21 @@ PING_WINDOW_S = 600
 PING_MIN_SAMPLES = 6
 
 
-def ping_windows(db: sqlite3.Connection) -> List[Dict[str, Any]]:
-    """Average loss per Iran relay and foreign server over the last window, with the number of samples."""
+def ping_windows(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
+    """Average loss per Iran relay and foreign server of one workspace over the last window, with the number of samples."""
     rows = db.execute(
         "SELECT p.server_id, s.name AS from_name, t.id AS to_id, t.public_ip AS target, AVG(p.loss) AS loss, AVG(p.rtt) AS rtt, COUNT(p.loss) AS n "
-        "FROM pings p JOIN servers s ON s.id=p.server_id JOIN servers t ON t.public_ip=p.target "
-        "WHERE s.role='relay' AND t.role<>'relay' AND p.ts>=? GROUP BY p.server_id, t.id",
-        (int(time.time()) - PING_WINDOW_S,),
+        "FROM pings p JOIN servers s ON s.id=p.server_id JOIN servers t ON t.public_ip=p.target AND t.workspace_id=s.workspace_id "
+        "WHERE s.workspace_id=? AND s.role='relay' AND t.role<>'relay' AND p.ts>=? GROUP BY p.server_id, t.id",
+        (ws, int(time.time()) - PING_WINDOW_S),
     ).fetchall()
     return [dict(r) for r in rows if r["n"] >= PING_MIN_SAMPLES]
 
 
-def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
-    th, now, out = thresholds(db), int(time.time()), []
+def issues(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
+    th, now, out = thresholds(db, ws), int(time.time()), []
     forecasts: List[Any] = []
-    servers = db.execute("SELECT * FROM servers").fetchall()
+    servers = db.execute("SELECT * FROM servers WHERE workspace_id=?", (ws,)).fetchall()
     for s in servers:
         st, lt = status_of(s), latest_of(s)
         if st == "pending":
@@ -79,7 +79,7 @@ def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
             out.append(_issue(s, "reboot_required", "info", "سرور برای اعمال آپدیت نیاز به ریبوت دارد", "در ساعت کم‌ترافیک و با تأیید خودتان ریبوت کنید؛ رله‌ها را یکی‌یکی."))
     names = {s["id"]: s for s in servers}
     by_target: Dict[int, List[Dict[str, Any]]] = {}
-    for w in ping_windows(db):
+    for w in ping_windows(db, ws):
         by_target.setdefault(w["to_id"], []).append(w)
     classified, replaced = detectors.classify_paths(th, names, by_target)
     out.extend(classified)
@@ -110,11 +110,15 @@ def issues(db: sqlite3.Connection) -> List[Dict[str, Any]]:
                 "پینگ ICMP روی بعضی میزبان‌ها محدود می‌شود؛ با رلهٔ دوم یا تست TCP تأیید کنید.", **evidence,
             ))
     if th["on_ssl"]:
-        out.extend(ssl_svc.issues(db))
+        out.extend(ssl_svc.issues(db, ws))
     order = {"critical": 0, "warning": 1, "info": 2}
     return sorted(out, key=lambda i: (order[i["severity"]], i["server_name"] or ""))
 
 
-def traffic_24h(db: sqlite3.Connection) -> Dict[str, int]:
-    r = db.execute("SELECT COALESCE(SUM(rx_delta),0) rx, COALESCE(SUM(tx_delta),0) tx FROM metrics WHERE ts>=?", (int(time.time()) - 86400,)).fetchone()
+def traffic_24h(db: sqlite3.Connection, ws: int) -> Dict[str, int]:
+    r = db.execute(
+        "SELECT COALESCE(SUM(m.rx_delta),0) rx, COALESCE(SUM(m.tx_delta),0) tx FROM metrics m JOIN servers s ON s.id=m.server_id "
+        "WHERE s.workspace_id=? AND m.ts>=?",
+        (ws, int(time.time()) - 86400),
+    ).fetchone()
     return {"rx_bytes": r["rx"], "tx_bytes": r["tx"]}

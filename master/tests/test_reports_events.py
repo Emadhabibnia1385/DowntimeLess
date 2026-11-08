@@ -66,9 +66,9 @@ def test_issue_open_and_close_are_logged_with_the_sweep_time(owner):
     db = connect()
     issue = {"id": "server:1:disk", "server_id": None, "server_name": "de-1", "code": "disk", "severity": "warning", "title": "t", "suggestion": "", "evidence": {}}
     now = 1_800_000_000
-    incidents.record(db, now, [issue])
-    incidents.record(db, now + 15, [issue])
-    incidents.record(db, now + 60, [])
+    incidents.record(db, 1, now, [issue])
+    incidents.record(db, 1, now + 15, [issue])
+    incidents.record(db, 1, now + 60, [])
     kinds = [(e["kind"], e["ts"]) for e in _events()]
     assert kinds == [("issue_opened", now), ("issue_closed", now + 15)]
     db.close()
@@ -80,8 +80,8 @@ def test_changes_filters_order_and_cap(owner):
     db = connect()
     now = int(time.time())
     for n in range(520):
-        events.record(db, "job_created", "j%d" % n, sid, ts=now - 1000 + n // 10)
-    events.record(db, "rebooted", "old", other, ts=now - 3 * 86400)
+        events.record(db, 1, "job_created", "j%d" % n, sid, ts=now - 1000 + n // 10)
+    events.record(db, 1, "rebooted", "old", other, ts=now - 3 * 86400)
     db.close()
     r = owner.get("/api/v1/reports/changes").json()
     assert len(r["events"]) == 500 and r["truncated"]
@@ -97,8 +97,8 @@ def test_changes_filters_order_and_cap(owner):
 def test_events_older_than_180_days_are_pruned(owner):
     db = connect()
     now = int(time.time())
-    events.record(db, "settings_changed", "old", None, ts=now - 181 * 86400)
-    events.record(db, "settings_changed", "new", None, ts=now - 179 * 86400)
+    events.record(db, 1, "settings_changed", "old", None, ts=now - 181 * 86400)
+    events.record(db, 1, "settings_changed", "new", None, ts=now - 179 * 86400)
     events.prune(db, now)
     assert [e["title"] for e in db.execute("SELECT title FROM events")] == ["new"]
     db.close()
@@ -107,7 +107,7 @@ def test_events_older_than_180_days_are_pruned(owner):
 def test_briefing_lists_recent_changes_but_not_issue_noise(owner):
     sid, key = make_server(owner, "de-1", "exit")
     db = connect()
-    events.record(db, "issue_opened", "de-1: disk", sid)
+    events.record(db, 1, "issue_opened", "de-1: disk", sid)
     db.close()
     b = owner.get("/api/v1/reports/briefing").json()
     assert [c["kind"] for c in b["changes_24h"]] == ["server_added"] and b["issue_events_24h"] == 1

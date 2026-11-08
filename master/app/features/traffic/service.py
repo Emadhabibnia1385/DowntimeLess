@@ -68,16 +68,20 @@ def _day_sum(days: Dict[int, Tuple[int, int]], lo: int, hi: int) -> Dict[str, in
     return _pair(sum(v[0] for v in vals), sum(v[1] for v in vals))
 
 
-def category_cond(category: Optional[str]) -> Tuple[str, List[Any]]:
-    """SQL on `servers` for one category: a numeric id, 'none' for servers without one, None for all."""
+def category_cond(db: sqlite3.Connection, ws: int, category: Optional[str], alias: str = "s") -> Tuple[str, List[Any]]:
+    """SQL on a `servers` alias for one category of workspace `ws`: an id, 'none' for servers without one, None for all.
+
+    A category id of another workspace (or none at all) matches nothing, never another workspace's rows."""
     if category is None or category == "":
         return "1=1", []
     if category == "none":
-        return "category_id IS NULL", []
-    return "category_id=?", [int(category)]
+        return "%s.category_id IS NULL" % alias, []
+    if not db.execute("SELECT 1 FROM categories WHERE id=? AND workspace_id=?", (int(category), ws)).fetchone():
+        return "0=1", []
+    return "%s.category_id=?" % alias, [int(category)]
 
 
-def summary(db: sqlite3.Connection, now: int, tz_offset_min: int, since: Optional[int], until: Optional[int],
+def summary(db: sqlite3.Connection, ws: int, now: int, tz_offset_min: int, since: Optional[int], until: Optional[int],
             category: Optional[str] = None) -> Dict[str, Any]:
     """Whole local days: `since` is snapped back to its local midnight, and a day counts when it starts before `until`."""
     off = tz_offset_min * 60
@@ -88,11 +92,11 @@ def summary(db: sqlite3.Connection, now: int, tz_offset_min: int, since: Optiona
     start = min(lo, today - DAY)
     per: Dict[int, Dict[int, Tuple[int, int]]] = {}
     fleet: Dict[int, Tuple[int, int]] = {}
-    cond, cargs = category_cond(category)
+    cond, cargs = category_cond(db, ws, category)
     rows = db.execute(
-        "SELECT server_id, (ts+?)/? AS d, SUM(rx_delta) rx, SUM(tx_delta) tx FROM metrics WHERE ts>=? AND ts<=? "
-        "AND server_id IN (SELECT id FROM servers WHERE %s) GROUP BY server_id, d" % cond,
-        [off, DAY, start, now] + cargs,
+        "SELECT m.server_id, (m.ts+?)/? AS d, SUM(m.rx_delta) rx, SUM(m.tx_delta) tx FROM metrics m JOIN servers s ON s.id=m.server_id "
+        "WHERE s.workspace_id=? AND m.ts>=? AND m.ts<=? AND " + cond + " GROUP BY m.server_id, d",
+        [off, DAY, ws, start, now] + cargs,
     )
     for r in rows:
         key = r["d"] * DAY - off
@@ -106,7 +110,11 @@ def summary(db: sqlite3.Connection, now: int, tz_offset_min: int, since: Optiona
     fleet_facts = facts(fleet)
     fleet_total = fleet_facts["period"]["total"]
     servers: List[Dict[str, Any]] = []
-    for s in db.execute("SELECT id, name, alias, role, panel_only, country, category_id FROM servers WHERE %s ORDER BY role, name" % cond, cargs):
+    for s in db.execute(
+        "SELECT s.id, s.name, s.alias, s.role, s.panel_only, s.country, s.category_id FROM servers s WHERE s.workspace_id=? AND " + cond
+        + " ORDER BY s.role, s.name",
+        [ws] + cargs,
+    ):
         f = facts(per.get(s["id"], {}))
         servers.append({
             "server_id": s["id"], "name": s["name"], "alias": s["alias"],
@@ -117,7 +125,7 @@ def summary(db: sqlite3.Connection, now: int, tz_offset_min: int, since: Optiona
     return {"generated_at": now, "tz_offset_min": tz_offset_min, "since": lo, "until": until, "fleet": fleet_facts, "servers": servers}
 
 
-def series(db: sqlite3.Connection, now: int, since: int, until: int, tz_offset_min: int, server_id: Optional[int],
+def series(db: sqlite3.Connection, ws: int, now: int, since: int, until: int, tz_offset_min: int, server_id: Optional[int],
            category: Optional[str] = None) -> Dict[str, Any]:
     """Hourly buckets for windows up to 8 days, daily ones beyond; the window never reaches past `now`."""
     off = tz_offset_min * 60
@@ -126,15 +134,18 @@ def series(db: sqlite3.Connection, now: int, since: int, until: int, tz_offset_m
     size = HOUR if hourly else DAY
     first = ((since + off) // size) * size - off
     hour_start = (now + off) // HOUR * HOUR - off
-    sql = "SELECT (ts+?)/? AS h, SUM(rx_delta) rx, SUM(tx_delta) tx FROM metrics WHERE ts>=? AND ts<?"
-    args: List[Any] = [off, HOUR, first, end]
+    sql = (
+        "SELECT (m.ts+?)/? AS h, SUM(m.rx_delta) rx, SUM(m.tx_delta) tx FROM metrics m JOIN servers s ON s.id=m.server_id "
+        "WHERE s.workspace_id=? AND m.ts>=? AND m.ts<?"
+    )
+    args: List[Any] = [off, HOUR, ws, first, end]
     if server_id is not None:
-        sql += " AND server_id=?"
+        sql += " AND m.server_id=?"
         args.append(server_id)
-    cond, cargs = category_cond(category)
-    sql += " AND server_id IN (SELECT id FROM servers WHERE %s)" % cond
+    cond, cargs = category_cond(db, ws, category)
+    sql += " AND " + cond
     args += cargs
-    hours = {r["h"] * HOUR - off: (r["rx"], r["tx"]) for r in db.execute(sql + " GROUP BY h", args)}
+    hours = {r["h"] * HOUR - off: (r["rx"], r["tx"]) for r in db.execute(sql + " GROUP BY h", args)}  # ws: sql above joins servers by workspace_id
 
     # one hourly pass feeds the chart, the best days and the hour-of-day profile
     days: Dict[int, List[int]] = {}
