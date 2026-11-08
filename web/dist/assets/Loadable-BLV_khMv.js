@@ -1,0 +1,1 @@
+import{D as e,or as t,w as n,xn as r}from"./useDocumentTitle-P-S6EHOY.js";var i=t();function a({query:t,children:a,skeleton:o=(0,i.jsx)(n,{})}){return t.isPending?o:t.isError?(0,i.jsx)(e,{message:r(t.error),onRetry:()=>void t.refetch()}):a(t.data)}export{a as t};

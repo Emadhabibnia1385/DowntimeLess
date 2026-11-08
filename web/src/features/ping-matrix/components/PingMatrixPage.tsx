@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import type { PingCell } from "@/api/generated/model";
 import { useOverviewPingMatrix } from "@/api/generated/overview/overview";
 import { useThresholds } from "@/features/settings";
+import { IpText } from "@/shared/IpText";
 import { Loadable } from "@/shared/Loadable";
 import { useDocumentTitle } from "@/shared/useDocumentTitle";
 import { formatMs, formatPercent, t } from "@/strings";
@@ -70,9 +71,7 @@ export function PingMatrixPage() {
 										>
 											{row.name}
 										</Link>
-										<span dir="ltr" className="text-end font-mono text-xs text-muted">
-											{row.target}
-										</span>
+										<IpText ip={row.target} className="text-xs text-muted" />
 									</div>,
 									...grid.columns.map((column) => (
 										<Cell key={column.key} cell={grid.cell(row.id, column.key)} limits={limits} />

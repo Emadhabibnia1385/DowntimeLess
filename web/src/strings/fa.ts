@@ -5,6 +5,7 @@ export const fa = {
 		edit: "ویرایش",
 		delete: "حذف",
 		none: "—",
+		copyIp: "کپی آدرس IP",
 		saved: "ذخیره شد",
 		done: "تمام شد",
 		unknown: "نامشخص",
@@ -252,6 +253,8 @@ export const fa = {
 		sortBy: (label: string) => `مرتب‌سازی بر اساس ${label}`,
 		updateAgent: "به‌روزرسانی agent",
 		updateAll: "به‌روزرسانی همهٔ agentها",
+		updateAllHint:
+			"به‌روزرسانی همهٔ agentها: هر سرور آنلاین که agent قدیمی دارد، فایل جدید را از همین پنل می‌گیرد و دوباره راه می‌افتد.",
 		updateAllTitle: "به‌روزرسانی همهٔ agentها؟",
 		updateAllBody:
 			"agent هر سرور آنلاین که نسخهٔ قدیمی دارد، فایل خودش را از همین پنل می‌گیرد و دوباره راه می‌افتد. به سرورها و سرویس‌های دیگر دست نمی‌زند.",

@@ -175,28 +175,24 @@ export function ServersPage() {
 				actions={
 					canManage ? (
 						<>
-							<UpdateAllAgentsButton servers={servers.data ?? []} />
 							<Button onPress={() => setAdding(true)}>
 								<AddIcon aria-hidden />
 								{t.servers.add}
 							</Button>
+							<Button variant="secondary" onPress={() => setManaging(true)}>
+								{t.categories.manage}
+							</Button>
+							<UpdateAllAgentsButton servers={servers.data ?? []} />
 						</>
 					) : undefined
 				}
 			/>
-			<div className="flex flex-wrap items-center justify-between gap-3">
-				<FilterChips
-					label={t.categories.filterLabel}
-					value={fleet}
-					onChange={setFilter}
-					options={options}
-				/>
-				{canManage ? (
-					<Button variant="secondary" onPress={() => setManaging(true)}>
-						{t.categories.manage}
-					</Button>
-				) : null}
-			</div>
+			<FilterChips
+				label={t.categories.filterLabel}
+				value={fleet}
+				onChange={setFilter}
+				options={options}
+			/>
 			<DataTable
 				ariaLabel={t.servers.tableLabel}
 				columns={columns}

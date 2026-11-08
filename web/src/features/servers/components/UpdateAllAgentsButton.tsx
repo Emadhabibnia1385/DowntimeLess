@@ -1,4 +1,4 @@
-import { Button, ConfirmDialog, toast } from "@nyxon/nasim";
+import { Button, ConfirmDialog, toast, Tooltip } from "@nyxon/nasim";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import type { ServerOut } from "@/api/generated/model";
@@ -34,10 +34,14 @@ export function UpdateAllAgentsButton({ servers }: { servers: readonly ServerOut
 	};
 	return (
 		<>
-			<Button variant="secondary" onPress={press}>
-				<RefreshIcon aria-hidden />
-				{t.servers.updateAll}
-			</Button>
+			<Tooltip>
+				<Button isIconOnly variant="secondary" aria-label={t.servers.updateAll} onPress={press}>
+					<RefreshIcon aria-hidden />
+				</Button>
+				<Tooltip.Content className="max-w-64 break-normal text-pretty text-start leading-relaxed">
+					{t.servers.updateAllHint}
+				</Tooltip.Content>
+			</Tooltip>
 			<ConfirmDialog
 				isOpen={asking}
 				onOpenChange={setAsking}

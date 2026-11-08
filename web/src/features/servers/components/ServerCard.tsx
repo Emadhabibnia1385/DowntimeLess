@@ -3,6 +3,7 @@ import type { ServerOut } from "@/api/generated/model";
 import { formatPercent, t } from "@/strings";
 import { displayName, roleLabel } from "../lib/status";
 import { ServerStatusChip } from "./ServerStatusChip";
+import { IpText } from "@/shared/IpText";
 
 const level = (value: number | null | undefined) =>
 	value === null || value === undefined ? t.common.none : formatPercent(value);
@@ -22,8 +23,8 @@ export function ServerCard({ server }: { server: ServerOut }) {
 				</div>
 				<ServerStatusChip status={server.status} />
 			</div>
-			<p dir="ltr" className="truncate text-end font-mono text-sm text-muted">
-				{server.public_ip ?? t.common.none}
+			<p className="text-sm text-muted">
+				{server.public_ip ? <IpText ip={server.public_ip} /> : t.common.none}
 			</p>
 			<dl className="grid grid-cols-2 gap-2 text-sm">
 				<div>
