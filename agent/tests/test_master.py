@@ -12,6 +12,7 @@ REPORT_KEYS = {
     "ram_total_mb", "ram_avail_mb", "disk_total_gb", "disk_used_gb", "net", "tcp_retrans_pct",
     "conntrack_pct", "failed_units", "reboot_required", "ssl", "ping", "jobs_done",
     "load5", "load15", "swap_total_mb", "swap_used_mb", "tcp_established", "info",
+    "checks", "checks_error",
 }
 GEO = {"country": "DE", "city": "Falkenstein", "org": "Hetzner Online GmbH"}
 

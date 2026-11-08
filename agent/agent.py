@@ -16,12 +16,13 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
-VERSION = "0.2.8"
+VERSION = "0.3.0"
 UA = "DowntimeLess-Agent/" + VERSION
 SELF_PATH = os.path.realpath(__file__)
 # With no address they describe the caller's outbound address; with one, that address itself.
@@ -33,6 +34,8 @@ GEO_TTL_S = 6 * 3600
 GEO_RETRY_S = 900
 SSL_TTL_S = 1800
 CERT_GLOBS = ("/etc/letsencrypt/live/*/cert.pem", "/root/.acme.sh/*/*.cer")
+# PasarGuard node certificates (/var/lib/<node>/certs): listed apart, the master offers no certbot action on them
+NODE_CERT_GLOBS = ("/var/lib/*/certs/ssl_cert.pem",)
 ACME_SKIP = ("ca.cer", "fullchain.cer")
 # a folder like "example.com.bak-20261103" is a backup of a certificate, not one
 BACKUP_RE = re.compile(r"\.bak|\.old$|\.orig$|backup", re.I)
@@ -427,6 +430,8 @@ def run_pings(items, budget=20.0):
 
 
 def build_report(state):
+    # the read-only checks run in the background during the sampling pause and the pings
+    checks_at = start_checks(state)
     a = sample()
     time.sleep(1)
     b = sample()
@@ -482,6 +487,7 @@ def build_report(state):
         "ping": run_pings(state["ping_targets"]),
         "jobs_done": list(state["jobs_done"]),
         **acct_fields(state),
+        **checks_fields(state, checks_at),
     }
 
 
@@ -693,9 +699,35 @@ def ssl_report(now=None):
                 certs.append(c)
     renew = renew_status()
     domains = nginx_domains(run_text(["nginx", "-T"], timeout=15))
-    if not certs and not renew["certbot_installed"] and not domains:
+    nodes = node_certs(now)
+    if not certs and not renew["certbot_installed"] and not domains and not nodes:
         return None
-    return {"certs": certs, "renew": renew, "domains": domains}
+    out = {"certs": certs, "renew": renew, "domains": domains}
+    if nodes:
+        out["node_certs"] = nodes
+    return out
+
+
+def parse_cert_ips(text):
+    return re.findall(r"IP Address:([0-9A-Fa-f.:]+)", text)
+
+
+def node_certs(now):
+    """PasarGuard node certificates: name of the node directory, expiry and the IPs they were issued for."""
+    out = []
+    for pattern in NODE_CERT_GLOBS:
+        for path in sorted(glob.glob(pattern))[:50]:
+            name = os.path.basename(os.path.dirname(os.path.dirname(path)))
+            if BACKUP_RE.search(name):
+                continue
+            text = run_text(["openssl", "x509", "-noout", "-enddate", "-ext", "subjectAltName", "-in", path], timeout=5)
+            end = parse_cert_end(text)
+            if end is None:
+                continue
+            out.append({"name": clean_text(name, 64), "source": "pasarguard-node", "not_after": end,
+                        "days_left": int((end - now) // 86400), "ips": parse_cert_ips(text)[:20],
+                        "domains": parse_cert_names(text)[:20]})
+    return out
 
 
 def ssl_cached(state):
@@ -707,6 +739,961 @@ def ssl_cached(state):
             log("ssl scan failed: %s" % e)
         state["ssl"] = (time.time(), value)
     return value
+
+
+# ---- read-only checks (0.3.0): what the server listens on, runs and is configured with ----
+#
+# Every collector only reads: files under /proc, /sys and /etc, and list/show commands with short timeouts.
+# Each runs in its own thread at its own cadence; the report waits for them at most CHECKS_BUDGET_S, takes the
+# last good value of a collector that is still busy, and names a failed one in checks_error. Reports carry
+# names, states and counts only: never config values, tokens, environment, or log lines.
+
+CHECKS_BUDGET_S = 4.0
+CMD_TIMEOUT_S = 5
+SLOW_TIMEOUT_S = 8  # docker and journal
+STUCK_S = 120  # a collector thread older than this is given up and may be started again
+LIST_MAX = 300
+STR_MAX = 200
+UNIT_PATTERN = re.compile(r"^(backpack-|relay-dnat|backhaul|gre-|wattun@|dl-|xray|x-ui|pasarguard|panel-dnat|mobin-dnat|nginx|fail2ban)")
+# listeners on ephemeral ports are kept only for processes like these
+KEEP_PROC_RE = re.compile(r"xray|backhaul|backpack|wattun|rathole|frp|gost|nginx|sshd|haproxy|sing-box|hysteria|tunnel|"
+                          r"pasarguard|dagger|paqet|realm|x-ui", re.I)
+SAFE_TEXT_RE = re.compile(r"[^A-Za-z0-9@._:/+=,()\[\] -]")
+# credentials in URLs, key=value secrets and long token-like runs never leave the server
+SECRET_RES = (
+    re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://[^\s/@]*@\S*"),
+    re.compile(r"(?i)\b[\w.-]*(token|secret|passw(or)?d|passwd|api[_-]?key|private[_-]?key|auth)[\w.-]*\s*[=:]\s*\S+"),
+    re.compile(r"[A-Za-z0-9+/_=-]{32,}"),
+)
+
+
+def clean_text(value, limit=STR_MAX, scrub=False):
+    """A short printable string, or None; with scrub, anything that looks like a secret is removed first."""
+    if value is None:
+        return None
+    text = str(value)
+    for rx in SECRET_RES if scrub else ():
+        text = rx.sub("[redacted]", text)
+    text = SAFE_TEXT_RE.sub("", text).strip()
+    return text[:limit] or None
+
+
+def bounded(value, depth=0):
+    """The value with every list cut to LIST_MAX items and every string to STR_MAX characters."""
+    if depth > 8:
+        return None
+    if isinstance(value, str):
+        return value[:STR_MAX]
+    if isinstance(value, (list, tuple)):
+        return [bounded(v, depth + 1) for v in list(value)[:LIST_MAX]]
+    if isinstance(value, dict):
+        return {str(k)[:64]: bounded(v, depth + 1) for k, v in list(value.items())[:LIST_MAX]}
+    return value
+
+
+def has(binary):
+    return shutil.which(binary) is not None
+
+
+def run_check(argv, timeout=CMD_TIMEOUT_S, ok=(0,), input=None):
+    """(exit code, stdout) of a read-only command; raises when it is missing, times out or fails."""
+    r = subprocess.run(argv, input=input, capture_output=True, text=True, timeout=timeout, errors="replace",
+                       stdin=None if input is not None else subprocess.DEVNULL)
+    if r.returncode not in ok:
+        raise RuntimeError("%s exited %d" % (os.path.basename(argv[0]), r.returncode))
+    return r.returncode, r.stdout
+
+
+def check_out(argv, timeout=CMD_TIMEOUT_S, ok=(0,)):
+    return run_check(argv, timeout, ok)[1]
+
+
+def stream_lines(argv, on_line, timeout, max_bytes=16 << 20, merge_stderr=False):
+    """Feeds each output line (bytes) to on_line without holding the output; returns the exit code.
+
+    Stops reading after max_bytes; raises TimeoutExpired when the command outlives the timeout."""
+    proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT if merge_stderr else subprocess.DEVNULL)
+    killed = []
+
+    def kill():
+        killed.append(True)
+        proc.kill()
+
+    timer = threading.Timer(timeout, kill)
+    timer.start()
+    seen = 0
+    try:
+        for raw in proc.stdout:
+            seen += len(raw)
+            on_line(raw)
+            if seen > max_bytes:
+                break
+    finally:
+        timer.cancel()
+        if proc.poll() is None:
+            proc.kill()
+        proc.stdout.close()
+        code = proc.wait()
+    if killed:
+        raise subprocess.TimeoutExpired(argv, timeout)
+    return code if seen <= max_bytes else 0
+
+
+def count_lines(argv, needles, timeout, merge_stderr=False):
+    counts = [0] * len(needles)
+
+    def on_line(raw):
+        for i, needle in enumerate(needles):
+            if needle in raw:
+                counts[i] += 1
+    code = stream_lines(argv, on_line, timeout, merge_stderr=merge_stderr)
+    return counts, code
+
+
+def read_int(path):
+    try:
+        return int(read(path).split()[0])
+    except (ValueError, IndexError):
+        return None
+
+
+def read_word(path, limit=64):
+    text = read(path).strip()
+    return clean_text(text, limit) if text else None
+
+
+def soft(fn, *args):
+    """fn(*args), or None when it fails: one missing tool must not blank a whole collector."""
+    try:
+        return fn(*args)
+    except Exception:
+        return None
+
+
+# -- listeners: ss -H -tulnp --
+
+SS_PROC_RE = re.compile(r'users:\(\("([^"]{1,64})"')
+
+
+def parse_ss_listeners(text):
+    seen, out = set(), []
+    for line in text.splitlines():
+        f = line.split()
+        if len(f) < 5 or f[0] not in ("tcp", "udp"):
+            continue
+        port = f[4].rsplit(":", 1)[-1]
+        if not port.isdigit():
+            continue
+        port = int(port)
+        m = SS_PROC_RE.search(line)
+        proc = clean_text(m.group(1), 40) if m else None
+        if port == 0 or (port > 32768 and not (proc and KEEP_PROC_RE.search(proc))):
+            continue
+        key = (f[0], port, proc)
+        if key not in seen:
+            seen.add(key)
+            out.append({"proto": f[0], "port": port, "proc": proc})
+    out.sort(key=lambda x: (x["port"], x["proto"], x["proc"] or ""))
+    return out[:LIST_MAX]
+
+
+def collect_listeners(memo):
+    if not has("ss"):
+        return None
+    return parse_ss_listeners(check_out(["ss", "-H", "-tulnp"]))
+
+
+# -- units: enabled tunnel/panel/firewall units and anything in auto-restart --
+
+def parse_unit_files(text):
+    """Enabled unit names from `systemctl list-unit-files --state=enabled --no-legend --plain`."""
+    out = []
+    for line in text.splitlines():
+        f = line.split()
+        if len(f) >= 2 and f[1].startswith("enabled") and "@." not in f[0]:
+            out.append(f[0])
+    return out
+
+
+def parse_list_units(text):
+    """(name, active, sub) from `systemctl list-units --all --no-legend --plain`."""
+    out = []
+    for line in text.splitlines():
+        f = line.split()
+        if f and f[0] in ("●", "×", "*"):
+            f = f[1:]
+        if len(f) >= 4:
+            out.append((f[0], f[2], f[3]))
+    return out
+
+
+def parse_systemctl_show(text):
+    """One dict per unit from `systemctl show -p ...` with several units (blocks split by a blank line)."""
+    blocks, cur = [], {}
+    for line in text.splitlines() + [""]:
+        if not line.strip():
+            if cur:
+                blocks.append(cur)
+            cur = {}
+            continue
+        k, _, v = line.partition("=")
+        cur[k.strip()] = v.strip()
+    return blocks
+
+
+def collect_units(memo):
+    if not has("systemctl"):
+        return None
+    enabled = [n for n in parse_unit_files(check_out(["systemctl", "list-unit-files", "--state=enabled",
+                                                      "--no-legend", "--plain"])) if UNIT_PATTERN.match(n)]
+    loaded = parse_list_units(check_out(["systemctl", "list-units", "--all", "--no-legend", "--plain"]))
+    names = list(dict.fromkeys(enabled + [n for n, _, sub in loaded if UNIT_PATTERN.match(n) or sub == "auto-restart"]))
+    names = [n for n in names if UNIT_RE.match(n)][:LIST_MAX]
+    if not names:
+        return []
+    out = []
+    for b in parse_systemctl_show(check_out(["systemctl", "show", "-p", "Id,ActiveState,SubState,NRestarts,UnitFileState",
+                                             "--"] + names)):
+        is_enabled = b.get("UnitFileState", "").startswith("enabled")
+        if not (is_enabled or b.get("SubState") == "auto-restart"):
+            continue
+        restarts = b.get("NRestarts", "")
+        out.append({"name": clean_text(b.get("Id"), 100), "enabled": is_enabled, "active": clean_text(b.get("ActiveState"), 20),
+                    "sub": clean_text(b.get("SubState"), 20), "restarts": int(restarts) if restarts.isdigit() else None})
+    return out
+
+
+# -- containers: docker ps -a + docker inspect (selected fields only, never env or command) --
+
+PS_FORMAT = "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.State}}\t{{.Status}}"
+INSPECT_FORMAT = ('{"id":{{json .Id}},"restarts":{{json .RestartCount}},"policy":{{json .HostConfig.RestartPolicy.Name}},'
+                  '"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}},'
+                  '"status":{{json .State.Status}},"exit_code":{{json .State.ExitCode}},"oom":{{json .State.OOMKilled}},'
+                  '"started":{{json .State.StartedAt}},"image":{{json .Config.Image}}}')
+DB_IMAGE_RE = re.compile(r"mysql|mariadb|postgres|timescale|redis|pgbouncer|adminer|phpmyadmin", re.I)
+NODE_IMAGE_RE = re.compile(r"(^|/)node(:|@|$)")
+CONTAINER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+
+
+def image_tag(image):
+    """repo:tag without a digest."""
+    return clean_text(str(image or "").split("@")[0], 100)
+
+
+def parse_docker_ps(text):
+    out = []
+    for line in text.splitlines():
+        f = line.split("\t")
+        if len(f) >= 5 and CONTAINER_RE.match(f[1].split(",")[0]):
+            out.append({"id": f[0][:64], "name": f[1].split(",")[0], "image": f[2], "state": f[3], "status": f[4]})
+    return out
+
+
+def parse_docker_time(value):
+    m = re.match(r"(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)", str(value or ""))
+    if not m or m.group(1) == "0001":
+        return None
+    return calendar.timegm(tuple(int(x) for x in m.groups()) + (0, 0, 0))
+
+
+def parse_docker_inspect(text):
+    out = {}
+    for line in text.splitlines():
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(d, dict) and isinstance(d.get("id"), str):
+            out[d["id"]] = d
+    return out
+
+
+def collect_containers(memo):
+    if not has("docker"):
+        return None
+    rows = parse_docker_ps(check_out(["docker", "ps", "-a", "--no-trunc", "--format", PS_FORMAT], timeout=SLOW_TIMEOUT_S))[:50]
+    details = {}
+    if rows:
+        details = parse_docker_inspect(check_out(["docker", "inspect", "--format", INSPECT_FORMAT] + [r["id"] for r in rows],
+                                                 timeout=SLOW_TIMEOUT_S))
+    out = []
+    for r in rows:
+        d = details.get(r["id"], {})
+        num = lambda v: v if isinstance(v, int) and not isinstance(v, bool) else None  # noqa: E731
+        out.append({"name": r["name"], "image": image_tag(d.get("image") or r["image"]), "state": clean_text(r["state"], 20),
+                    "status": clean_text(r["status"], 60, scrub=True), "restarts": num(d.get("restarts")),
+                    "health": clean_text(d.get("health"), 20), "policy": clean_text(d.get("policy"), 20),
+                    "exit_code": num(d.get("exit_code")), "oom_killed": d.get("oom") if isinstance(d.get("oom"), bool) else None,
+                    "started_at": parse_docker_time(d.get("started"))})
+    return out
+
+
+def pasarguard_containers(rows):
+    """Running PasarGuard panel and node containers (database containers of the same project excluded)."""
+    return [r for r in rows if "pasarguard" in (r["name"] + " " + r["image"]).lower() and not DB_IMAGE_RE.search(r["image"])
+            and r["state"] == "running"]
+
+
+LOG_SIGNATURES = (("unavailable", b"Code: Unavailable"), ("keepalive", b"keep alive timeout"),
+                  ("queuepool", b"QueuePool limit"), ("certfail", b"CERTIFICATE_VERIFY_FAILED"))
+
+
+def collect_container_logs(memo):
+    """Per PasarGuard container, how many log lines of the last 10 minutes match each known failure. Counts only."""
+    if not has("docker"):
+        return None
+    rows = pasarguard_containers(parse_docker_ps(check_out(["docker", "ps", "--no-trunc", "--format", PS_FORMAT],
+                                                           timeout=SLOW_TIMEOUT_S)))
+    if not rows:
+        return None
+    out, until = [], time.monotonic() + 30
+    for r in rows[:20]:
+        if time.monotonic() > until:
+            break
+        counts, _ = count_lines(["docker", "logs", "--since", "10m", r["name"]], [s for _, s in LOG_SIGNATURES],
+                                SLOW_TIMEOUT_S, merge_stderr=True)
+        out.append(dict({"container": r["name"]}, **{k: n for (k, _), n in zip(LOG_SIGNATURES, counts)}))
+    return out
+
+
+# -- nftables: table names, the relay DNAT table, number of DNAT rules --
+
+def parse_nft_tables(text):
+    out = []
+    for line in text.splitlines():
+        f = line.split()
+        if len(f) == 3 and f[0] == "table":
+            out.append("%s %s" % (f[1], clean_text(f[2], 64)))
+    return out
+
+
+def nft_dnat_counter():
+    by_table, cur = {}, [None]
+
+    def on_line(raw):
+        line = raw.decode("utf-8", "replace").strip()
+        if line.startswith("table "):
+            f = line.split()
+            cur[0] = clean_text(f[2], 64) if len(f) >= 3 else None
+        elif "dnat to" in line and cur[0]:
+            by_table[cur[0]] = by_table.get(cur[0], 0) + 1
+    return by_table, on_line
+
+
+def collect_nft(memo):
+    if not has("nft"):
+        return None
+    tables = parse_nft_tables(check_out(["nft", "list", "tables"]))
+    by_table, on_line = nft_dnat_counter()
+    if stream_lines(["nft", "list", "ruleset"], on_line, CMD_TIMEOUT_S) != 0:
+        raise RuntimeError("nft list ruleset failed")
+    return {"tables": tables[:LIST_MAX], "relay_dnat": any(t.split()[-1] == "relay_dnat" for t in tables),
+            "dnat_rules": sum(by_table.values()), "dnat_by_table": dict(list(by_table.items())[:50]),
+            "ip_forward": read_int("/proc/sys/net/ipv4/ip_forward")}
+
+
+# -- conntrack: live limits and drop counters --
+
+def parse_nf_conntrack_stat(text):
+    """Sums of the per-CPU hex counters in /proc/net/stat/nf_conntrack."""
+    lines = [line.split() for line in text.splitlines() if line.strip()]
+    if len(lines) < 2:
+        return None
+    head, sums = lines[0], {}
+    for row in lines[1:]:
+        for k, v in zip(head, row):
+            try:
+                sums[k] = sums.get(k, 0) + int(v, 16)
+            except ValueError:
+                pass
+    return sums
+
+
+def collect_conntrack(memo):
+    base = "/proc/sys/net/netfilter/"
+    count = read_int(base + "nf_conntrack_count")
+    if count is None:
+        return {"module_loaded": os.path.isdir("/sys/module/nf_conntrack"), "count": None, "max": None,
+                "tcp_established_timeout": None, "insert_failed": None, "drop": None, "early_drop": None}
+    stat = parse_nf_conntrack_stat(read("/proc/net/stat/nf_conntrack")) or {}
+    return {"module_loaded": True, "count": count, "max": read_int(base + "nf_conntrack_max"),
+            "tcp_established_timeout": read_int(base + "nf_conntrack_tcp_timeout_established"),
+            "insert_failed": stat.get("insert_failed"), "drop": stat.get("drop"), "early_drop": stat.get("early_drop")}
+
+
+# -- kernel and host baseline --
+
+def parse_vmstat(text, key):
+    m = re.search(r"(?m)^%s\s+(\d+)$" % re.escape(key), text)
+    return int(m.group(1)) if m else None
+
+
+def parse_timedatectl(text):
+    value = text.strip().rpartition("=")[2].strip().lower()
+    return {"yes": True, "no": False}.get(value)
+
+
+SIZE_UNITS = {"B": 1 / 1048576, "K": 1 / 1024, "M": 1, "G": 1024, "T": 1048576}
+
+
+def parse_journal_usage(text):
+    """MB from `journalctl --disk-usage` ("... take up 1.2G in the file system.")."""
+    m = re.search(r"take up ([\d.]+)\s*([BKMGT])", text)
+    return round(float(m.group(1)) * SIZE_UNITS[m.group(2)], 1) if m else None
+
+
+def inode_pct(path="/"):
+    st = os.statvfs(path)
+    return round(100.0 * (st.f_files - st.f_ffree) / st.f_files, 1) if st.f_files else None
+
+
+def collect_kernel(memo):
+    p = "/proc/sys/"
+    return {
+        "congestion": read_word(p + "net/ipv4/tcp_congestion_control"),
+        "qdisc": read_word(p + "net/core/default_qdisc"),
+        "mtu_probing": read_int(p + "net/ipv4/tcp_mtu_probing"),
+        "ip_forward": read_int(p + "net/ipv4/ip_forward"),
+        "reserved_ports": read(p + "net/ipv4/ip_local_reserved_ports").strip()[:STR_MAX] or None,
+        "swappiness": read_int(p + "vm/swappiness"),
+        "oom_kill": parse_vmstat(read("/proc/vmstat"), "oom_kill"),
+        "boot_id": read_word(p + "kernel/random/boot_id"),
+        "ntp_synced": soft(lambda: parse_timedatectl(check_out(["timedatectl", "show", "-p", "NTPSynchronized"])))
+        if has("timedatectl") else None,
+        "inode_pct": soft(inode_pct),
+        "journal_mb": soft(lambda: parse_journal_usage(check_out(["journalctl", "--disk-usage"], timeout=SLOW_TIMEOUT_S)))
+        if has("journalctl") else None,
+    }
+
+
+# -- security: firewall, fail2ban, sshd --
+
+def parse_ufw_conf(text):
+    m = re.search(r"(?m)^\s*ENABLED\s*=\s*(\w+)", text)
+    return None if not m else ("active" if m.group(1).lower() == "yes" else "inactive")
+
+
+def parse_sshd_password_auth(text):
+    m = re.search(r"(?m)^passwordauthentication\s+(\w+)", text)
+    return None if not m else m.group(1).lower() == "yes"
+
+
+def fail2ban_state():
+    b = parse_systemctl_show(check_out(["systemctl", "show", "-p", "LoadState,ActiveState", "fail2ban.service"]))
+    if not b or b[0].get("LoadState") != "loaded":
+        return None
+    return clean_text(b[0].get("ActiveState"), 20)
+
+
+def collect_security(memo):
+    conf = read("/etc/ufw/ufw.conf")
+    return {
+        "ufw": parse_ufw_conf(conf) if conf else None,
+        "fail2ban": soft(fail2ban_state) if has("systemctl") else None,
+        "password_auth": soft(lambda: parse_sshd_password_auth(check_out(["sshd", "-T"]))) if has("sshd") else None,
+    }
+
+
+# -- apt: what would make the next reboot or upgrade fail --
+
+def collect_apt(memo):
+    if not has("dpkg"):
+        return None
+    audit = check_out(["dpkg", "--audit"], ok=(0, 1))
+    holds = soft(lambda: check_out(["apt-mark", "showhold"]).split()) if has("apt-mark") else None
+    pkgs = {line.strip() for line in read("/var/run/reboot-required.pkgs").splitlines() if line.strip()}
+    return {"dpkg_audit": len([line for line in audit.splitlines() if line.strip()]),
+            "held_docker": None if holds is None else any(p in holds for p in HOLD_PKGS),
+            "reboot_required_pkgs": len(pkgs)}
+
+
+# -- tunnels: ports, peer and interface from tunnel configs; every other key (token, secret, ...) is dropped --
+
+TUNNEL_GLOBS = (("backhaul", "/etc/backhaul/*.toml"), ("backpack", "/etc/backpack/*.toml"), ("rathole", "/etc/rathole/*.toml"),
+                ("frp", "/etc/frp/*.toml"), ("frp", "/etc/frp/*.ini"), ("wattun", "/etc/wattun/*.yml"),
+                ("wattun", "/etc/wattun/*.yaml"))
+# the only keys read from a tunnel config
+PEER_KEYS = ("remote_addr", "server_addr", "serveraddr", "peer_ip", "peer", "remote")
+LISTEN_KEYS = ("bind_addr", "bindaddr", "bind_port", "bindport", "listen", "listen_port", "remote_port", "remoteport")
+IFACE_KEYS = ("iface", "interface", "tun_name", "device", "dev", "ifname")
+MODE_KEYS = ("mode", "role")
+KIND_KEYS = ("transport", "carrier", "type")
+HOST_RE = re.compile(r"^[A-Za-z0-9.:\[\]_-]{1,100}$")
+IFACE_RE = re.compile(r"^[A-Za-z0-9_.@-]{1,15}$")
+WORD_RE = re.compile(r"^[A-Za-z0-9_-]{1,24}$")
+TUNNEL_NAME_RE = re.compile(r"^[A-Za-z0-9@._-]{1,64}$")
+LINK_KINDS = {768: "ipip", 776: "sit", 778: "gre", 823: "ip6gre", 65534: "tun"}
+SYS_NET = "/sys/class/net"
+
+
+def strip_comment(line):
+    out, quote = [], None
+    for ch in line:
+        if quote:
+            if ch == quote:
+                quote = None
+        elif ch in "\"'":
+            quote = ch
+        elif ch in "#;":
+            break
+        out.append(ch)
+    return "".join(out).strip()
+
+
+def config_items(text):
+    """(section, key, raw value) from TOML, INI or simple YAML; arrays may span lines."""
+    section, pending = "", None
+    for line in text.splitlines():
+        line = strip_comment(line)
+        if not line:
+            continue
+        if pending is not None:
+            pending[2] += " " + line
+            if pending[2].count("[") <= pending[2].count("]"):
+                yield tuple(pending)
+                pending = None
+            continue
+        if line.startswith("["):
+            section = line.strip("[] ").lower()
+            continue
+        m = re.match(r"^-?\s*([A-Za-z0-9_.-]+)\s*[=:]\s*(.*)$", line)
+        if not m:
+            continue
+        key, value = m.group(1).lower().rsplit(".", 1)[-1], m.group(2).strip()
+        if value.startswith("[") and value.count("[") > value.count("]"):
+            pending = [section, key, value]
+            continue
+        yield section, key, value
+
+
+def scalar(value):
+    m = re.match(r"""^["']([^"']*)["']""", value)
+    return m.group(1) if m else value.split()[0] if value.split() else ""
+
+
+def port_of(text):
+    """The port of "443", ":443", "0.0.0.0:443" or "[::]:443"."""
+    tail = str(text).strip().rsplit(":", 1)[-1]
+    return int(tail) if tail.isdigit() and 0 < int(tail) < 65536 else None
+
+
+def map_ports(value):
+    """Listening ports of a Backhaul/BackPack `ports = ["443", "8443=127.0.0.1:8443", "2000-2010=..."]` list."""
+    out = []
+    for item in re.findall(r"""["']([^"']*)["']|(\d+)""", value):
+        item = item[0] or item[1]
+        left = item.split("=", 1)[0].strip()
+        rng = re.fullmatch(r"(?:.*:)?(\d+)-(\d+)", left)
+        if rng:
+            lo, hi = int(rng.group(1)), int(rng.group(2))
+            if 0 < lo <= hi < 65536:
+                out.extend(range(lo, min(hi, lo + LIST_MAX) + 1))
+            continue
+        p = port_of(left)
+        if p:
+            out.append(p)
+    return out
+
+
+def parse_tunnel_config(kind, name, text):
+    """{name, type, mode, transport, ports, peer, iface} of one tunnel config; nothing else is kept."""
+    info = {"name": name, "type": kind, "mode": None, "transport": None, "ports": [], "peer": None, "iface": None}
+    for section, key, value in config_items(text):
+        head = section.split(".")[0]
+        if info["mode"] is None and head in ("server", "client", "common"):
+            info["mode"] = head if head != "common" else None
+        if key == "ports":
+            info["ports"].extend(map_ports(value))
+        elif key in LISTEN_KEYS:
+            p = port_of(scalar(value))
+            if p and head != "client":
+                info["ports"].append(p)
+        elif key in PEER_KEYS and info["peer"] is None:
+            v = scalar(value)
+            info["peer"] = v if HOST_RE.match(v) else None
+        elif key in IFACE_KEYS and info["iface"] is None:
+            v = scalar(value)
+            info["iface"] = v if IFACE_RE.match(v) else None
+        elif key in MODE_KEYS:
+            v = scalar(value).lower()
+            info["mode"] = v if WORD_RE.match(v) else info["mode"]
+        elif key in KIND_KEYS and info["transport"] is None:
+            v = scalar(value).lower()
+            info["transport"] = v if WORD_RE.match(v) else None
+    info["ports"] = sorted(set(info["ports"]))[:LIST_MAX]
+    if info["mode"] is None and kind == "frp":
+        info["mode"] = "server" if name.startswith("frps") else "client" if name.startswith("frpc") else None
+    return info
+
+
+def unit_candidates(kind, name):
+    return {
+        "backhaul": ["backhaul-%s.service" % name, "backhaul.service"],
+        "backpack": ["backpack-%s.service" % name],
+        "rathole": ["rathole@%s.service" % name, "ratholes@%s.service" % name, "ratholec@%s.service" % name,
+                    "rathole-%s.service" % name],
+        "frp": ["%s.service" % name, "frps@%s.service" % name, "frpc@%s.service" % name],
+        "wattun": ["wattun@%s.service" % name],
+    }[kind]
+
+
+def iface_bytes(iface):
+    base = "%s/%s/statistics/" % (SYS_NET, iface)
+    rx, tx = read_int(base + "rx_bytes"), read_int(base + "tx_bytes")
+    return (rx, tx) if rx is not None and tx is not None else None
+
+
+def tunnel_links():
+    """L3 tunnel interfaces (GRE, SIT, IPIP, TUN/WireGuard) with their byte counters."""
+    out = []
+    for path in sorted(glob.glob(SYS_NET + "/*"))[:LIST_MAX * 2]:
+        iface = os.path.basename(path)
+        kind = LINK_KINDS.get(read_int(path + "/type"))
+        if not kind or not IFACE_RE.match(iface):
+            continue
+        b = iface_bytes(iface)
+        out.append({"iface": iface, "kind": kind, "mtu": read_int(path + "/mtu"), "state": read_word(path + "/operstate", 12),
+                    "rx_bytes": b[0] if b else None, "tx_bytes": b[1] if b else None})
+    return out[:LIST_MAX]
+
+
+def collect_tunnels(memo):
+    found = []
+    for kind, pattern in TUNNEL_GLOBS:
+        for path in sorted(glob.glob(pattern))[:100]:
+            name = os.path.splitext(os.path.basename(path))[0]
+            if not TUNNEL_NAME_RE.match(name) or BACKUP_RE.search(name):
+                continue
+            found.append(parse_tunnel_config(kind, name, read(path)[:1 << 20]))
+    links = tunnel_links()
+    if not found and not links:
+        return None
+    states = {}
+    if found and has("systemctl"):
+        names = [u for t in found for u in unit_candidates(t["type"], t["name"]) if UNIT_RE.match(u)]
+        blocks = soft(lambda: parse_systemctl_show(check_out(["systemctl", "show", "-p", "Id,LoadState,ActiveState", "--"]
+                                                            + list(dict.fromkeys(names))[:LIST_MAX]))) or []
+        states = {b.get("Id"): b.get("ActiveState") for b in blocks if b.get("LoadState") == "loaded"}
+    for t in found:
+        unit = next((u for u in unit_candidates(t["type"], t["name"]) if u in states), None)
+        t["unit"], t["active"] = unit, states.get(unit) if unit else None
+        if t["iface"]:
+            b = iface_bytes(t["iface"])
+            t["rx_bytes"], t["tx_bytes"] = (b[0], b[1]) if b else (None, None)
+    return {"configs": found[:LIST_MAX], "links": links}
+
+
+# -- PasarGuard panel: one fixed read-only script inside the panel's own container --
+
+# Runs as `docker exec -i -w /code CONTAINER python -`. It reads the panel's own database settings inside the
+# container, makes every session read-only with a short statement timeout, uses windowed queries on indexed
+# columns, and prints one JSON object of names, states and numbers. It never prints the database address or
+# an exception message, only exception class names.
+PANEL_SCRIPT = r'''
+import asyncio, datetime, json, os, signal, sys
+signal.alarm(7)
+OUT, ERRORS = {}, []
+
+
+def db_url():
+    url = os.environ.get("SQLALCHEMY_DATABASE_URL")
+    if not url and os.path.exists("/code/.env"):
+        for line in open("/code/.env"):
+            k, _, v = line.partition("=")
+            if k.strip() == "SQLALCHEMY_DATABASE_URL":
+                url = v.strip().strip("'\"")
+    return url or "sqlite+aiosqlite:///db.sqlite3"
+
+
+async def main():
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+    engine = create_async_engine(db_url(), pool_pre_ping=False)
+    dialect = engine.dialect.name
+    groups = "`groups`" if dialect in ("mysql", "mariadb") else "groups"
+
+    async def read_only(c):
+        if dialect == "postgresql":
+            await c.execute(text("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY"))
+            await c.execute(text("SET statement_timeout = 3000"))
+        elif dialect in ("mysql", "mariadb"):
+            await c.execute(text("SET SESSION TRANSACTION READ ONLY"))
+            try:
+                await c.execute(text("SET SESSION max_execution_time = 3000"))
+            except Exception:
+                await c.execute(text("SET SESSION max_statement_time = 3"))
+        elif dialect == "sqlite":
+            await c.execute(text("PRAGMA query_only = ON"))
+        await c.commit()  # the session settings apply from the next transaction on
+
+    async def fetch(*queries, **params):
+        last = None
+        for sql in queries:
+            try:
+                async with engine.connect() as c:
+                    await read_only(c)
+                    return (await c.execute(text(sql), params)).all()
+            except Exception as e:
+                last = e
+        raise last
+
+    async def part(name, coro):
+        try:
+            OUT[name] = await coro
+        except Exception as e:
+            ERRORS.append(name + ":" + type(e).__name__)
+
+    async def nodes():
+        rows = await fetch("SELECT id, name, address, port, status, message, keep_alive FROM nodes ORDER BY id LIMIT 300",
+                           "SELECT id, name, address, port, status, message, NULL FROM nodes ORDER BY id LIMIT 300")
+        return [{"id": r[0], "name": r[1], "address": r[2], "port": r[3], "status": str(r[4] or ""),
+                 "message": str(r[5] or "")[:120], "keep_alive": r[6]} for r in rows]
+
+    hour = datetime.datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+
+    async def usage_between(start, end):
+        rows = await fetch("SELECT node_id, COUNT(DISTINCT user_id), SUM(used_traffic) FROM node_user_usages "
+                           "WHERE created_at >= :a AND created_at < :b GROUP BY node_id", a=start, b=end)
+        return [{"node_id": r[0], "users": int(r[1] or 0), "bytes": int(r[2] or 0)} for r in rows]
+
+    async def usage():
+        one = datetime.timedelta(hours=1)
+        last = await usage_between(hour - one, hour)
+        prev = await usage_between(hour - 2 * one, hour - one)
+        start = hour - one
+        epoch = int((start - datetime.datetime(1970, 1, 1)).total_seconds())
+        return {"hour_start": epoch, "last": last, "prev": prev}
+
+    async def admins():
+        rows = await fetch("SELECT username, used_traffic, data_limit FROM admins ORDER BY username LIMIT 300",
+                           "SELECT username, NULL, NULL FROM admins ORDER BY username LIMIT 300")
+        return [{"name": r[0], "used": r[1], "limit": r[2]} for r in rows]
+
+    async def inbounds_without_group():
+        rows = await fetch(
+            "SELECT i.tag FROM inbounds i WHERE NOT EXISTS (SELECT 1 FROM inbounds_groups_association a JOIN %s g "
+            "ON g.id = a.group_id WHERE a.inbound_id = i.id AND NOT g.is_disabled) ORDER BY i.tag LIMIT 300" % groups,
+            "SELECT i.tag FROM inbounds i WHERE NOT EXISTS (SELECT 1 FROM inbounds_groups_association a "
+            "WHERE a.inbound_id = i.id) ORDER BY i.tag LIMIT 300")
+        return [r[0] for r in rows]
+
+    async def user_status():
+        rows = await fetch("SELECT status, COUNT(*) FROM users GROUP BY status")
+        return {str(r[0]).split(".")[-1].lower(): int(r[1]) for r in rows}
+
+    await part("nodes", nodes())
+    await part("usage", usage())
+    await part("admins", admins())
+    await part("inbounds_without_group", inbounds_without_group())
+    await part("user_status", user_status())
+    await engine.dispose()
+
+
+try:
+    try:
+        OUT["version"] = open("/code/VERSION").read().strip()[:40]
+    except OSError:
+        OUT["version"] = None
+    asyncio.run(main())
+    OUT["errors"] = ERRORS
+    print(json.dumps(OUT, default=lambda v: int(v) if hasattr(v, "__int__") else None, separators=(",", ":")))
+except BaseException as e:
+    print(json.dumps({"error": type(e).__name__}))
+'''
+PANEL_FIND_S = 300
+USER_STATUSES = ("active", "limited", "expired", "on_hold", "disabled")
+CLASS_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,59}$")
+PART_ERROR_RE = re.compile(r"^[a-z_]{1,40}:[A-Za-z_][A-Za-z0-9_]{0,59}$")
+VERSION_RE = re.compile(r"^[A-Za-z0-9.+_-]{1,40}$")
+
+
+class PanelError(Exception):
+    """A panel read failed; `short` is the only text that reaches the report."""
+
+    def __init__(self, short):
+        super().__init__(short)
+        self.short = short if CLASS_RE.match(str(short)) else "PanelError"
+
+
+def find_panel_container():
+    """Name of a running PasarGuard panel container (one with /code), or None."""
+    if not has("docker"):
+        return None
+    rows = pasarguard_containers(parse_docker_ps(check_out(["docker", "ps", "--no-trunc", "--format", PS_FORMAT],
+                                                           timeout=SLOW_TIMEOUT_S)))
+    for r in [r for r in rows if not NODE_IMAGE_RE.search(r["image"])][:5]:
+        code, _ = run_check(["docker", "exec", r["name"], "test", "-d", "/code"], ok=(0, 1))
+        if code == 0:
+            return r["name"]
+    return None
+
+
+def as_int(v):
+    return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+
+def clean_panel(d, container):
+    """Only known fields of the panel script's answer, each type-checked, capped and scrubbed."""
+    if not isinstance(d, dict):
+        raise PanelError("BadOutput")
+    if "error" in d:
+        raise PanelError(d.get("error"))
+    rows = lambda v: [x for x in v if isinstance(x, dict)][:LIST_MAX] if isinstance(v, list) else None  # noqa: E731
+    nodes = [{"id": as_int(n.get("id")), "name": clean_text(n.get("name"), 64, scrub=True),
+              "address": n.get("address") if isinstance(n.get("address"), str) and HOST_RE.match(n["address"]) else None,
+              "port": as_int(n.get("port")), "status": clean_text(n.get("status"), 20, scrub=True),
+              "message": clean_text(n.get("message"), 120, scrub=True), "keep_alive": as_int(n.get("keep_alive"))}
+             for n in rows(d.get("nodes")) or []] if "nodes" in d else None
+    usage = None
+    if isinstance(d.get("usage"), dict):
+        u = d["usage"]
+        usage = {"hour_start": as_int(u.get("hour_start"))}
+        for k in ("last", "prev"):
+            usage[k] = [{"node_id": as_int(x.get("node_id")), "users": as_int(x.get("users")), "bytes": as_int(x.get("bytes"))}
+                        for x in rows(u.get(k)) or []]
+    admins = [{"name": clean_text(a.get("name"), 64, scrub=True), "used": as_int(a.get("used")), "limit": as_int(a.get("limit"))}
+              for a in rows(d.get("admins")) or []] if "admins" in d else None
+    tags = d.get("inbounds_without_group")
+    tags = [clean_text(t, 64, scrub=True) for t in tags[:LIST_MAX] if isinstance(t, str)] if isinstance(tags, list) else None
+    status = None
+    if isinstance(d.get("user_status"), dict):
+        raw = {str(k): v for k, v in d["user_status"].items() if as_int(v) is not None}
+        status = {k: raw.get(k, 0) for k in USER_STATUSES}
+        status["other"] = sum(v for k, v in raw.items() if k not in USER_STATUSES)
+    version = d.get("version") if isinstance(d.get("version"), str) and VERSION_RE.match(d["version"]) else None
+    errors = [e for e in d.get("errors") or [] if isinstance(e, str) and PART_ERROR_RE.match(e)][:20]
+    return {"container": container, "version": version, "nodes": nodes, "usage": usage, "admins": admins,
+            "inbounds_without_group": tags, "user_status": status, "errors": errors}
+
+
+def parse_panel_output(text, container):
+    lines = [line for line in text.splitlines() if line.strip().startswith("{")]
+    try:
+        d = json.loads(lines[-1]) if lines else None
+    except ValueError:
+        raise PanelError("BadOutput")
+    return clean_panel(d, container)
+
+
+def collect_panel(memo):
+    now = time.monotonic()
+    if now - memo.get("found_at", -1e9) > PANEL_FIND_S:
+        memo["container"], memo["found_at"] = find_panel_container(), now
+    name = memo.get("container")
+    if not name:
+        return None
+    try:
+        _, out = run_check(["docker", "exec", "-i", "-w", "/code", name, "python", "-"], timeout=SLOW_TIMEOUT_S,
+                           input=PANEL_SCRIPT)
+    except subprocess.TimeoutExpired:
+        raise PanelError("Timeout")
+    except (OSError, RuntimeError):
+        memo["found_at"] = -1e9  # the container may have been replaced: look again next time
+        raise PanelError("ExecFailed")
+    return parse_panel_output(out, name)
+
+
+# -- runner: cadence, cache, time budget --
+
+# name, collector, seconds between runs (0 = every report)
+COLLECTORS = (
+    ("listeners", collect_listeners, 0),
+    ("units", collect_units, 0),
+    ("conntrack", collect_conntrack, 0),
+    ("containers", collect_containers, 60),
+    ("nft", collect_nft, 60),
+    ("tunnels", collect_tunnels, 60),
+    ("kernel", collect_kernel, 300),
+    ("security", collect_security, 300),
+    ("container_logs", collect_container_logs, 300),
+    ("apt", collect_apt, 600),
+)
+PANEL_COLLECTOR = ("panel", collect_panel, 60)
+
+
+def all_collectors():
+    return COLLECTORS + (PANEL_COLLECTOR,)
+
+
+def short_error(e):
+    if isinstance(e, PanelError):
+        return e.short
+    if isinstance(e, subprocess.TimeoutExpired):
+        return "Timeout"
+    return type(e).__name__
+
+
+def launch(fn, memo):
+    job = {"done": threading.Event(), "value": None, "error": None}
+
+    def work():
+        try:
+            job["value"] = fn(memo)
+        except Exception as e:  # a broken collector only blanks its own part
+            job["error"] = short_error(e)
+        finally:
+            job["done"].set()
+    threading.Thread(target=work, name="dl-check", daemon=True).start()
+    return job
+
+
+def start_checks(state, clock=time.monotonic):
+    """Starts every collector that is due and not still running; returns at once."""
+    ck = state.setdefault("checks", {})
+    now = clock()
+    for name, fn, every in all_collectors():
+        s = ck.setdefault(name, {"next": 0.0, "value": None, "error": None, "at": None, "job": None, "memo": {}})
+        if s["job"] is not None and now - s["started"] > STUCK_S:
+            s["job"], s["error"], s["next"] = None, "Timeout", now + every
+        if s["job"] is None and now >= s["next"]:
+            s["job"], s["started"] = launch(fn, s["memo"]), now
+    return now
+
+
+def finish_checks(state, deadline, clock=time.monotonic):
+    """Waits for running collectors until the deadline; returns (checks, checks_error, panel, panel_error)."""
+    ck = state.get("checks") or {}
+    for s in ck.values():
+        if s["job"] is not None:
+            s["job"]["done"].wait(max(0.0, deadline - clock()))
+    now = clock()
+    out, errors, panel, panel_error = {}, [], None, None
+    for name, fn, every in all_collectors():
+        s = ck.get(name)
+        if s is None:
+            value, err = None, None
+        else:
+            job = s["job"]
+            if job is not None and job["done"].is_set():
+                s["job"], s["next"] = None, now + every
+                s["value"], s["error"], s["at"] = job["value"], job["error"], None if job["error"] else now
+            value, err = s["value"], s["error"]
+            if s["job"] is not None and (s["at"] is None or now - s["at"] > max(3 * every, 90)):
+                value, err = None, "Timeout"  # still running and nothing recent to show
+            if err:
+                value = None
+        if name == "panel":
+            panel, panel_error = value, err
+            continue
+        out[name] = bounded(value)
+        if err:
+            errors.append(name)
+    if isinstance(out.get("security"), dict):
+        listeners = out.get("listeners")
+        out["security"]["sshd_ports"] = sorted({x["port"] for x in listeners if x["proto"] == "tcp" and x["proc"] == "sshd"}) \
+            if isinstance(listeners, list) else None
+    return out, errors, bounded(panel), panel_error
+
+
+def checks_fields(state, started):
+    checks, errors, panel, panel_error = finish_checks(state, started + CHECKS_BUDGET_S)
+    out = {"checks": checks, "checks_error": errors}
+    if panel is not None:
+        out["panel"] = panel
+    if panel_error:
+        out["panel_error"] = panel_error
+    return out
 
 
 # ---- jobs ----
