@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ServerTraffic, TrafficSeries, TrafficSummary, Volume } from "@/api/generated/model";
 import { AppProviders } from "@/app/providers";
 import { routeTree } from "@/routeTree.gen";
+import { t } from "@/strings";
 
 const GB = 1024 ** 3;
 const NOW = Math.floor(Date.now() / 1000);
@@ -89,7 +90,11 @@ const series = (over: Partial<TrafficSeries> = {}): TrafficSeries => ({
 
 const SERVERS = [server(1, "de-1", "exit", "DE", 60, 3), server(2, "ir-1", "relay", "IR", 40, 1)];
 
-type Mocks = { summary?: TrafficSummary; series?: (query: URLSearchParams) => TrafficSeries };
+type Mocks = {
+	summary?: TrafficSummary;
+	series?: (query: URLSearchParams) => TrafficSeries;
+	links?: unknown[];
+};
 
 function open(entry: string, mocks: Mocks = {}) {
 	const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -102,7 +107,9 @@ function open(entry: string, mocks: Mocks = {}) {
 					? (mocks.summary ?? summary(SERVERS))
 					: path === "/traffic/series"
 						? (mocks.series ?? (() => series()))(url.searchParams)
-						: [];
+						: path === "/links/traffic"
+							? { since: 0, until: 1, links: mocks.links ?? [] }
+							: [];
 		return new Response(JSON.stringify(body), {
 			status: 200,
 			headers: { "Content-Type": "application/json" },
@@ -277,5 +284,28 @@ describe("TrafficPage", () => {
 		);
 		expect(screen.getByText("در این بازه روزی با ترافیک ثبت نشده است.")).toBeTruthy();
 		expect(screen.getAllByText("در این بازه ترافیکی ثبت نشده است.").length).toBeGreaterThan(0);
+	});
+
+	it("lists the bytes between a relay and each exit", async () => {
+		const link = {
+			server_id: 7,
+			server_name: "رلهٔ آزمایشی",
+			server_role: "relay",
+			peer_ip: "198.51.100.20",
+			peer_id: 1,
+			peer_name: "خروجی آزمایشی",
+			peer_role: "exit",
+			in_bytes: 3_000_000_000,
+			out_bytes: 1_000_000_000,
+		};
+		open("/traffic", { links: [link] });
+		expect(await screen.findByText("رلهٔ آزمایشی")).toBeTruthy();
+		expect(screen.getByText("خروجی آزمایشی")).toBeTruthy();
+		expect(screen.getByText("198.51.100.20")).toBeTruthy();
+	});
+
+	it("says how to switch counting on when no link has data", async () => {
+		open("/traffic");
+		expect(await screen.findByText(t.traffic.links.emptyTitle)).toBeTruthy();
 	});
 });

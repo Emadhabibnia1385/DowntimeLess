@@ -8,6 +8,7 @@ import { useSeries, useSummary } from "../api";
 import { serverLabel } from "../lib/rows";
 import { dayStart, type Period, periodDays, periodWindow } from "../lib/period";
 import { HourCard } from "./HourCard";
+import { LinksCard } from "./LinksCard";
 import { PeriodBar } from "./PeriodBar";
 import { ServerTable } from "./ServerTable";
 import { TopDaysCard } from "./TopDaysCard";
@@ -102,6 +103,7 @@ export function TrafficPage({
 							</>
 						)}
 					</Loadable>
+					<LinksCard window={stable} />
 					<ServerTable
 						rows={summary.data?.servers}
 						status={summary.isPending ? "loading" : summary.isError ? "error" : "ready"}
