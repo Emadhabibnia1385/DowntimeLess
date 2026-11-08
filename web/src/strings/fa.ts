@@ -225,7 +225,7 @@ export const fa = {
 		count: (count: string) => `${count} سرور`,
 		deleteTitle: "حذف این دسته‌بندی؟",
 		deleteBody: "سرورهای این دسته بدون دسته‌بندی می‌شوند و حذف نمی‌شوند.",
-		filterLabel: "نمایش سرورهای یک دسته‌بندی",
+		filterField: "دسته‌بندی",
 		filterAll: "همه",
 	},
 	servers: {
@@ -270,7 +270,7 @@ export const fa = {
 			actions:
 				"به‌روزرسانی agent، ویرایش و حذف. زیرش نسخهٔ agent است: تیک یعنی به‌روز، ضربدر یعنی نیاز به به‌روزرسانی.",
 		},
-		roleFilterLabel: "نمایش سرورهای یک نقش",
+		roleField: "نقش",
 		coresOf: (busy: string, total: string) => `${busy} از ${total}`,
 		gigUsed: (used: string, total: string) => `${used} از ${total}`,
 		version: "نسخه",

@@ -1,4 +1,4 @@
-import { Button, type DataColumn, DataTable, FilterChips, PageHeader } from "@nyxon/nasim";
+import { Button, type DataColumn, DataTable, PageHeader, SelectField } from "@nyxon/nasim";
 import { type ReactNode, useMemo, useState } from "react";
 import type { ServerOut } from "@/api/generated/model";
 import { useCanManage } from "@/features/auth";
@@ -78,13 +78,35 @@ export function ServersPage() {
 		[categories.data],
 	);
 	const hasUncategorized = (servers.data ?? []).some((server) => server.category_id == null);
+	const count = (test: (server: ServerOut) => boolean) =>
+		formatNumber((servers.data ?? []).filter(test).length);
+	const withCount = (label: string, amount: string) => `${label} (${amount})`;
 	const options = [
-		{ value: ALL, label: t.categories.filterAll },
+		{
+			value: ALL,
+			label: withCount(
+				t.categories.filterAll,
+				count(() => true),
+			),
+		},
 		...(categories.data ?? []).map((category) => ({
 			value: String(category.id),
-			label: category.name,
+			label: withCount(
+				category.name,
+				count((server) => server.category_id === category.id),
+			),
 		})),
-		...(hasUncategorized && names.size > 0 ? [{ value: NONE, label: t.categories.none }] : []),
+		...(hasUncategorized && names.size > 0
+			? [
+					{
+						value: NONE,
+						label: withCount(
+							t.categories.none,
+							count((server) => server.category_id == null),
+						),
+					},
+				]
+			: []),
 	];
 	const fleet = options.some((option) => option.value === filter) ? filter : ALL;
 	const [roleChoice, setRoleChoice] = useState<string>(ALL);
@@ -92,8 +114,20 @@ export function ServersPage() {
 		(servers.data ?? []).some((server) => server.role === role),
 	);
 	const roleOptions = [
-		{ value: ALL, label: t.categories.filterAll },
-		...rolesPresent.map((role) => ({ value: role, label: roleLabel(role) })),
+		{
+			value: ALL,
+			label: withCount(
+				t.categories.filterAll,
+				count(() => true),
+			),
+		},
+		...rolesPresent.map((role) => ({
+			value: role,
+			label: withCount(
+				roleLabel(role),
+				count((server) => server.role === role),
+			),
+		})),
 	];
 	const role = roleOptions.some((option) => option.value === roleChoice) ? roleChoice : ALL;
 	const onSort = (key: SortKey, first: SortDirection) =>
@@ -198,17 +232,17 @@ export function ServersPage() {
 					) : undefined
 				}
 			/>
-			<div className="flex flex-wrap items-start gap-x-8 gap-y-3">
-				<FilterChips
-					label={t.categories.filterLabel}
+			<div className="grid max-w-xl gap-3 sm:grid-cols-2">
+				<SelectField
+					label={t.categories.filterField}
 					value={fleet}
-					onChange={setFilter}
+					onChange={(next) => setFilter(next ?? ALL)}
 					options={options}
 				/>
-				<FilterChips
-					label={t.servers.roleFilterLabel}
+				<SelectField
+					label={t.servers.roleField}
 					value={role}
-					onChange={setRoleChoice}
+					onChange={(next) => setRoleChoice(next ?? ALL)}
 					options={roleOptions}
 				/>
 			</div>

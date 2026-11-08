@@ -1,1 +1,0 @@
-import{n as e}from"./rolldown-runtime-WkwZ5CU-.js";import{Er as t,ut as n}from"./useDocumentTitle-VA7kgxF4.js";var r=e(t(),1);function i(e={}){let{isReadOnly:t}=e,[i,a]=n(e.isSelected,e.defaultSelected||!1,e.onChange),[o]=(0,r.useState)(i);function s(e){t||a(e)}function c(){t||a(!i)}return{isSelected:i,defaultSelected:e.defaultSelected??o,setSelected:s,toggle:c}}export{i as t};
