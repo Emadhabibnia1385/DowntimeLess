@@ -80,7 +80,7 @@ export function LoginPage({ redirect }: { redirect: string | undefined }) {
 	const { scheme } = useTheme();
 
 	return (
-		<div className="grid min-h-dvh place-items-center bg-background px-page py-10 text-foreground">
+		<div className="grid min-h-dvh place-items-center bg-background px-page pt-10 pb-20 text-foreground">
 			<div className="flex w-full max-w-sm flex-col gap-6">
 				<div className="flex flex-col items-center gap-2 text-center">
 					<h1>
@@ -167,9 +167,7 @@ export function LoginPage({ redirect }: { redirect: string | undefined }) {
 						<SubmitButton>{t.login.submit}</SubmitButton>
 					</FormRoot>
 				</div>
-				<div className="flex justify-center">
-					<Footer />
-				</div>
+				<Footer />
 			</div>
 		</div>
 	);

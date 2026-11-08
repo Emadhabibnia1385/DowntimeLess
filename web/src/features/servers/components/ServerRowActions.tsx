@@ -8,7 +8,7 @@ import {
 	useServersUpdate,
 } from "@/api/generated/servers/servers";
 import { errorMessage } from "@/api/transport";
-import { EditIcon, RefreshIcon, TrashIcon } from "@/shared/icons";
+import { CheckIcon, CloseIcon, EditIcon, RefreshIcon, TrashIcon } from "@/shared/icons";
 import { useRefreshAll } from "@/shared/useRefreshAll";
 import { t } from "@/strings";
 import { ServerForm, type ServerFormValues } from "./ServerForm";
@@ -93,18 +93,23 @@ export function ServerRowActions({ server }: { server: ServerOut }) {
 				</Button>
 			</div>
 			{server.agent_version ? (
-				<p className="text-xs text-muted">
-					{t.servers.version}{" "}
+				<p className="flex items-center gap-1 text-xs text-muted">
+					<RefreshIcon aria-hidden className="size-3.5" />
+					<span>{t.servers.version}</span>
 					<span dir="ltr" className="font-mono">
 						{server.agent_version}
 					</span>
 					{server.agent_outdated ? (
-						<span title={t.servers.updateNeeded}>
-							{" "}
-							<span aria-hidden>🔄</span>
+						<span title={t.servers.updateNeeded} className="inline-flex text-danger">
+							<CloseIcon aria-hidden className="size-4" />
 							<span className="sr-only">{t.servers.updateNeeded}</span>
 						</span>
-					) : null}
+					) : (
+						<span title={t.servers.upToDate} className="inline-flex text-success">
+							<CheckIcon aria-hidden className="size-4" />
+							<span className="sr-only">{t.servers.upToDate}</span>
+						</span>
+					)}
 				</p>
 			) : null}
 			<Modal isOpen={editing} onOpenChange={setEditing} title={t.servers.editRowTitle}>

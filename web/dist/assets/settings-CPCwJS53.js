@@ -1,1 +1,0 @@
-import{t as e}from"./settings-DQX94rcS.js";var t=e;export{t as component};

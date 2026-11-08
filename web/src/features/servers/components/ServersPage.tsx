@@ -19,7 +19,7 @@ import { AddServerDialog } from "./AddServerDialog";
 import { ServerNameCell } from "./ServerNameCell";
 import { ServerRowActions } from "./ServerRowActions";
 import { ServerStatusChip } from "./ServerStatusChip";
-import { SortHeader } from "./SortHeader";
+import { PlainHeader, SortHeader } from "./SortHeader";
 import { UpdateAllAgentsButton } from "./UpdateAllAgentsButton";
 
 const percent = (value: number | null | undefined) =>
@@ -123,7 +123,7 @@ export function ServersPage() {
 			? [
 					{
 						id: "actions",
-						header: t.servers.actions,
+						header: <PlainHeader label={t.servers.actions} help={t.servers.help.actions} />,
 						isActions: true,
 						cell: (server: ServerOut) => <ServerRowActions server={server} />,
 					},

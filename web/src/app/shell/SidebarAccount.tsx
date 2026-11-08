@@ -1,6 +1,5 @@
 import { Button, ThemeToggle } from "@nyxon/nasim";
 import { useMe, useSignOut } from "@/features/auth";
-import { Footer } from "@/shared/Footer";
 import { LogoutIcon } from "@/shared/icons";
 import { t } from "@/strings";
 import { InstallButton } from "./InstallButton";
@@ -29,7 +28,6 @@ export function SidebarAccount() {
 					<LogoutIcon aria-hidden />
 				</Button>
 			</div>
-			<Footer />
 		</div>
 	);
 }

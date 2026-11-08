@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Latest } from "@/api/generated/model";
+import { t } from "@/strings";
 import { cpuUsage, diskUsage, ramUsage } from "./usage";
 
 const latest = (over: Partial<Latest>): Latest =>
@@ -13,7 +14,7 @@ describe("usage", () => {
 		expect(u?.detail).toContain("۴");
 	});
 	it("gives only the percent while the agent does not send cores", () => {
-		expect(cpuUsage(latest({ cpu_pct: 10 }))?.detail).toBeNull();
+		expect(cpuUsage(latest({ cpu_pct: 10 }))?.detail).toBe(t.servers.coresUnknown);
 	});
 	it("shows used and total gigabytes for memory and disk", () => {
 		const ram = ramUsage(latest({ ram_pct: 50, ram_used_mb: 4096, ram_total_mb: 8192 }));

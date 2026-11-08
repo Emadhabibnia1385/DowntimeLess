@@ -19,3 +19,5 @@ export { default as TrashIcon } from "~icons/solar/trash-bin-minimalistic-linear
 // Points forward in a left-to-right page: turn it with `rtl:rotate-180` in a right-to-left one
 export { default as ForwardIcon } from "~icons/solar/alt-arrow-right-linear";
 export { default as InstallIcon } from "~icons/solar/download-minimalistic-linear";
+export { default as CheckIcon } from "~icons/solar/check-circle-linear";
+export { default as CloseIcon } from "~icons/solar/close-circle-linear";

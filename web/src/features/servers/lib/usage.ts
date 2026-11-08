@@ -5,7 +5,7 @@ export type Usage = { percent: string; detail: string | null };
 
 const MB_PER_GB = 1024;
 
-/** "۷۵٪" and, when the agent reports the totals, "۳ از ۴ هسته درگیر". */
+/** "۷۵٪" and, under it, "۳ از ۴ هسته درگیر", or a note that an old agent does not report cores. */
 export function cpuUsage(latest: Latest): Usage | null {
 	if (latest.cpu_pct == null) return null;
 	const { cpu_cores: cores } = latest;
@@ -15,7 +15,7 @@ export function cpuUsage(latest: Latest): Usage | null {
 		detail:
 			cores && busy != null
 				? t.servers.coresUsed(formatDecimal(busy), formatDecimal(cores, 0))
-				: null,
+				: t.servers.coresUnknown,
 	};
 }
 

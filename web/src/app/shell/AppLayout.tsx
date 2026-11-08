@@ -28,9 +28,8 @@ function Shell() {
 			sidebarFooter={<SidebarAccount />}
 		>
 			<Outlet />
-			<div className="mt-10 border-t border-border pt-4 lg:hidden">
-				<Footer />
-			</div>
+			<Footer sidebar />
+			<div aria-hidden className="h-12" />
 			<div aria-hidden className="h-16 lg:hidden" />
 			<BottomBar />
 		</AppShell>
