@@ -22,7 +22,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 UA = "DowntimeLess-Agent/" + VERSION
 SELF_PATH = os.path.realpath(__file__)
 # With no address they describe the caller's outbound address; with one, that address itself.
@@ -876,6 +876,9 @@ def soft(fn, *args):
 SS_PROC_RE = re.compile(r'users:\(\("([^"]{1,64})"')
 
 
+UDP_COLLAPSE_OVER = 12
+
+
 def parse_ss_listeners(text):
     seen, out = set(), []
     for line in text.splitlines():
@@ -894,6 +897,14 @@ def parse_ss_listeners(text):
         if key not in seen:
             seen.add(key)
             out.append({"proto": f[0], "port": port, "proc": proc})
+    # a process holding many UDP sockets (xray keeps one per client flow) is one summary row, not a list
+    udp_by_proc = {}
+    for x in out:
+        if x["proto"] == "udp":
+            udp_by_proc.setdefault(x["proc"], []).append(x)
+    crowded = {proc for proc, rows in udp_by_proc.items() if len(rows) > UDP_COLLAPSE_OVER}
+    out = [x for x in out if not (x["proto"] == "udp" and x["proc"] in crowded)]
+    out += [{"proto": "udp", "port": 0, "proc": proc, "count": len(udp_by_proc[proc])} for proc in sorted(crowded, key=str)]
     out.sort(key=lambda x: (x["port"], x["proto"], x["proc"] or ""))
     return out[:LIST_MAX]
 
@@ -967,10 +978,16 @@ def collect_units(memo):
 # -- containers: docker ps -a + docker inspect (selected fields only, never env or command) --
 
 PS_FORMAT = "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.State}}\t{{.Status}}"
-INSPECT_FORMAT = ('{"id":{{json .Id}},"restarts":{{json .RestartCount}},"policy":{{json .HostConfig.RestartPolicy.Name}},'
-                  '"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}},'
-                  '"status":{{json .State.Status}},"exit_code":{{json .State.ExitCode}},"oom":{{json .State.OOMKilled}},'
-                  '"started":{{json .State.StartedAt}},"image":{{json .Config.Image}}}')
+_INSPECT_HEAD = '{"id":{{json .Id}},"restarts":{{json .RestartCount}},"policy":{{json .HostConfig.RestartPolicy.Name}},'
+_INSPECT_TAIL = ('"status":{{json .State.Status}},"exit_code":{{json .State.ExitCode}},"oom":{{json .State.OOMKilled}},'
+                 '"started":{{json .State.StartedAt}},"image":{{json .Config.Image}}}')
+# New Docker answers a missing .State.Health with an error, older Docker with an empty value: try both, then go without
+INSPECT_FORMATS = (
+    _INSPECT_HEAD + '"health":{{with index .State "Health"}}{{json .Status}}{{else}}null{{end}},' + _INSPECT_TAIL,
+    _INSPECT_HEAD + '"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}},' + _INSPECT_TAIL,
+    _INSPECT_HEAD + '"health":null,' + _INSPECT_TAIL,
+)
+INSPECT_FORMAT = INSPECT_FORMATS[0]
 DB_IMAGE_RE = re.compile(r"mysql|mariadb|postgres|timescale|redis|pgbouncer|adminer|phpmyadmin", re.I)
 NODE_IMAGE_RE = re.compile(r"(^|/)node(:|@|$)")
 CONTAINER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
@@ -1015,8 +1032,16 @@ def collect_containers(memo):
     rows = parse_docker_ps(check_out(["docker", "ps", "-a", "--no-trunc", "--format", PS_FORMAT], timeout=SLOW_TIMEOUT_S))[:50]
     details = {}
     if rows:
-        details = parse_docker_inspect(check_out(["docker", "inspect", "--format", INSPECT_FORMAT] + [r["id"] for r in rows],
-                                                 timeout=SLOW_TIMEOUT_S))
+        error = None
+        for fmt in INSPECT_FORMATS:
+            try:
+                details = parse_docker_inspect(check_out(["docker", "inspect", "--format", fmt] + [r["id"] for r in rows],
+                                                         timeout=SLOW_TIMEOUT_S))
+                break
+            except Exception as e:  # noqa: BLE001 - the next format may work on this Docker
+                error = e
+        else:
+            raise error
     out = []
     for r in rows:
         d = details.get(r["id"], {})

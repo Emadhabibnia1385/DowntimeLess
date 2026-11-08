@@ -653,7 +653,7 @@ def test_report_carries_checks_and_panel_and_no_secret(full_host, master):
     master.responses = [{"interval_s": 30}]  # an older master: none of the newer response fields
     assert agent.run_cycle(st) == 30
     body = master.reports[0][1]
-    assert body["agent_version"] == "0.3.0"
+    assert body["agent_version"] == agent.VERSION
     assert body["checks"]["nft"]["relay_dnat"] is True and body["checks"]["listeners"][0]["port"] == 22
     assert body["checks"]["container_logs"][0]["unavailable"] == 1
     assert body["panel"]["nodes"][0]["name"] == "de-1" and "panel_error" not in body
@@ -690,3 +690,39 @@ def test_checks_never_hold_the_report_past_the_budget(master, monkeypatch):
     assert master.reports[0][1]["checks_error"] == ["hang"]
     release.set()
 
+
+
+def test_a_docker_that_rejects_the_health_template_falls_back_to_the_next_format(monkeypatch):
+    # New Docker errors on a missing .State.Health; the agent must try the other templates, never give up
+    seen = []
+    real = agent.check_out
+
+    def fake(argv, timeout=agent.CMD_TIMEOUT_S, ok=(0,)):
+        if argv[:2] == ["docker", "inspect"]:
+            seen.append(argv[3])
+            if len(seen) == 1:
+                raise RuntimeError("template parsing error: map has no entry for key \"Health\"")
+            return cx.DOCKER_INSPECT
+        if argv[:2] == ["docker", "ps"]:
+            return cx.DOCKER_PS
+        return real(argv, timeout, ok)
+
+    monkeypatch.setattr(agent, "has", lambda name: True)
+    monkeypatch.setattr(agent, "check_out", fake)
+    got = {c["name"]: c for c in agent.collect_containers({})}
+    assert len(seen) == 2 and seen[0] != seen[1]
+    assert got["node-de"]["restarts"] == 41
+
+
+def test_every_inspect_template_avoids_the_fields_that_hold_secrets():
+    for fmt in agent.INSPECT_FORMATS:
+        assert ".Config.Env" not in fmt and ".Config.Cmd" not in fmt and ".Args" not in fmt and "Log" not in fmt
+
+
+def test_a_process_with_hundreds_of_udp_sockets_is_one_summary_row():
+    text = "\n".join("udp UNCONN 0 0 *:%d *:* users:((\"xray\",pid=7,fd=%d))" % (2000 + i, i) for i in range(300))
+    text += '\ntcp LISTEN 0 4096 0.0.0.0:443 0.0.0.0:* users:(("xray",pid=7,fd=3))\n'
+    got = agent.parse_ss_listeners(text)
+    assert {"proto": "udp", "port": 0, "proc": "xray", "count": 300} in got
+    assert {"proto": "tcp", "port": 443, "proc": "xray"} in got
+    assert len(got) == 2
