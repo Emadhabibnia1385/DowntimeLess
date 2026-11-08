@@ -25,6 +25,14 @@ def _tz(minutes: int) -> int:
     return minutes
 
 
+def _category(value: Optional[str]) -> Optional[str]:
+    if value in (None, "", "none"):
+        return value or None
+    if not value.isdigit():
+        raise DLError("traffic.category_invalid")
+    return value
+
+
 def _window(since: Optional[int], until: Optional[int]) -> Optional[Tuple[int, int]]:
     if since is None and until is None:
         return None
@@ -104,9 +112,10 @@ class TrafficSeries(BaseModel):
 @router.get("/summary", response_model=TrafficSummary, operation_id="traffic_summary")
 def summary(
     since: Optional[int] = None, until: Optional[int] = None, tz_offset_min: int = DEFAULT_TZ_MIN,
+    category: Optional[str] = None,
     _: Actor = Depends(require("viewer")), db: sqlite3.Connection = Depends(get_db),
 ):
-    """Traffic per server and for the fleet over a window [since, until) in unix seconds (default: the last 30 days).
+    """Traffic per server and for the fleet (only one category when `category` is an id or 'none') over a window [since, until) in unix seconds (default: the last 30 days).
 
     Always today and yesterday; for the window the total, daily average, peak day and share of the fleet.
     Days are local days at the UTC offset in minutes (default +03:30) and the window is counted in whole days (at most 366).
@@ -114,13 +123,13 @@ def summary(
     """
     window = _window(since, until)
     tz = _tz(tz_offset_min)
-    return svc.summary(db, _now(), tz, *(window or (None, None)))
+    return svc.summary(db, _now(), tz, *(window or (None, None)), category=_category(category))
 
 
 @router.get("/series", response_model=TrafficSeries, operation_id="traffic_series")
 def series(
     since: Optional[int] = None, until: Optional[int] = None, range: Optional[str] = None,
-    server_id: Optional[int] = None, tz_offset_min: int = DEFAULT_TZ_MIN,
+    server_id: Optional[int] = None, tz_offset_min: int = DEFAULT_TZ_MIN, category: Optional[str] = None,
     _: Actor = Depends(require("viewer")), db: sqlite3.Connection = Depends(get_db),
 ):
     """Traffic over time for a window [since, until) or a preset range (24h, 7d, 30d, 90d), with the busiest days and hours.
@@ -135,4 +144,4 @@ def series(
         window = svc.preset_window(range or "24h", _now(), tz * 60)
     if server_id is not None and not db.execute("SELECT 1 FROM servers WHERE id=?", (server_id,)).fetchone():
         raise DLError("server.not_found")
-    return svc.series(db, _now(), window[0], window[1], tz, server_id)
+    return svc.series(db, _now(), window[0], window[1], tz, server_id, _category(category))

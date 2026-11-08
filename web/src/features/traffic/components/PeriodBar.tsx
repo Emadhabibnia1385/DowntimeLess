@@ -1,10 +1,12 @@
 import { DateTimeField, SelectField } from "@nyxon/nasim";
+import { useCategories } from "@/features/categories";
 import { t } from "@/strings";
 import { defaultCustom, isPeriodId, PERIOD_IDS, type Period } from "../lib/period";
 
 const periodOptions = PERIOD_IDS.map((id) => ({ value: id, label: t.traffic.periods[id] }));
 
 const ALL = "all";
+const NONE = "none";
 const dateOf = (value: string) => (value ? value.slice(0, 10) : undefined);
 const fieldValue = (day: string | undefined) => (day ? `${day}T00:00` : "");
 
@@ -15,6 +17,8 @@ export function PeriodBar({
 	serverId,
 	onServerChange,
 	servers,
+	category,
+	onCategoryChange,
 	nowSeconds,
 }: {
 	period: Period;
@@ -22,8 +26,17 @@ export function PeriodBar({
 	serverId: number | null;
 	onServerChange: (serverId: number | null) => void;
 	servers: { value: string; label: string }[];
+	category: string | null;
+	onCategoryChange: (category: string | null) => void;
 	nowSeconds: number;
 }) {
+	const categories = useCategories();
+	const categoryOptions = [
+		{ value: ALL, label: t.categories.filterAll },
+		...(categories.data ?? []).map((item) => ({ value: String(item.id), label: item.name })),
+		{ value: NONE, label: t.categories.none },
+	];
+	const hasCategories = (categories.data ?? []).length > 0;
 	const custom = period.id === "custom";
 	const dateLabels = {
 		calendarLabel: t.traffic.calendar,
@@ -32,7 +45,9 @@ export function PeriodBar({
 	};
 	return (
 		<div className="flex flex-col gap-2">
-			<div className="grid max-w-xl gap-3 sm:grid-cols-2">
+			<div
+				className={`grid gap-3 sm:grid-cols-2 ${hasCategories ? "max-w-3xl lg:grid-cols-3" : "max-w-xl"}`}
+			>
 				<SelectField
 					label={t.traffic.periodField}
 					value={period.id}
@@ -46,6 +61,14 @@ export function PeriodBar({
 					}}
 					options={periodOptions}
 				/>
+				{hasCategories ? (
+					<SelectField
+						label={t.traffic.categoryField}
+						value={category ?? ALL}
+						onChange={(next) => onCategoryChange(next && next !== ALL ? next : null)}
+						options={categoryOptions}
+					/>
+				) : null}
 				<SelectField
 					label={t.traffic.serverField}
 					value={serverId === null ? ALL : String(serverId)}

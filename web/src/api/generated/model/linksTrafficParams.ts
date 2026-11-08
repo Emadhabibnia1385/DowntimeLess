@@ -8,4 +8,5 @@
 export type LinksTrafficParams = {
 	since?: number | null;
 	until?: number | null;
+	category?: string | null;
 };

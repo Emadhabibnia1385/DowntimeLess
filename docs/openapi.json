@@ -6458,7 +6458,7 @@
     },
     "/api/v1/links/traffic": {
       "get": {
-        "description": "Bytes each server exchanged with each peer server in a window (hour resolution), biggest first.",
+        "description": "Bytes each server exchanged with each peer server in a window (hour resolution), biggest first.\n\nWith `category` (an id or 'none') only links where the server or its peer is in that category.",
         "operationId": "links_traffic",
         "parameters": [
           {
@@ -6491,6 +6491,22 @@
                 }
               ],
               "title": "Until"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
             }
           },
           {
@@ -8905,6 +8921,22 @@
             }
           },
           {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -8951,7 +8983,7 @@
     },
     "/api/v1/traffic/summary": {
       "get": {
-        "description": "Traffic per server and for the fleet over a window [since, until) in unix seconds (default: the last 30 days).\n\nAlways today and yesterday; for the window the total, daily average, peak day and share of the fleet.\nDays are local days at the UTC offset in minutes (default +03:30) and the window is counted in whole days (at most 366).\nDownload is rx (into the server), upload is tx (out of it).",
+        "description": "Traffic per server and for the fleet (only one category when `category` is an id or 'none') over a window [since, until) in unix seconds (default: the last 30 days).\n\nAlways today and yesterday; for the window the total, daily average, peak day and share of the fleet.\nDays are local days at the UTC offset in minutes (default +03:30) and the window is counted in whole days (at most 366).\nDownload is rx (into the server), upload is tx (out of it).",
         "operationId": "traffic_summary",
         "parameters": [
           {
@@ -8994,6 +9026,22 @@
               "default": 210,
               "title": "Tz Offset Min",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
             }
           },
           {

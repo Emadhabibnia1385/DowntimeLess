@@ -267,3 +267,52 @@ def test_real_agent_reports_show_up_in_today(owner):
     report(owner, key, net={"iface": "eth0", "rx_bytes": 51000, "tx_bytes": 11000, "rx_bps": 1, "tx_bps": 1})
     (row,) = owner.get("/api/v1/traffic/summary").json()["servers"]
     assert row["today"] == {"rx": 50000, "tx": 10000, "total": 60000}
+
+
+def test_summary_and_series_can_be_limited_to_one_category(owner):
+    from conftest import make_server, report
+
+    a = owner.post("/api/v1/categories", json={"name": "الف"}).json()["id"]
+    b = owner.post("/api/v1/categories", json={"name": "ب"}).json()["id"]
+    one, k1 = make_server(owner, "one", "exit")
+    two, k2 = make_server(owner, "two", "exit")
+    three, k3 = make_server(owner, "three", "exit")
+    owner.patch("/api/v1/servers/%d" % one, json={"category_id": a})
+    owner.patch("/api/v1/servers/%d" % two, json={"category_id": b})
+    for key, size in ((k1, 1000), (k2, 5000), (k3, 20000)):
+        report(owner, key, net={"rx_bytes": 0, "tx_bytes": 0})
+        report(owner, key, net={"rx_bytes": size, "tx_bytes": size // 2})
+    every = owner.get("/api/v1/traffic/summary").json()
+    assert {s["server_id"] for s in every["servers"]} == {one, two, three}
+    only_a = owner.get("/api/v1/traffic/summary?category=%d" % a).json()
+    assert [s["server_id"] for s in only_a["servers"]] == [one]
+    assert only_a["fleet"]["period"]["rx"] == 1000
+    none = owner.get("/api/v1/traffic/summary?category=none").json()
+    assert [s["server_id"] for s in none["servers"]] == [three]
+    assert owner.get("/api/v1/traffic/series?range=24h&category=%d" % b).json()["rx_total"] == 5000
+    assert owner.get("/api/v1/traffic/series?range=24h").json()["rx_total"] == 26000
+    bad = owner.get("/api/v1/traffic/summary?category=abc")
+    assert bad.status_code == 422 and bad.json()["code"] == "traffic.category_invalid"
+
+
+def test_link_traffic_can_be_limited_to_a_category(owner):
+    from app.db import connect
+    from conftest import make_server, report
+
+    cat = owner.post("/api/v1/categories", json={"name": "الف"}).json()["id"]
+    relay, rk = make_server(owner, "relay", "relay")
+    exit_, ek = make_server(owner, "exit", "exit")
+    other, ok = make_server(owner, "other", "exit")
+    report(owner, rk, public_ip="203.0.113.10")
+    report(owner, ek, public_ip="198.51.100.20")
+    report(owner, ok, public_ip="198.51.100.30")
+    owner.patch("/api/v1/servers/%d" % exit_, json={"category_id": cat})
+    db = connect()
+    import time
+    hour = int(time.time()) // 3600 * 3600
+    for ip, n in (("198.51.100.20", 10), ("198.51.100.30", 99)):
+        db.execute("INSERT INTO link_traffic (server_id, peer_ip, hour, in_bytes, out_bytes) VALUES (?,?,?,?,0)", (relay, ip, hour, n))
+    db.close()
+    rows = owner.get("/api/v1/links/traffic?category=%d" % cat).json()["links"]
+    assert [r["peer_ip"] for r in rows] == ["198.51.100.20"]
+    assert len(owner.get("/api/v1/links/traffic").json()["links"]) == 2

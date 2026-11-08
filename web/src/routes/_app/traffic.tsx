@@ -1,7 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { isPeriodId, type Period, type PeriodId, parseDay, TrafficPage } from "@/features/traffic";
 
-type TrafficSearch = { period?: PeriodId; from?: string; to?: string; server?: number };
+type TrafficSearch = {
+	period?: PeriodId;
+	from?: string;
+	to?: string;
+	server?: number;
+	category?: string;
+};
 
 export const Route = createFileRoute("/_app/traffic")({
 	// The period, a custom range and the server live in the address so a reload or a link keeps them.
@@ -15,19 +21,29 @@ export const Route = createFileRoute("/_app/traffic")({
 			from: period === "custom" ? day(search.from) : undefined,
 			to: period === "custom" ? day(search.to) : undefined,
 			server: Number.isInteger(server) && server > 0 ? server : undefined,
+			category: /^(none|[1-9]\d{0,8})$/.test(String(search.category))
+				? String(search.category)
+				: undefined,
 		};
 	},
 	component: TrafficRoute,
 });
 
 function TrafficRoute() {
-	const { period, from, to, server } = Route.useSearch();
+	const { period, from, to, server, category } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const current: Period = { id: period ?? "30d", from, to };
 	return (
 		<TrafficPage
 			period={current}
 			serverId={server ?? null}
+			category={category ?? null}
+			onCategoryChange={(next) =>
+				void navigate({
+					search: (prev) => ({ ...prev, category: next ?? undefined, server: undefined }),
+					replace: true,
+				})
+			}
 			onPeriodChange={(next) =>
 				void navigate({
 					search: (prev) => ({

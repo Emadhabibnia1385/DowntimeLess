@@ -11,9 +11,9 @@ const REFRESH_MS = 60_000;
 const MAX_ROWS = 30;
 
 // Bytes between each server and each peer server in the window, measured on the server side.
-export function LinksCard({ window }: { window: Window }) {
+export function LinksCard({ window, category }: { window: Window; category: string | null }) {
 	const links = useLinksTraffic(
-		{ since: window.since, until: window.until },
+		{ since: window.since, until: window.until, category: category ?? undefined },
 		{ query: { refetchInterval: REFRESH_MS } },
 	);
 	const servers = useServers();

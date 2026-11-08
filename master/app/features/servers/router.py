@@ -40,7 +40,7 @@ def create_server(body: ServerCreate, _: Actor = Depends(require("admin")), db: 
     token = new_token(24)
     cols = svc.role_columns(body.role)
     cur = db.execute(
-        "INSERT INTO servers (name, alias, role, panel_only, category_id, enroll_hash, created_at, permission) VALUES (?,?,?,?,?,?,?,'full')",
+        "INSERT INTO servers (name, alias, role, panel_only, category_id, enroll_hash, created_at, permission, acct_on) VALUES (?,?,?,?,?,?,?,'full',1)",
         (body.name, body.alias, cols["role"], cols["panel_only"], _category(db, body.category_id), digest(token), int(time.time())),
     )
     changelog.record(db, "server_added", "%s (%s)" % (body.name, body.role), cur.lastrowid, {"role": body.role})

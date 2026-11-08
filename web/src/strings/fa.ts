@@ -822,6 +822,7 @@ export const fa = {
 		total: "مجموع",
 		fleet: "کل ناوگان",
 		serverField: "سرور",
+		categoryField: "دسته‌بندی",
 		periodField: "بازهٔ زمانی",
 		periods: {
 			today: "امروز",

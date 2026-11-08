@@ -21,8 +21,8 @@ def test_server_lifecycle_events(owner):
     assert len(renamed) == 2 and "name: de-1 -> de-one" in renamed[0]["title"]
     owner.patch("/api/v1/servers/%d" % sid, json={"name": "de-one"})  # no real change: nothing logged
     assert len(_events("server_renamed")) == 2
-    owner.patch("/api/v1/servers/%d" % sid, json={"acct_on": True})
-    owner.patch("/api/v1/servers/%d" % sid, json={"acct_on": True})
+    owner.patch("/api/v1/servers/%d" % sid, json={"acct_on": False})
+    owner.patch("/api/v1/servers/%d" % sid, json={"acct_on": False})
     assert len(_events("acct_toggled")) == 1
     owner.delete("/api/v1/servers/%d" % sid)
     gone = _events("server_removed")

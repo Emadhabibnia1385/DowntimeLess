@@ -55,16 +55,27 @@ def _window(since: Optional[int], until: Optional[int]):
 
 
 @router.get("/traffic", response_model=LinksOut, operation_id="links_traffic")
-def traffic(since: Optional[int] = None, until: Optional[int] = None, _: Actor = Depends(require("viewer")), db: sqlite3.Connection = Depends(get_db)):
-    """Bytes each server exchanged with each peer server in a window (hour resolution), biggest first."""
+def traffic(since: Optional[int] = None, until: Optional[int] = None, category: Optional[str] = None, _: Actor = Depends(require("viewer")), db: sqlite3.Connection = Depends(get_db)):
+    """Bytes each server exchanged with each peer server in a window (hour resolution), biggest first.
+
+    With `category` (an id or 'none') only links where the server or its peer is in that category.
+    """
     since, until = _window(since, until)
+    if category in (None, ""):
+        cat_sql, cat_args = "1=1", []
+    elif category == "none":
+        cat_sql, cat_args = "(s.category_id IS NULL OR p.category_id IS NULL)", []
+    elif category.isdigit():
+        cat_sql, cat_args = "(s.category_id=? OR p.category_id=?)", [int(category), int(category)]
+    else:
+        raise DLError("traffic.category_invalid")
     rows = db.execute(
         "SELECT l.server_id, COALESCE(NULLIF(s.alias,''), s.name) AS server_name, s.role AS server_role, l.peer_ip, "
         "p.id AS peer_id, COALESCE(NULLIF(p.alias,''), p.name) AS peer_name, p.role AS peer_role, "
         "SUM(l.in_bytes) AS in_bytes, SUM(l.out_bytes) AS out_bytes "
         "FROM link_traffic l JOIN servers s ON s.id=l.server_id LEFT JOIN servers p ON p.public_ip=l.peer_ip "
-        "WHERE l.hour>=? AND l.hour<? GROUP BY l.server_id, l.peer_ip ORDER BY SUM(l.in_bytes)+SUM(l.out_bytes) DESC",
-        (since - since % 3600, until),
+        "WHERE l.hour>=? AND l.hour<? AND %s GROUP BY l.server_id, l.peer_ip ORDER BY SUM(l.in_bytes)+SUM(l.out_bytes) DESC" % cat_sql,
+        [since - since % 3600, until] + cat_args,
     ).fetchall()
     return {"since": since, "until": until, "links": [dict(r) for r in rows]}
 

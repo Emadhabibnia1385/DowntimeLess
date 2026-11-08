@@ -11,4 +11,5 @@ export type TrafficSeriesParams = {
 	range?: string | null;
 	server_id?: number | null;
 	tz_offset_min?: number;
+	category?: string | null;
 };

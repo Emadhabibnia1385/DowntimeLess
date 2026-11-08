@@ -64,6 +64,8 @@ export const getLinksTrafficUrl = (params?: LinksTrafficParams) => {
 
 /**
  * Bytes each server exchanged with each peer server in a window (hour resolution), biggest first.
+ *
+ * With `category` (an id or 'none') only links where the server or its peer is in that category.
  * @summary Traffic
  */
 export const linksTraffic = async (

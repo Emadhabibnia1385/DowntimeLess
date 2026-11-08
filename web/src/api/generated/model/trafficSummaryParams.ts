@@ -9,4 +9,5 @@ export type TrafficSummaryParams = {
 	since?: number | null;
 	until?: number | null;
 	tz_offset_min?: number;
+	category?: string | null;
 };

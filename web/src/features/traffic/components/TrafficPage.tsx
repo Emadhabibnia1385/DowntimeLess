@@ -42,11 +42,15 @@ function rangeLine(period: Period, now: number): string | null {
 export function TrafficPage({
 	period,
 	serverId,
+	category,
 	onPeriodChange,
 	onServerChange,
+	onCategoryChange,
 }: {
 	period: Period;
 	serverId: number | null;
+	category: string | null;
+	onCategoryChange: (category: string | null) => void;
 	onPeriodChange: (period: Period) => void;
 	onServerChange: (serverId: number | null) => void;
 }) {
@@ -59,8 +63,8 @@ export function TrafficPage({
 		() => (since === undefined || until === undefined ? null : { since, until }),
 		[since, until],
 	);
-	const summary = useSummary(stable);
-	const series = useSeries(stable, serverId);
+	const summary = useSummary(stable, category);
+	const series = useSeries(stable, serverId, category);
 	const servers = useMemo(
 		() =>
 			(summary.data?.servers ?? []).map((server) => ({
@@ -82,6 +86,8 @@ export function TrafficPage({
 				serverId={serverId}
 				onServerChange={onServerChange}
 				servers={servers}
+				category={category}
+				onCategoryChange={onCategoryChange}
 				nowSeconds={now}
 			/>
 			{stable === null ? (
@@ -103,7 +109,7 @@ export function TrafficPage({
 							</>
 						)}
 					</Loadable>
-					<LinksCard window={stable} />
+					<LinksCard window={stable} category={category} />
 					<ServerTable
 						rows={summary.data?.servers}
 						status={summary.isPending ? "loading" : summary.isError ? "error" : "ready"}

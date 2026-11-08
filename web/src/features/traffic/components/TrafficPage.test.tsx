@@ -94,6 +94,7 @@ type Mocks = {
 	summary?: TrafficSummary;
 	series?: (query: URLSearchParams) => TrafficSeries;
 	links?: unknown[];
+	categories?: { id: number; name: string }[];
 };
 
 function open(entry: string, mocks: Mocks = {}) {
@@ -107,9 +108,11 @@ function open(entry: string, mocks: Mocks = {}) {
 					? (mocks.summary ?? summary(SERVERS))
 					: path === "/traffic/series"
 						? (mocks.series ?? (() => series()))(url.searchParams)
-						: path === "/links/traffic"
-							? { since: 0, until: 1, links: mocks.links ?? [] }
-							: [];
+						: path === "/categories"
+							? (mocks.categories ?? [])
+							: path === "/links/traffic"
+								? { since: 0, until: 1, links: mocks.links ?? [] }
+								: [];
 		return new Response(JSON.stringify(body), {
 			status: 200,
 			headers: { "Content-Type": "application/json" },
@@ -307,5 +310,22 @@ describe("TrafficPage", () => {
 	it("says how to switch counting on when no link has data", async () => {
 		open("/traffic");
 		expect(await screen.findByText(t.traffic.links.emptyTitle)).toBeTruthy();
+	});
+
+	it("limits everything to the chosen category and sends it to the API", async () => {
+		const { calls } = open("/traffic?category=2", {
+			categories: [{ id: 2, name: "گروه آزمایشی" }],
+		});
+		await waitFor(() => expect(calls("/traffic/summary").length).toBeGreaterThan(0));
+		expect(calls("/traffic/summary").at(-1)?.searchParams.get("category")).toBe("2");
+		expect(calls("/traffic/series").at(-1)?.searchParams.get("category")).toBe("2");
+		expect(calls("/links/traffic").at(-1)?.searchParams.get("category")).toBe("2");
+		expect(await screen.findByText(t.traffic.categoryField)).toBeTruthy();
+	});
+
+	it("shows no category field on a fresh install without categories", async () => {
+		open("/traffic");
+		await screen.findByText(t.traffic.serverField);
+		expect(screen.queryByText(t.traffic.categoryField)).toBeNull();
 	});
 });

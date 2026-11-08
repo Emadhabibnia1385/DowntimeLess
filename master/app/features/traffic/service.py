@@ -68,7 +68,17 @@ def _day_sum(days: Dict[int, Tuple[int, int]], lo: int, hi: int) -> Dict[str, in
     return _pair(sum(v[0] for v in vals), sum(v[1] for v in vals))
 
 
-def summary(db: sqlite3.Connection, now: int, tz_offset_min: int, since: Optional[int], until: Optional[int]) -> Dict[str, Any]:
+def category_cond(category: Optional[str]) -> Tuple[str, List[Any]]:
+    """SQL on `servers` for one category: a numeric id, 'none' for servers without one, None for all."""
+    if category is None or category == "":
+        return "1=1", []
+    if category == "none":
+        return "category_id IS NULL", []
+    return "category_id=?", [int(category)]
+
+
+def summary(db: sqlite3.Connection, now: int, tz_offset_min: int, since: Optional[int], until: Optional[int],
+            category: Optional[str] = None) -> Dict[str, Any]:
     """Whole local days: `since` is snapped back to its local midnight, and a day counts when it starts before `until`."""
     off = tz_offset_min * 60
     if since is None or until is None:
@@ -78,9 +88,11 @@ def summary(db: sqlite3.Connection, now: int, tz_offset_min: int, since: Optiona
     start = min(lo, today - DAY)
     per: Dict[int, Dict[int, Tuple[int, int]]] = {}
     fleet: Dict[int, Tuple[int, int]] = {}
+    cond, cargs = category_cond(category)
     rows = db.execute(
-        "SELECT server_id, (ts+?)/? AS d, SUM(rx_delta) rx, SUM(tx_delta) tx FROM metrics WHERE ts>=? AND ts<=? GROUP BY server_id, d",
-        (off, DAY, start, now),
+        "SELECT server_id, (ts+?)/? AS d, SUM(rx_delta) rx, SUM(tx_delta) tx FROM metrics WHERE ts>=? AND ts<=? "
+        "AND server_id IN (SELECT id FROM servers WHERE %s) GROUP BY server_id, d" % cond,
+        [off, DAY, start, now] + cargs,
     )
     for r in rows:
         key = r["d"] * DAY - off
@@ -94,7 +106,7 @@ def summary(db: sqlite3.Connection, now: int, tz_offset_min: int, since: Optiona
     fleet_facts = facts(fleet)
     fleet_total = fleet_facts["period"]["total"]
     servers: List[Dict[str, Any]] = []
-    for s in db.execute("SELECT id, name, alias, role, panel_only, country, category_id FROM servers ORDER BY role, name"):
+    for s in db.execute("SELECT id, name, alias, role, panel_only, country, category_id FROM servers WHERE %s ORDER BY role, name" % cond, cargs):
         f = facts(per.get(s["id"], {}))
         servers.append({
             "server_id": s["id"], "name": s["name"], "alias": s["alias"],
@@ -105,7 +117,8 @@ def summary(db: sqlite3.Connection, now: int, tz_offset_min: int, since: Optiona
     return {"generated_at": now, "tz_offset_min": tz_offset_min, "since": lo, "until": until, "fleet": fleet_facts, "servers": servers}
 
 
-def series(db: sqlite3.Connection, now: int, since: int, until: int, tz_offset_min: int, server_id: Optional[int]) -> Dict[str, Any]:
+def series(db: sqlite3.Connection, now: int, since: int, until: int, tz_offset_min: int, server_id: Optional[int],
+           category: Optional[str] = None) -> Dict[str, Any]:
     """Hourly buckets for windows up to 8 days, daily ones beyond; the window never reaches past `now`."""
     off = tz_offset_min * 60
     end = min(until, now + 1)
@@ -118,6 +131,9 @@ def series(db: sqlite3.Connection, now: int, since: int, until: int, tz_offset_m
     if server_id is not None:
         sql += " AND server_id=?"
         args.append(server_id)
+    cond, cargs = category_cond(category)
+    sql += " AND server_id IN (SELECT id FROM servers WHERE %s)" % cond
+    args += cargs
     hours = {r["h"] * HOUR - off: (r["rx"], r["tx"]) for r in db.execute(sql + " GROUP BY h", args)}
 
     # one hourly pass feeds the chart, the best days and the hour-of-day profile

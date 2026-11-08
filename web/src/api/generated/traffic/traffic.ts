@@ -201,7 +201,7 @@ export const getTrafficSummaryUrl = (params?: TrafficSummaryParams) => {
 };
 
 /**
- * Traffic per server and for the fleet over a window [since, until) in unix seconds (default: the last 30 days).
+ * Traffic per server and for the fleet (only one category when `category` is an id or 'none') over a window [since, until) in unix seconds (default: the last 30 days).
  *
  * Always today and yesterday; for the window the total, daily average, peak day and share of the fleet.
  * Days are local days at the UTC offset in minutes (default +03:30) and the window is counted in whole days (at most 366).

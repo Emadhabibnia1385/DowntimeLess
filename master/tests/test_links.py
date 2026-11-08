@@ -12,19 +12,19 @@ def _two(owner):
     return relay, rk, exit_, ek
 
 
-def test_peers_are_sent_only_to_servers_with_counting_switched_on(owner):
+def test_peers_are_sent_to_servers_with_counting_on_and_it_is_on_by_default(owner):
     relay, rk, exit_, ek = _two(owner)
-    assert report(owner, rk).json()["acct_peers"] == []
-    assert owner.patch("/api/v1/servers/%d" % relay, json={"acct_on": True}).json()["acct_on"] is True
     assert report(owner, rk).json()["acct_peers"] == ["198.51.100.20"]
-    assert report(owner, ek).json()["acct_peers"] == []
-    owner.patch("/api/v1/servers/%d" % relay, json={"acct_on": False})
+    assert report(owner, ek).json()["acct_peers"] == ["203.0.113.10"]
+    assert owner.patch("/api/v1/servers/%d" % relay, json={"acct_on": False}).json()["acct_on"] is False
     assert report(owner, rk).json()["acct_peers"] == []
+    assert report(owner, ek).json()["acct_peers"] == ["203.0.113.10"]
+    owner.patch("/api/v1/servers/%d" % relay, json={"acct_on": True})
+    assert report(owner, rk).json()["acct_peers"] == ["198.51.100.20"]
 
 
 def test_cumulative_counters_become_hourly_bytes_and_a_reset_counts_as_zero(owner):
     relay, rk, exit_, ek = _two(owner)
-    owner.patch("/api/v1/servers/%d" % relay, json={"acct_on": True})
     peer = "198.51.100.20"
     report(owner, rk, acct={peer: {"in": 1000, "out": 5000}})   # baseline, nothing counted yet
     report(owner, rk, acct={peer: {"in": 1600, "out": 9000}})   # +600 in, +4000 out
