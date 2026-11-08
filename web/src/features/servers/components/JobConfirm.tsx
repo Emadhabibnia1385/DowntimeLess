@@ -2,12 +2,13 @@ import { ConfirmDialog } from "@nyxon/nasim";
 import { t } from "@/strings";
 import { useQueueJobs } from "../api";
 
-export type Mutating = "apt_upgrade_safe" | "self_update" | "reboot";
+export type Mutating = "apt_upgrade_safe" | "self_update" | "reboot" | "vacuum_logs";
 
 const CONFIRMS: Record<Mutating, { title: string; body: string }> = {
 	apt_upgrade_safe: { title: t.server.confirmUpgradeTitle, body: t.server.confirmUpgrade },
 	self_update: { title: t.server.confirmSelfUpdateTitle, body: t.server.confirmSelfUpdate },
 	reboot: { title: t.server.confirmRebootTitle, body: t.server.confirmReboot },
+	vacuum_logs: { title: t.server.vacuumTitle, body: t.server.vacuumBody },
 };
 
 // Every job that changes the server is queued only after this question.

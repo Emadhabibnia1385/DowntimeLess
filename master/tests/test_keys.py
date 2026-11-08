@@ -42,3 +42,30 @@ def test_bad_keys_and_unknown_scopes_fail(owner):
     assert owner.post("/api/v1/keys", json={"name": "x", "scope": "operate"}).status_code == 422
     owner.post("/api/v1/auth/logout")
     assert owner.get("/api/v1/issues", headers={"Authorization": "Bearer dl_wrong"}).status_code == 401
+
+
+def test_diagnostics_and_service_actions_are_for_signed_in_people_and_full_keys_only(owner):
+    from conftest import make_server
+
+    sid, _ = make_server(owner)
+    read = owner.post("/api/v1/keys", json={"name": "r", "scope": "read"}).json()["token"]
+    full = owner.post("/api/v1/keys", json={"name": "f", "scope": "full"}).json()["token"]
+    jobs = [("processes", {}), ("journal", {"unit": "nginx", "lines": 50}), ("service_restart", {"unit": "nginx.service"}), ("vacuum_logs", {}), ("dns_check", {"target": "example.com"}), ("http_check", {"url": "https://example.com/"}), ("traceroute", {"target": "1.1.1.1"}), ("ports", {}), ("disk_usage", {})]
+    for kind, args in jobs:
+        assert owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": kind, "args": args}).status_code == 201, kind
+        r = owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": kind, "args": args}, headers={"Authorization": "Bearer " + read}, cookies={})
+        assert r.status_code in (401, 403), kind
+        r = owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": kind, "args": args}, headers={"Authorization": "Bearer " + full}, cookies={})
+        assert r.status_code == 201, kind
+
+
+def test_job_arguments_are_checked_by_the_master_before_anything_is_queued(owner):
+    from conftest import make_server
+
+    sid, _ = make_server(owner)
+    bad = [("service_restart", {}), ("service_restart", {"unit": "a b"}), ("service_restart", {"unit": "x;reboot"}),
+           ("journal", {"lines": 5}), ("journal", {"unit": "$(id)"}), ("traceroute", {"target": "a b"}),
+           ("dns_check", {"target": ""}), ("http_check", {"url": "ftp://x"}), ("http_check", {"url": "javascript:1"})]
+    for kind, args in bad:
+        r = owner.post("/api/v1/servers/%d/jobs" % sid, json={"kind": kind, "args": args})
+        assert r.status_code == 422 and r.json()["code"] == "job.args_invalid", (kind, args)

@@ -113,11 +113,11 @@ def list_jobs(server_id: int, _: Actor = Depends(require("viewer")), db: sqlite3
 @router.post("/{server_id}/jobs", response_model=JobOut, status_code=201, operation_id="servers_create_job")
 def create_job(server_id: int, body: JobCreate, actor: Actor = Depends(require("admin")), db: sqlite3.Connection = Depends(get_db)):
     server = _row(db, server_id)
-    if body.kind not in svc.SAFE_KINDS | svc.MUTATING_KINDS:
+    if body.kind not in svc.SAFE_KINDS | svc.MUTATING_KINDS | svc.DIAG_KINDS | svc.ACTION_KINDS:
         raise DLError("job.kind_unknown")
-    if body.kind in svc.CERT_KINDS and not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$", str(body.args.get("name", ""))):
+    if not svc.job_args_valid(body.kind, body.args):
         raise DLError("job.args_invalid")
-    if body.kind in svc.MUTATING_KINDS:
+    if body.kind not in svc.SAFE_KINDS:
         if actor.via == "key" and not actor.full:
             raise DLError("job.permission")  # a read key never changes a server; a full key may
     cur = db.execute(

@@ -17,10 +17,11 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
-VERSION = "0.2.6"
+VERSION = "0.2.7"
 UA = "DowntimeLess-Agent/" + VERSION
 SELF_PATH = os.path.realpath(__file__)
 # With no address they describe the caller's outbound address; with one, that address itself.
@@ -38,7 +39,7 @@ BACKUP_RE = re.compile(r"\.bak|\.old$|\.orig$|backup", re.I)
 CERT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$")
 DOMAIN_RE = re.compile(r"^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
 # self_update only swaps this file for the master's copy, so it needs no permission level (the master agrees)
-MUTATING = ("apt_upgrade_safe", "reboot", "cert_renew", "cert_delete")
+MUTATING = ("apt_upgrade_safe", "reboot", "cert_renew", "cert_delete", "service_restart", "vacuum_logs")
 HOLD_PKGS = ("docker-ce", "docker-ce-cli", "containerd.io", "docker-compose-plugin", "docker-buildx-plugin")
 # Hold only what is not held already, and release only our own holds afterwards.
 APT_SCRIPT = """
@@ -704,6 +705,120 @@ def job_self_update(args, state):
     return {"from": VERSION, "to": new}
 
 
+# ---- diagnostics and service actions: each returns {"output": text} for the panel to show ----
+
+OUTPUT_MAX = 6000
+UNIT_RE = re.compile(r"^[A-Za-z0-9@._:-]{1,100}$")
+
+
+def run_cmd(argv, timeout=25):
+    """Runs a command and returns its output (stdout then stderr), cut to what a report may carry."""
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, errors="replace")
+    except FileNotFoundError:
+        raise RuntimeError("%s is not installed on this server" % argv[0])
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("%s took longer than %d seconds" % (argv[0], timeout))
+    text = (r.stdout + r.stderr).strip()
+    return text, r.returncode
+
+
+def output_of(text):
+    text = text.strip()
+    if len(text) > OUTPUT_MAX:
+        text = text[:OUTPUT_MAX] + "\n… (cut)"
+    return {"output": text or "(empty)"}
+
+
+def unit_arg(args, required=False):
+    unit = args.get("unit")
+    if unit in (None, ""):
+        if required:
+            raise ValueError("args.unit is required")
+        return None
+    if not isinstance(unit, str) or not UNIT_RE.match(unit):
+        raise ValueError("invalid unit name")
+    return unit
+
+
+def job_processes(args, state):
+    text, _ = run_cmd(["ps", "-eo", "pid,user:12,pcpu,pmem,etime,args", "--sort=-pcpu", "--width", "160"])
+    return output_of("\n".join(text.splitlines()[:16]))
+
+
+def job_ports(args, state):
+    text, _ = run_cmd(["ss", "-H", "-tulpn"])
+    lines = text.splitlines()
+    return output_of("\n".join(lines[:80]) + ("\n… %d more" % (len(lines) - 80) if len(lines) > 80 else ""))
+
+
+def job_disk_usage(args, state):
+    df, _ = run_cmd(["df", "-h", "-x", "tmpfs", "-x", "devtmpfs", "-x", "squashfs", "-x", "overlay"])
+    du, _ = run_cmd(["sh", "-c", "du -xh --max-depth=1 /var /home /root /opt 2>/dev/null | sort -rh | head -14"], timeout=28)
+    return output_of(df + "\n\n" + du)
+
+
+def job_journal(args, state):
+    n = args.get("lines", 100)
+    if not isinstance(n, int) or not 10 <= n <= 300:
+        raise ValueError("args.lines must be 10 to 300")
+    argv = ["journalctl", "--no-pager", "-o", "short-iso", "-n", str(n)]
+    unit = unit_arg(args)
+    if unit:
+        argv += ["-u", unit]
+    text, _ = run_cmd(argv)
+    return output_of(text[-OUTPUT_MAX:])
+
+
+def job_traceroute(args, state):
+    target = args.get("target")
+    if not valid_host(target):
+        raise ValueError("invalid target")
+    for argv in (["mtr", "-rwn", "-c", "4", target], ["traceroute", "-n", "-w", "1", "-q", "1", "-m", "20", target],
+                 ["tracepath", "-n", "-m", "20", target]):
+        if shutil.which(argv[0]):
+            text, _ = run_cmd(argv, timeout=40)
+            return output_of(text)
+    raise RuntimeError("none of mtr, traceroute or tracepath is installed")
+
+
+def job_http_check(args, state):
+    url = http_url(args.get("url"))
+    start = time.monotonic()
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            code, got = r.status, len(r.read(1 << 20))
+    except urllib.error.HTTPError as e:
+        code, got = e.code, 0
+    took = time.monotonic() - start
+    return {"output": "HTTP %s - %.2f s - %d bytes read" % (code, took, got), "status": code}
+
+
+def job_dns_check(args, state):
+    host = args.get("target")
+    if not valid_host(host):
+        raise ValueError("invalid target")
+    infos = socket.getaddrinfo(host, None)
+    ips = sorted({i[4][0] for i in infos})
+    return {"output": "\n".join(ips), "count": len(ips)}
+
+
+def job_service_restart(args, state):
+    unit = unit_arg(args, required=True)
+    text, code = run_cmd(["systemctl", "restart", unit], timeout=60)
+    active, _ = run_cmd(["systemctl", "is-active", unit])
+    if code != 0:
+        raise RuntimeError(text[:200] or "restart failed")
+    return {"output": "%s: %s" % (unit, active), "active": active == "active"}
+
+
+def job_vacuum_logs(args, state):
+    text, _ = run_cmd(["journalctl", "--vacuum-size=200M"], timeout=60)
+    apt, _ = run_cmd(["apt-get", "clean"], timeout=60) if shutil.which("apt-get") else ("", 0)
+    return output_of(text + ("\n" + apt if apt else ""))
+
+
 JOBS = {
     "ping": job_ping,
     "tcp_check": job_tcp_check,
@@ -714,6 +829,15 @@ JOBS = {
     "cert_renew": job_cert_renew,
     "cert_delete": job_cert_delete,
     "self_update": job_self_update,
+    "processes": job_processes,
+    "ports": job_ports,
+    "disk_usage": job_disk_usage,
+    "journal": job_journal,
+    "traceroute": job_traceroute,
+    "http_check": job_http_check,
+    "dns_check": job_dns_check,
+    "service_restart": job_service_restart,
+    "vacuum_logs": job_vacuum_logs,
 }
 
 

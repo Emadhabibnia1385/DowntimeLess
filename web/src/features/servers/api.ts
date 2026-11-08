@@ -11,9 +11,11 @@ import { errorMessage } from "@/api/transport";
 import { useRefreshAll } from "@/shared/useRefreshAll";
 import { t } from "@/strings";
 
-const REFRESH_MS = 15_000;
+// The agent reports every 30 seconds, so asking more often only repeats the same numbers.
+const REFRESH_MS = 30_000;
+const WAITING_MS = 5_000;
 
-/** The fleet, refreshed every 15 seconds. */
+/** The fleet, refreshed every 30 seconds. */
 export function useServers() {
 	return useServersList({ query: { refetchInterval: REFRESH_MS } });
 }
@@ -23,7 +25,15 @@ export function useServer(serverId: number) {
 }
 
 export function useServerJobs(serverId: number) {
-	return useServersJobs(serverId, { query: { refetchInterval: REFRESH_MS } });
+	// While a job waits for its result, look more often so the output shows soon after the report.
+	return useServersJobs(serverId, {
+		query: {
+			refetchInterval: (query) =>
+				(query.state.data ?? []).some((job) => job.status === "queued" || job.status === "sent")
+					? WAITING_MS
+					: REFRESH_MS,
+		},
+	});
 }
 
 /** Queues one or more jobs on a server, then says so and refreshes the job list. */

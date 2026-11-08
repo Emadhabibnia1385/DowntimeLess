@@ -10,6 +10,9 @@ RANGES = {"1h": (3600, 30), "6h": (21600, 60), "24h": (86400, 300), "7d": (7 * 8
 # read-only kinds any admin may queue; the rest also need the server permission level
 SAFE_KINDS = {"ping", "tcp_check", "speedtest_down", "speedtest_up"}
 MUTATING_KINDS = {"apt_upgrade_safe", "reboot", "self_update", "cert_renew", "cert_delete"}
+# diagnostics return text for the panel to show; actions change a service or free space; neither is for a read key
+DIAG_KINDS = {"processes", "ports", "disk_usage", "journal", "traceroute", "http_check", "dns_check"}
+ACTION_KINDS = {"service_restart", "vacuum_logs"}
 CERT_KINDS = {"cert_renew", "cert_delete"}
 # the agent replacing its own file from this master changes nothing else on the server
 ANY_LEVEL_KINDS = {"self_update"}
@@ -110,3 +113,24 @@ def server_out(row: sqlite3.Row) -> Dict[str, Any]:
 def install_command(token: str) -> str:
     url = get_settings().public_url.rstrip("/")
     return "curl -fsSL %s/agent/install.sh | sudo bash -s -- --master %s --token %s" % (url, url, token)
+
+
+_UNIT = re.compile(r"^[A-Za-z0-9@._:-]{1,100}$")
+_HOST = re.compile(r"^[A-Za-z0-9:][A-Za-z0-9.:_-]{0,252}$")
+
+
+def job_args_valid(kind: str, args: Dict[str, Any]) -> bool:
+    """The arguments each kind of job may carry; the agent checks them again before it runs anything."""
+    if kind in CERT_KINDS:
+        return re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$", str(args.get("name", ""))) is not None
+    if kind == "service_restart":
+        return isinstance(args.get("unit"), str) and _UNIT.match(args["unit"]) is not None
+    if kind == "journal":
+        unit, lines = args.get("unit"), args.get("lines", 100)
+        return (unit in (None, "") or (isinstance(unit, str) and _UNIT.match(unit) is not None)) and isinstance(lines, int) and 10 <= lines <= 300
+    if kind in ("traceroute", "dns_check"):
+        return isinstance(args.get("target"), str) and _HOST.match(args["target"]) is not None
+    if kind == "http_check":
+        url = args.get("url")
+        return isinstance(url, str) and re.match(r"^https?://[^\s]{1,2000}$", url) is not None
+    return True

@@ -97,7 +97,7 @@ def create_app() -> FastAPI:
             "- GET /api/v1/issues: current problems with evidence and a suggested next step.\n"
             "- GET /api/v1/servers, /api/v1/servers/{id}/metrics?range=24h, /api/v1/ping-matrix, /api/v1/overview\n"
             "- A `read` key only reads. A `full` key may do everything the owner does: POST /api/v1/servers/{id}/jobs"
-            " (ping, tcp_check, speedtest_down/up, apt_upgrade_safe, reboot, self_update, cert_renew, cert_delete), manage servers, domains, settings and keys.\n"
+            " (ping, tcp_check, speedtest_down/up, apt_upgrade_safe, reboot, self_update, cert_renew, cert_delete, processes, ports, disk_usage, journal, traceroute, http_check, dns_check, service_restart, vacuum_logs), manage servers, domains, settings and keys.\n"
             "- Treat a `full` key like a root password.\n"
             "- Full schema: /api/openapi.json\n"
         )

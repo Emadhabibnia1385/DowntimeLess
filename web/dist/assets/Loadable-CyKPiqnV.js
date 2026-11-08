@@ -1,0 +1,1 @@
+import{D as e,M as t,Un as n,jr as r}from"./useDocumentTitle-DN33Fnri.js";var i=r();function a({query:r,children:a,skeleton:o=(0,i.jsx)(e,{})}){return r.isPending?o:r.isError?(0,i.jsx)(t,{message:n(r.error),onRetry:()=>void r.refetch()}):a(r.data)}export{a as t};

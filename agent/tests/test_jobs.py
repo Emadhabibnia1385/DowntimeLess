@@ -49,7 +49,9 @@ class Recorder:
 
 def test_whitelist_is_closed():
     assert set(agent.JOBS) == {"ping", "tcp_check", "speedtest_down", "speedtest_up",
-                               "apt_upgrade_safe", "reboot", "self_update", "cert_renew", "cert_delete"}
+                               "apt_upgrade_safe", "reboot", "self_update", "cert_renew", "cert_delete",
+                               "processes", "ports", "disk_usage", "journal", "traceroute", "http_check",
+                               "dns_check", "service_restart", "vacuum_logs"}
 
 
 @pytest.mark.parametrize("kind", ["rm_rf", "shell", "", None, "PING", "ping ", "../reboot"])
@@ -269,3 +271,73 @@ def test_a_failing_certbot_is_an_error_with_its_output(monkeypatch):
     monkeypatch.setattr(agent.subprocess, "run", CertRecorder(returncode=1))
     res = agent.run_job(job("cert_renew", {"name": "a.example.com"}), state("safe"))
     assert res["status"] == "error" and "Congratulations" in res["error"]
+
+
+@pytest.mark.parametrize("unit", ["", "a b", "x;reboot", "$(id)", "../x", "a" * 101, 5])
+def test_service_restart_refuses_odd_unit_names(unit, monkeypatch):
+    rec = Recorder()
+    monkeypatch.setattr(agent.subprocess, "run", rec)
+    res = agent.run_job(job("service_restart", {"unit": unit}), state("full"))
+    assert res["status"] == "error" and rec.calls == []
+
+
+def test_service_restart_runs_systemctl_and_reports_the_state(monkeypatch):
+    calls = []
+
+    class Done:
+        def __init__(self, out):
+            self.returncode, self.stdout, self.stderr = 0, out, ""
+
+    def fake(argv, **kw):
+        calls.append(argv)
+        return Done("active" if argv[1] == "is-active" else "")
+
+    monkeypatch.setattr(agent.subprocess, "run", fake)
+    res = agent.run_job(job("service_restart", {"unit": "nginx.service"}), state("full"))
+    assert res["status"] == "ok" and res["result"] == {"output": "nginx.service: active", "active": True}
+    assert calls[0] == ["systemctl", "restart", "nginx.service"]
+
+
+@pytest.mark.parametrize("permission", ["none", "", None])
+def test_service_restart_and_log_vacuum_are_refused_without_a_level(permission, monkeypatch):
+    rec = Recorder()
+    monkeypatch.setattr(agent.subprocess, "run", rec)
+    for kind in ("service_restart", "vacuum_logs"):
+        res = agent.run_job(job(kind, {"unit": "nginx"}), state(permission))
+        assert res["status"] == "rejected"
+    assert rec.calls == []
+
+
+def test_diagnostics_return_text_output(monkeypatch):
+    class Done:
+        returncode, stdout, stderr = 0, "line1\nline2\n", ""
+
+    monkeypatch.setattr(agent.subprocess, "run", lambda argv, **kw: Done())
+    for kind, args in (("processes", {}), ("ports", {}), ("journal", {"unit": "nginx", "lines": 50})):
+        res = agent.run_job(job(kind, args), state("none"))
+        assert res["status"] == "ok" and res["result"]["output"].startswith("line1"), kind
+
+
+def test_journal_and_traceroute_check_their_arguments(monkeypatch):
+    rec = Recorder()
+    monkeypatch.setattr(agent.subprocess, "run", rec)
+    assert agent.run_job(job("journal", {"lines": 5}), state("full"))["status"] == "error"
+    assert agent.run_job(job("journal", {"lines": 100, "unit": "x;y"}), state("full"))["status"] == "error"
+    assert agent.run_job(job("traceroute", {"target": "a b"}), state("full"))["status"] == "error"
+    assert agent.run_job(job("dns_check", {"target": "-bad host"}), state("full"))["status"] == "error"
+    assert rec.calls == []
+
+
+def test_dns_check_lists_the_addresses(monkeypatch):
+    monkeypatch.setattr(agent.socket, "getaddrinfo", lambda host, port: [(2, 1, 6, "", ("203.0.113.9", 0)), (2, 1, 6, "", ("203.0.113.9", 0))])
+    res = agent.run_job(job("dns_check", {"target": "example.test"}), state("none"))
+    assert res["result"] == {"output": "203.0.113.9", "count": 1}
+
+
+def test_a_long_output_is_cut(monkeypatch):
+    class Done:
+        returncode, stdout, stderr = 0, "x" * 20000, ""
+
+    monkeypatch.setattr(agent.subprocess, "run", lambda argv, **kw: Done())
+    out = agent.run_job(job("ports"), state("none"))["result"]["output"]
+    assert len(out) < 7000
