@@ -40,24 +40,30 @@ describe("numberOrNull", () => {
 });
 
 describe("buildMatrix", () => {
+	// Iran relays 1 and 2 ping foreign servers 10 and 11; relay 2 has not measured server 11
 	const matrix = buildMatrix([
-		cell(2, "relay-b", 1, "exit-a", 0),
-		cell(1, "exit-a", 2, "relay-b", 20),
-		cell(2, "relay-b", null, "1.1.1.1", 0),
+		cell(1, "iran-b", 10, "de-a", 0),
+		cell(2, "iran-a", 10, "de-a", 20),
+		cell(1, "iran-b", 11, "nl-a", 60),
 	]);
 
-	it("lists each source once and each destination once", () => {
-		expect(matrix.rows.map((row) => row.name)).toEqual(["exit-a", "relay-b"]);
-		expect(matrix.columns.map((column) => column.name)).toEqual(["1.1.1.1", "exit-a", "relay-b"]);
+	it("puts foreign servers down the side and Iran relays along the top", () => {
+		expect(matrix.rows.map((row) => row.name)).toEqual(["de-a", "nl-a"]);
+		expect(matrix.columns.map((column) => column.name)).toEqual(["iran-a", "iran-b"]);
 	});
 
-	it("finds the cell for a pair, if one was measured", () => {
-		expect(matrix.cell(1, "id:2")?.loss_pct).toBe(20);
-		expect(matrix.cell(2, "id:1")?.loss_pct).toBe(0);
-		expect(matrix.cell(1, "id:1")).toBeUndefined();
+	it("finds the ping from a relay to a foreign server, if one was measured", () => {
+		expect(matrix.cell(10, "id:2")?.loss_pct).toBe(20);
+		expect(matrix.cell(11, "id:1")?.loss_pct).toBe(60);
+		expect(matrix.cell(11, "id:2")).toBeUndefined();
+	});
+
+	it("skips a ping whose destination is not a known server", () => {
+		expect(buildMatrix([cell(1, "iran-a", null, "1.1.1.1", 0)]).rows).toEqual([]);
 	});
 
 	it("is empty for no measurements", () => {
 		expect(buildMatrix([]).rows).toEqual([]);
+		expect(buildMatrix([]).columns).toEqual([]);
 	});
 });

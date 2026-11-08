@@ -51,27 +51,29 @@ export function PingMatrixPage() {
 							caption={t.pingMatrix.tableLabel}
 							className="min-w-[32rem]"
 							columns={[
-								t.pingMatrix.from,
+								t.pingMatrix.foreignServer,
 								...grid.columns.map((column) => (
 									<span key={column.key} className="flex flex-col">
 										<span>{column.name}</span>
-										<span dir="ltr" className="text-end font-mono text-xs font-normal text-muted">
-											{column.target}
-										</span>
+										<span className="text-xs font-normal text-muted">{t.pingMatrix.iranRelay}</span>
 									</span>
 								)),
 							]}
 							rows={grid.rows.map((row) => ({
 								id: String(row.id),
 								cells: [
-									<Link
-										key="name"
-										to="/servers/$serverId"
-										params={{ serverId: String(row.id) }}
-										className="font-semibold text-accent-soft-foreground underline-offset-4 hover:underline"
-									>
-										{row.name}
-									</Link>,
+									<div key="name" className="flex flex-col">
+										<Link
+											to="/servers/$serverId"
+											params={{ serverId: String(row.id) }}
+											className="font-semibold text-accent-soft-foreground underline-offset-4 hover:underline"
+										>
+											{row.name}
+										</Link>
+										<span dir="ltr" className="text-end font-mono text-xs text-muted">
+											{row.target}
+										</span>
+									</div>,
 									...grid.columns.map((column) => (
 										<Cell key={column.key} cell={grid.cell(row.id, column.key)} limits={limits} />
 									)),

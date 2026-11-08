@@ -60,10 +60,11 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
             "UPDATE jobs SET status=?, result=?, error=?, done_at=? WHERE id=? AND server_id=?",
             (j.status if j.status in ("ok", "error", "rejected") else "error", json.dumps(j.result) if j.result is not None else None, j.error, now, j.id, sid),
         )
+    # only Iran relays measure, and only towards foreign servers: foreign-to-foreign pings are noise
     targets = [
         {"target": r["public_ip"], "tcp_port": None}
-        for r in db.execute("SELECT public_ip FROM servers WHERE id<>? AND public_ip IS NOT NULL AND public_ip NOT LIKE '%:%'", (sid,))
-    ]
+        for r in db.execute("SELECT public_ip FROM servers WHERE role<>'relay' AND public_ip IS NOT NULL AND public_ip NOT LIKE '%:%'")
+    ] if server["role"] == "relay" else []
     jobs = [{"id": r["id"], "kind": r["kind"], "args": json.loads(r["args"])} for r in db.execute("SELECT * FROM jobs WHERE server_id=? AND status='queued' ORDER BY id", (sid,))]
     if jobs:
         db.execute("UPDATE jobs SET status='sent' WHERE server_id=? AND status='queued'", (sid,))

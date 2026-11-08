@@ -8,21 +8,21 @@ from ..ssl import service as ssl_svc
 
 
 def ping_matrix(db: sqlite3.Connection) -> List[Dict[str, Any]]:
-    by_ip = {r["public_ip"]: r for r in db.execute("SELECT id, name, public_ip FROM servers WHERE public_ip IS NOT NULL")}
+    """Latest ping from each Iran relay to each foreign server; foreign-to-foreign and inbound pings do not matter."""
     rows = db.execute(
-        "SELECT p.server_id, p.target, p.loss, p.rtt, p.ts, s.name FROM pings p JOIN servers s ON s.id=p.server_id "
-        "WHERE p.ts=(SELECT MAX(ts) FROM pings q WHERE q.server_id=p.server_id AND q.target=p.target) AND p.ts>=?",
+        "SELECT p.server_id, s.name AS from_name, t.id AS to_id, t.name AS to_name, p.target, p.loss, p.rtt, p.ts "
+        "FROM pings p JOIN servers s ON s.id=p.server_id JOIN servers t ON t.public_ip=p.target "
+        "WHERE s.role='relay' AND t.role<>'relay' "
+        "AND p.ts=(SELECT MAX(ts) FROM pings q WHERE q.server_id=p.server_id AND q.target=p.target) AND p.ts>=?",
         (int(time.time()) - 600,),
     ).fetchall()
-    out = []
-    for r in rows:
-        to = by_ip.get(r["target"])
-        out.append({
-            "from_id": r["server_id"], "from_name": r["name"], "to_id": to["id"] if to else None,
-            "to_name": to["name"] if to else r["target"], "target": r["target"],
-            "loss_pct": r["loss"], "rtt_ms": r["rtt"], "ts": r["ts"],
-        })
-    return out
+    return [
+        {
+            "from_id": r["server_id"], "from_name": r["from_name"], "to_id": r["to_id"], "to_name": r["to_name"],
+            "target": r["target"], "loss_pct": r["loss"], "rtt_ms": r["rtt"], "ts": r["ts"],
+        }
+        for r in rows
+    ]
 
 
 def _issue(row, code: str, severity: str, title: str, suggestion: str, **evidence: Any) -> Dict[str, Any]:

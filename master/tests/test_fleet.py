@@ -119,3 +119,23 @@ def test_latest_carries_cores_and_totals(owner):
     latest = owner.get("/api/v1/servers/%d" % sid).json()["latest"]
     assert latest["cpu_cores"] == 4 and latest["ram_total_mb"] == 1000 and latest["ram_used_mb"] == 200
     assert latest["disk_total_gb"] == 100 and latest["disk_used_gb"] == 20
+
+
+def test_only_iran_relays_measure_and_only_towards_foreign_servers(owner):
+    relay, kr = make_server(owner, "iran-1", "relay")
+    exit_a, ka = make_server(owner, "de-1", "exit")
+    exit_b, kb = make_server(owner, "nl-1", "exit")
+    report(owner, ka, public_ip="198.51.100.1")
+    report(owner, kb, public_ip="198.51.100.2")
+    iran = report(owner, kr, public_ip="203.0.113.9", ping=[
+        {"target": "198.51.100.1", "loss_pct": 0, "rtt_ms": 40},
+        {"target": "198.51.100.2", "loss_pct": 100, "rtt_ms": None},
+    ]).json()
+    assert {t["target"] for t in iran["ping_targets"]} == {"198.51.100.1", "198.51.100.2"}
+    # a foreign server is given nothing to ping, and its stray results never reach the matrix
+    assert report(owner, ka, public_ip="198.51.100.1", ping=[{"target": "198.51.100.2", "loss_pct": 100, "rtt_ms": None},
+                                                             {"target": "203.0.113.9", "loss_pct": 100, "rtt_ms": None}]).json()["ping_targets"] == []
+    cells = owner.get("/api/v1/ping-matrix").json()
+    assert {(c["from_name"], c["to_name"]) for c in cells} == {("iran-1", "de-1"), ("iran-1", "nl-1")}
+    pings = [i for i in owner.get("/api/v1/issues").json() if i["code"].startswith("ping:")]
+    assert [i["evidence"]["to"] for i in pings] == ["nl-1"]
