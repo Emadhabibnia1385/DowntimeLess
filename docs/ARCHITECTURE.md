@@ -107,6 +107,23 @@ Everything the panel shows comes from the same JSON API. A program (Claude, a sc
 - Keys can never queue `reboot` / `apt_upgrade_safe` / `self_update`, never manage users or keys; a signed-in human does that.
 - `/llms.txt` describes the API for agents, `/api/openapi.json` is the schema, `docs/openapi.json` is the committed copy.
 
+## Reports and the AI briefing (`master/app/features/reports/`)
+
+Everything is computed on the master from data it already holds, so an assistant reads one document instead of gathering
+facts itself. All endpoints are `GET`, viewer or `read` key, JSON by default and dense Markdown with `?format=md`; windows are
+unix seconds (`since`/`until`, at most 366 days, error `window.invalid`). `/llms.txt` tells an assistant to start at the briefing.
+
+| Path | What |
+| --- | --- |
+| `/reports/briefing?detail=brief\|full` | fleet status, open issues with evidence, recurring issues, path problems, health, traffic, quota (when quota fields exist), certificates, outdated agents, changes, ordered "check first" steps |
+| `/reports/playbooks`, `/reports/playbooks/{code}` | curated fix guides (likely causes, read-only checks, safe fixes, never-do) per issue code or theme, flagged `detector: live\|planned`; unknown codes get a generic guide |
+| `/reports/health` | 0-100 score per server (healthy 80+, degraded 50-79, failing below 50 or any hard gate) with penalties, gates and the signals not measured yet |
+| `/reports/changes?since&until&server_id&kind` | the `events` table, newest first, at most 500 (jobs, agent updates, reboots, IP changes, server and settings changes, issue open/close), pruned after 180 days |
+| `/reports/daily`, `/incidents`, `/traffic`, `/availability`, `/capacity`, `/relays` | digest of the last 24 h against the 24 h before; incident counts, MTTR and flapping; bytes and peaks; percent of time reporting; peak-hour load and sibling comparison; relay-by-exit loss, RTT, verdict and bytes |
+
+Playbooks are hand-curated from the operator's vpnopsnyx knowledge base (`playbooks.py` names the source file of each entry);
+`docs/DETECTION-CATALOG.md` is the plan for the detectors that are still `planned`.
+
 ## Roadmap (see ROADMAP.md)
 
 v0.1 login + fleet + agent metrics + ping matrix + dashboard. Then: traffic quota and purchase alerts, Cloudflare tokens and

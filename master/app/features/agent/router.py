@@ -11,6 +11,7 @@ from ...settings import get_settings
 from ..servers import events
 from ..servers.service import swap_pct
 from ..links import service as links_svc
+from ..reports import events as changelog
 from ..ssl.service import adopt_domains
 from .schemas import EnrollRequest, EnrollResult, Report, ReportResult
 
@@ -49,6 +50,7 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
     changes = events.detect(server, body, public_ip, now)
     for column, value in changes.items():
         db.execute("UPDATE servers SET %s=? WHERE id=?" % column, (value, sid))  # column names come from detect()
+    changelog.report_changes(db, server, body, now, changes)
     db.execute(
         "UPDATE servers SET last_seen=?, last_report=?, prev_rx=?, prev_tx=?, agent_version=?, hostname=COALESCE(NULLIF(?,''),hostname), "
         "public_ip=COALESCE(?,public_ip), country=COALESCE(?,country), city=COALESCE(?,city), org=COALESCE(?,org) WHERE id=?",
@@ -69,6 +71,7 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
         if "target" in p:
             db.execute("INSERT INTO pings (server_id, ts, target, loss, rtt) VALUES (?,?,?,?,?)", (sid, now, str(p["target"]), p.get("loss_pct"), p.get("rtt_ms")))
     for j in body.jobs_done:
+        changelog.job_done(db, sid, j.id, j.status)
         db.execute(
             "UPDATE jobs SET status=?, result=?, error=?, done_at=? WHERE id=? AND server_id=?",
             (j.status if j.status in ("ok", "error", "rejected") else "error", json.dumps(j.result) if j.result is not None else None, j.error, now, j.id, sid),

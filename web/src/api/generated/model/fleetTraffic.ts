@@ -4,13 +4,13 @@
  * DowntimeLess
  * OpenAPI spec version: 0.1.0
  */
-import type { PeakDay } from "./peakDay";
+import type { AppFeaturesTrafficRouterPeakDay } from "./appFeaturesTrafficRouterPeakDay";
 import type { Volume } from "./volume";
 
 export interface FleetTraffic {
 	active_days: number;
 	avg_per_day: Volume;
-	peak_day: PeakDay | null;
+	peak_day: AppFeaturesTrafficRouterPeakDay | null;
 	period: Volume;
 	today: Volume;
 	yesterday: Volume;

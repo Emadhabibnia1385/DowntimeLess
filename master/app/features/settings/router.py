@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 
 from ...db import get_db
 from ...deps import Actor, require
+from ..reports import events as changelog
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -38,9 +39,12 @@ def get_settings_(_: Actor = Depends(require("viewer")), db: sqlite3.Connection 
 
 @router.put("", response_model=Dict[str, float], operation_id="settings_put")
 def put_settings(body: Dict[str, float], _: Actor = Depends(require("admin")), db: sqlite3.Connection = Depends(get_db)):
+    before = thresholds(db)
     for k, v in body.items():
         if k in DEFAULTS:
             if k.startswith("on_") or k == "quota_basis":
                 v = 1 if v else 0
             db.execute("INSERT INTO settings (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (k, str(v)))
-    return thresholds(db)
+    after = thresholds(db)
+    changelog.settings_changed(db, before, after)
+    return after

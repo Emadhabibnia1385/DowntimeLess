@@ -18,6 +18,7 @@ from .features.keys.router import router as keys_router
 from .features.links.router import router as links_router
 from .features.issues.router import router as issues_router
 from .features.overview.router import router as overview_router
+from .features.reports.router import router as reports_router
 from .features.servers.router import router as servers_router
 from .features.settings.router import router as settings_router
 from .features.ssl.router import router as ssl_router
@@ -78,7 +79,7 @@ def create_app() -> FastAPI:
     s = get_settings()
     app = FastAPI(title="DowntimeLess", version="0.1.0", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json")
     app.add_exception_handler(DLError, dl_error_handler)
-    for r in (auth_router, servers_router, categories_router, overview_router, issues_router, settings_router, keys_router, ssl_router, links_router, traffic_router, telegram_router):
+    for r in (auth_router, servers_router, categories_router, overview_router, issues_router, settings_router, keys_router, ssl_router, links_router, traffic_router, telegram_router, reports_router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(agent_router, prefix="/api")
 
@@ -97,8 +98,22 @@ def create_app() -> FastAPI:
     @app.get("/llms.txt", include_in_schema=False)
     def llms():
         return PlainTextResponse(
-            "# DowntimeLess\n> VPN fleet monitoring. JSON API for humans and AI agents.\n\n"
-            "- Auth: `Authorization: Bearer dl_...` (create a key in the panel: owner > API keys).\n"
+            "# DowntimeLess\n> VPN fleet monitoring. JSON API for humans and AI agents; the server already computed the analysis, read it before gathering anything yourself.\n\n"
+            "Auth: `Authorization: Bearer dl_...` (create a key in the panel: owner > API keys). A `read` key is enough for every report.\n"
+            "START: GET /api/v1/reports/briefing?format=md (detail=full lifts the caps). One dense document: fleet status, open issues with evidence, health, traffic, certificates, recent changes and an ordered 'check first' list.\n"
+            "THEN: GET /api/v1/reports/playbooks/{code} for each issue code in it (ping:<ip> works): likely causes, read-only checks, safe fixes, never-do rules. Unknown codes get a generic guide.\n"
+            "Reports (GET; add format=md for Markdown; since/until are unix seconds, at most 366 days apart):\n"
+            "- /api/v1/reports/briefing?detail=brief|full: the first read\n"
+            "- /api/v1/reports/playbooks and /playbooks/{code}: every fix guide, detector live or planned\n"
+            "- /api/v1/reports/health: 0-100 score and band per server, penalties, hard gates, signals not measured\n"
+            "- /api/v1/reports/changes?since&until&server_id&kind: change log (jobs, agent updates, reboots, IP changes, settings, issues), newest first, max 500\n"
+            "- /api/v1/reports/daily: last 24 h against the 24 h before (incidents, availability, traffic, changes)\n"
+            "- /api/v1/reports/incidents: counts by code and server, MTTR, flapping, longest outages\n"
+            "- /api/v1/reports/traffic: fleet and per-server bytes, peak day and hour, relay-exit pair bytes\n"
+            "- /api/v1/reports/availability: percent of time each server reported\n"
+            "- /api/v1/reports/capacity: peak-hour CPU, steal, load, conntrack, RAM, sibling comparison, growth\n"
+            "- /api/v1/reports/relays: relay-by-exit loss, RTT, path verdict and bytes\n\n"
+            "Raw data:\n"
             "- GET /api/v1/snapshot: whole fleet, issues and ping matrix in one document.\n"
             "- GET /api/v1/issues: current problems with evidence and a suggested next step.\n"
             "- GET /api/v1/issues/history?range=24h|7d|30d: every issue that was active in the range (occurrences, time active, each incident).\n"

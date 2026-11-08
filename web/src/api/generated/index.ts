@@ -6,6 +6,7 @@ export * from "./keys/keys";
 export * from "./links/links";
 export * from "./meta/meta";
 export * from "./overview/overview";
+export * from "./reports/reports";
 export * from "./servers/servers";
 export * from "./settings/settings";
 export * from "./ssl/ssl";

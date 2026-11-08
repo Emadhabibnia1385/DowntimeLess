@@ -6,6 +6,7 @@ from . import alerts
 from .db import connect
 from .features.issues import service as incidents_svc
 from .features.links import service as links_svc
+from .features.reports import events as changelog
 from .features.servers.service import status_of
 from .features.settings.router import thresholds
 from .features.ssl import service as ssl_svc
@@ -46,6 +47,7 @@ def sweep(tg: Telegram) -> None:
         db.execute("DELETE FROM metrics WHERE ts<?", (cut - 90 * 86400,))
         db.execute("DELETE FROM pings WHERE ts<?", (cut - 7 * 86400,))
         links_svc.prune(db, cut)
+        changelog.prune(db, cut)
         db.execute("DELETE FROM sessions WHERE expires_at<?", (cut,))
     finally:
         db.close()

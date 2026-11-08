@@ -10,6 +10,7 @@ from ...db import get_db
 from ...deps import Actor, require
 from ...errors import DLError
 from ...security import digest, new_token
+from ..reports import events as changelog
 from . import service as svc
 from .schemas import JobCreate, JobOut, MetricsOut, ServerCreate, ServerCreated, ServerOut, ServerPatch
 
@@ -42,6 +43,7 @@ def create_server(body: ServerCreate, _: Actor = Depends(require("admin")), db: 
         "INSERT INTO servers (name, alias, role, panel_only, category_id, enroll_hash, created_at, permission) VALUES (?,?,?,?,?,?,?,'full')",
         (body.name, body.alias, cols["role"], cols["panel_only"], _category(db, body.category_id), digest(token), int(time.time())),
     )
+    changelog.record(db, "server_added", "%s (%s)" % (body.name, body.role), cur.lastrowid, {"role": body.role})
     return {"server": svc.server_out(_row(db, cur.lastrowid)), "install_command": svc.install_command(token)}
 
 
@@ -60,7 +62,7 @@ def get_server(server_id: int, _: Actor = Depends(require("viewer")), db: sqlite
 
 @router.patch("/{server_id}", response_model=ServerOut, operation_id="servers_update")
 def patch_server(server_id: int, body: ServerPatch, _: Actor = Depends(require("admin")), db: sqlite3.Connection = Depends(get_db)):
-    _row(db, server_id)
+    before = _row(db, server_id)
     changes = body.model_dump(exclude_none=True)
     if "acct_on" in changes:
         changes["acct_on"] = 1 if changes["acct_on"] else 0
@@ -71,6 +73,7 @@ def patch_server(server_id: int, body: ServerPatch, _: Actor = Depends(require("
         changes["category_id"] = _category(db, body.category_id)
     if "role" in changes:
         changes.update(svc.role_columns(changes["role"]))
+    changelog.server_patched(db, before, changes)
     for field, value in changes.items():
         db.execute("UPDATE servers SET %s=? WHERE id=?" % field, (value, server_id))  # field names come from the model
     return svc.server_out(_row(db, server_id))
@@ -78,7 +81,8 @@ def patch_server(server_id: int, body: ServerPatch, _: Actor = Depends(require("
 
 @router.delete("/{server_id}", status_code=204, operation_id="servers_delete")
 def delete_server(server_id: int, _: Actor = Depends(require("admin")), db: sqlite3.Connection = Depends(get_db)):
-    _row(db, server_id)
+    row = _row(db, server_id)
+    changelog.record(db, "server_removed", changelog.label(row), server_id, {"role": row["role"]})
     db.execute("DELETE FROM servers WHERE id=?", (server_id,))
 
 
@@ -129,4 +133,5 @@ def create_job(server_id: int, body: JobCreate, actor: Actor = Depends(require("
         "INSERT INTO jobs (server_id, kind, args, created_by, created_at) VALUES (?,?,?,?,?)",
         (server_id, body.kind, json.dumps(body.args), actor.user_id, int(time.time())),
     )
+    changelog.job_created(db, server, cur.lastrowid, body.kind, actor.user_id)
     return _job_out(db.execute("SELECT * FROM jobs WHERE id=?", (cur.lastrowid,)).fetchone())

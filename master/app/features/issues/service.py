@@ -3,6 +3,7 @@ import sqlite3
 from typing import Any, Dict, List, Optional
 
 from ..overview import service as overview
+from ..reports import events as changelog
 
 RANGES = {"24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400}
 RANK = {"info": 0, "warning": 1, "critical": 2}
@@ -39,6 +40,8 @@ def record(db: sqlite3.Connection, now: int, found: Optional[List[Dict[str, Any]
                 (key, issue["code"], issue["server_id"], issue["server_name"], issue["severity"], issue["title"],
                  json.dumps(issue["evidence"], ensure_ascii=False), now, now),
             )
+            changelog.record(db, "issue_opened", "%s: %s" % (issue["server_name"] or "-", issue["code"]), issue["server_id"],
+                             {"key": key, "code": issue["code"], "severity": issue["severity"]}, now)
             role = db.execute("SELECT role FROM servers WHERE id=?", (issue["server_id"],)).fetchone() if issue["server_id"] else None
             events.append({
                 "type": "open", "incident_id": cur.lastrowid, "key": key, "code": issue["code"], "server_id": issue["server_id"],
@@ -50,6 +53,8 @@ def record(db: sqlite3.Connection, now: int, found: Optional[List[Dict[str, Any]
         "SELECT * FROM incidents WHERE closed_at IS NULL AND last_seen<=? AND (server_id IS NULL OR server_id IN (SELECT id FROM servers))",
         (now - GRACE_S,),
     ).fetchall():
+        changelog.record(db, "issue_closed", "%s: %s" % (row["server_name"] or "-", row["code"]), row["server_id"],
+                         {"key": row["key"], "code": row["code"], "severity": row["severity"], "duration_s": max(0, row["last_seen"] - row["opened_at"])}, row["last_seen"])
         events.append({
             "type": "close", "incident_id": row["id"], "key": row["key"], "code": row["code"], "server_id": row["server_id"],
             "server_name": row["server_name"], "severity": row["severity"], "title": row["title"], "evidence": _evidence(row["evidence"]),

@@ -1,6 +1,497 @@
 {
   "components": {
     "schemas": {
+      "AgentsOutdated": {
+        "properties": {
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "servers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Servers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "latest",
+          "servers"
+        ],
+        "title": "AgentsOutdated",
+        "type": "object"
+      },
+      "AvailabilityReport": {
+        "properties": {
+          "fleet_availability_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fleet Availability Pct"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/AvailabilityRow"
+            },
+            "title": "Servers",
+            "type": "array"
+          },
+          "since": {
+            "title": "Since",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "until": {
+            "title": "Until",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "since",
+          "until",
+          "fleet_availability_pct",
+          "servers",
+          "truncated",
+          "method"
+        ],
+        "title": "AvailabilityReport",
+        "type": "object"
+      },
+      "AvailabilityRow": {
+        "properties": {
+          "availability_pct": {
+            "title": "Availability Pct",
+            "type": "number"
+          },
+          "down_s": {
+            "title": "Down S",
+            "type": "integer"
+          },
+          "observed_s": {
+            "title": "Observed S",
+            "type": "integer"
+          },
+          "outages": {
+            "title": "Outages",
+            "type": "integer"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "server": {
+            "title": "Server",
+            "type": "string"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "server_id",
+          "server",
+          "role",
+          "availability_pct",
+          "down_s",
+          "outages",
+          "samples",
+          "observed_s"
+        ],
+        "title": "AvailabilityRow",
+        "type": "object"
+      },
+      "Briefing": {
+        "properties": {
+          "agents_outdated": {
+            "$ref": "#/components/schemas/AgentsOutdated"
+          },
+          "certs_at_risk": {
+            "items": {
+              "$ref": "#/components/schemas/CertRisk"
+            },
+            "title": "Certs At Risk",
+            "type": "array"
+          },
+          "changes_24h": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeBrief"
+            },
+            "title": "Changes 24H",
+            "type": "array"
+          },
+          "check_first": {
+            "items": {
+              "$ref": "#/components/schemas/CheckStep"
+            },
+            "title": "Check First",
+            "type": "array"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "fleet": {
+            "$ref": "#/components/schemas/FleetBrief"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "integer"
+          },
+          "health": {
+            "$ref": "#/components/schemas/HealthBrief"
+          },
+          "issue_events_24h": {
+            "title": "Issue Events 24H",
+            "type": "integer"
+          },
+          "issues": {
+            "$ref": "#/components/schemas/IssuesBrief"
+          },
+          "not_measured": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Not Measured",
+            "type": "array"
+          },
+          "path_problems": {
+            "items": {
+              "$ref": "#/components/schemas/PathProblem"
+            },
+            "title": "Path Problems",
+            "type": "array"
+          },
+          "quota": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/QuotaRow"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota"
+          },
+          "recurring_24h": {
+            "items": {
+              "$ref": "#/components/schemas/RecurringBrief"
+            },
+            "title": "Recurring 24H",
+            "type": "array"
+          },
+          "timezone_note": {
+            "title": "Timezone Note",
+            "type": "string"
+          },
+          "traffic": {
+            "$ref": "#/components/schemas/TrafficBrief"
+          }
+        },
+        "required": [
+          "generated_at",
+          "detail",
+          "timezone_note",
+          "fleet",
+          "issues",
+          "recurring_24h",
+          "path_problems",
+          "health",
+          "traffic",
+          "quota",
+          "certs_at_risk",
+          "agents_outdated",
+          "changes_24h",
+          "issue_events_24h",
+          "check_first",
+          "not_measured"
+        ],
+        "title": "Briefing",
+        "type": "object"
+      },
+      "ByteSplit": {
+        "properties": {
+          "exit": {
+            "title": "Exit",
+            "type": "integer"
+          },
+          "other": {
+            "title": "Other",
+            "type": "integer"
+          },
+          "relay": {
+            "title": "Relay",
+            "type": "integer"
+          },
+          "rx": {
+            "title": "Rx",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "tx": {
+            "title": "Tx",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rx",
+          "tx",
+          "total",
+          "relay",
+          "exit",
+          "other"
+        ],
+        "title": "ByteSplit",
+        "type": "object"
+      },
+      "CapacityReport": {
+        "properties": {
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/CapacityRow"
+            },
+            "title": "Servers",
+            "type": "array"
+          },
+          "since": {
+            "title": "Since",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "until": {
+            "title": "Until",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "since",
+          "until",
+          "servers",
+          "truncated",
+          "note"
+        ],
+        "title": "CapacityReport",
+        "type": "object"
+      },
+      "CapacityRow": {
+        "properties": {
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "conntrack_peak": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conntrack Peak"
+          },
+          "cores": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cores"
+          },
+          "cpu_growth_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Growth Pct"
+          },
+          "cpu_peak": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Peak"
+          },
+          "imbalance": {
+            "title": "Imbalance",
+            "type": "boolean"
+          },
+          "load1_peak": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Load1 Peak"
+          },
+          "load_per_core_peak": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Load Per Core Peak"
+          },
+          "peak_hour": {
+            "title": "Peak Hour",
+            "type": "integer"
+          },
+          "ram_peak": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ram Peak"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "server": {
+            "title": "Server",
+            "type": "string"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "integer"
+          },
+          "sibling_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sibling Group"
+          },
+          "steal_peak": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steal Peak"
+          },
+          "traffic_bytes": {
+            "title": "Traffic Bytes",
+            "type": "integer"
+          },
+          "traffic_growth_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Traffic Growth Pct"
+          },
+          "vs_sibling_median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vs Sibling Median"
+          }
+        },
+        "required": [
+          "server_id",
+          "server",
+          "role",
+          "category_id",
+          "cores",
+          "peak_hour",
+          "cpu_peak",
+          "steal_peak",
+          "load1_peak",
+          "load_per_core_peak",
+          "conntrack_peak",
+          "ram_peak",
+          "traffic_bytes",
+          "traffic_growth_pct",
+          "cpu_growth_pct",
+          "sibling_group",
+          "vs_sibling_median",
+          "imbalance"
+        ],
+        "title": "CapacityRow",
+        "type": "object"
+      },
       "CategoryBody": {
         "properties": {
           "name": {
@@ -14,6 +505,34 @@
           "name"
         ],
         "title": "CategoryBody",
+        "type": "object"
+      },
+      "CategoryCount": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "offline": {
+            "title": "Offline",
+            "type": "integer"
+          },
+          "online": {
+            "title": "Online",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "category",
+          "online",
+          "offline",
+          "pending"
+        ],
+        "title": "CategoryCount",
         "type": "object"
       },
       "CategoryOut": {
@@ -37,6 +556,131 @@
           "server_count"
         ],
         "title": "CategoryOut",
+        "type": "object"
+      },
+      "CertRisk": {
+        "properties": {
+          "auto_renew": {
+            "title": "Auto Renew",
+            "type": "string"
+          },
+          "days_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Left"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          }
+        },
+        "required": [
+          "name",
+          "server",
+          "days_left",
+          "level",
+          "auto_renew",
+          "error"
+        ],
+        "title": "CertRisk",
+        "type": "object"
+      },
+      "ChangeBrief": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ts",
+          "server",
+          "kind",
+          "title"
+        ],
+        "title": "ChangeBrief",
+        "type": "object"
+      },
+      "ChangesOut": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "since": {
+            "title": "Since",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "until": {
+            "title": "Until",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "since",
+          "until",
+          "events",
+          "truncated"
+        ],
+        "title": "ChangesOut",
         "type": "object"
       },
       "ChannelIn": {
@@ -83,6 +727,276 @@
           "created_at"
         ],
         "title": "ChannelOut",
+        "type": "object"
+      },
+      "CheckStep": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "first_check": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Check"
+          },
+          "playbook": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Playbook"
+          },
+          "servers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Servers",
+            "type": "array"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "why": {
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "count",
+          "servers",
+          "first_check",
+          "playbook",
+          "why"
+        ],
+        "title": "CheckStep",
+        "type": "object"
+      },
+      "DailyAvailability": {
+        "properties": {
+          "below_100": {
+            "items": {
+              "$ref": "#/components/schemas/AvailabilityRow"
+            },
+            "title": "Below 100",
+            "type": "array"
+          },
+          "fleet_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fleet Pct"
+          }
+        },
+        "required": [
+          "fleet_pct",
+          "below_100"
+        ],
+        "title": "DailyAvailability",
+        "type": "object"
+      },
+      "DailyIncidents": {
+        "properties": {
+          "closed": {
+            "title": "Closed",
+            "type": "integer"
+          },
+          "critical_opened": {
+            "title": "Critical Opened",
+            "type": "integer"
+          },
+          "mttr_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mttr S"
+          },
+          "opened": {
+            "title": "Opened",
+            "type": "integer"
+          },
+          "previous_closed": {
+            "title": "Previous Closed",
+            "type": "integer"
+          },
+          "previous_opened": {
+            "title": "Previous Opened",
+            "type": "integer"
+          },
+          "still_open": {
+            "title": "Still Open",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "opened",
+          "closed",
+          "critical_opened",
+          "still_open",
+          "mttr_s",
+          "previous_opened",
+          "previous_closed"
+        ],
+        "title": "DailyIncidents",
+        "type": "object"
+      },
+      "DailyOut": {
+        "properties": {
+          "availability": {
+            "$ref": "#/components/schemas/DailyAvailability"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeBrief"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "health": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Health",
+            "type": "object"
+          },
+          "incidents": {
+            "$ref": "#/components/schemas/DailyIncidents"
+          },
+          "previous_since": {
+            "title": "Previous Since",
+            "type": "integer"
+          },
+          "since": {
+            "title": "Since",
+            "type": "integer"
+          },
+          "top_issues": {
+            "items": {
+              "$ref": "#/components/schemas/TopIssue"
+            },
+            "title": "Top Issues",
+            "type": "array"
+          },
+          "traffic": {
+            "$ref": "#/components/schemas/DailyTraffic"
+          },
+          "until": {
+            "title": "Until",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "since",
+          "until",
+          "previous_since",
+          "incidents",
+          "availability",
+          "traffic",
+          "top_issues",
+          "health",
+          "changes"
+        ],
+        "title": "DailyOut",
+        "type": "object"
+      },
+      "DailyTraffic": {
+        "properties": {
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "exit": {
+            "title": "Exit",
+            "type": "integer"
+          },
+          "other": {
+            "title": "Other",
+            "type": "integer"
+          },
+          "previous_total": {
+            "title": "Previous Total",
+            "type": "integer"
+          },
+          "relay": {
+            "title": "Relay",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "previous_total",
+          "change_pct",
+          "relay",
+          "exit",
+          "other"
+        ],
+        "title": "DailyTraffic",
+        "type": "object"
+      },
+      "DayBytes": {
+        "properties": {
+          "day_start": {
+            "title": "Day Start",
+            "type": "integer"
+          },
+          "rx": {
+            "title": "Rx",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "tx": {
+            "title": "Tx",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day_start",
+          "rx",
+          "tx",
+          "total"
+        ],
+        "title": "DayBytes",
         "type": "object"
       },
       "DomainCreate": {
@@ -146,6 +1060,108 @@
           "agent_key"
         ],
         "title": "EnrollResult",
+        "type": "object"
+      },
+      "EventOut": {
+        "properties": {
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          },
+          "server_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "ts",
+          "server_id",
+          "server",
+          "kind",
+          "title",
+          "detail"
+        ],
+        "title": "EventOut",
+        "type": "object"
+      },
+      "FleetBrief": {
+        "properties": {
+          "by_category": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryCount"
+            },
+            "title": "By Category",
+            "type": "array"
+          },
+          "by_role": {
+            "items": {
+              "$ref": "#/components/schemas/RoleCount"
+            },
+            "title": "By Role",
+            "type": "array"
+          },
+          "offline": {
+            "title": "Offline",
+            "type": "integer"
+          },
+          "online": {
+            "title": "Online",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "online",
+          "offline",
+          "pending",
+          "by_role",
+          "by_category"
+        ],
+        "title": "FleetBrief",
         "type": "object"
       },
       "FleetHistory": {
@@ -255,7 +1271,7 @@
           "peak_day": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PeakDay"
+                "$ref": "#/components/schemas/app__features__traffic__router__PeakDay"
               },
               {
                 "type": "null"
@@ -283,6 +1299,24 @@
         "title": "FleetTraffic",
         "type": "object"
       },
+      "Gate": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "detail"
+        ],
+        "title": "Gate",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -294,6 +1328,156 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthAttention": {
+        "properties": {
+          "band": {
+            "title": "Band",
+            "type": "string"
+          },
+          "gates": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Gates",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "integer"
+          },
+          "top_penalty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Penalty"
+          }
+        },
+        "required": [
+          "server_id",
+          "name",
+          "role",
+          "score",
+          "band",
+          "gates",
+          "top_penalty"
+        ],
+        "title": "HealthAttention",
+        "type": "object"
+      },
+      "HealthBrief": {
+        "properties": {
+          "attention": {
+            "items": {
+              "$ref": "#/components/schemas/HealthAttention"
+            },
+            "title": "Attention",
+            "type": "array"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "counts",
+          "attention",
+          "truncated"
+        ],
+        "title": "HealthBrief",
+        "type": "object"
+      },
+      "HealthOut": {
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "integer"
+          },
+          "not_measured": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Not Measured",
+            "type": "object"
+          },
+          "quota_measured": {
+            "title": "Quota Measured",
+            "type": "boolean"
+          },
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/ServerHealth"
+            },
+            "title": "Servers",
+            "type": "array"
+          },
+          "weights": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "title": "Weights",
+            "type": "object"
+          }
+        },
+        "required": [
+          "generated_at",
+          "counts",
+          "servers",
+          "description",
+          "weights",
+          "not_measured",
+          "quota_measured"
+        ],
+        "title": "HealthOut",
         "type": "object"
       },
       "HistoryTotals": {
@@ -345,6 +1529,249 @@
           "tx"
         ],
         "title": "HourProfile",
+        "type": "object"
+      },
+      "IncByCode": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "incidents": {
+            "title": "Incidents",
+            "type": "integer"
+          },
+          "mttr_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mttr S"
+          },
+          "resolved": {
+            "title": "Resolved",
+            "type": "integer"
+          },
+          "total_s": {
+            "title": "Total S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "incidents",
+          "total_s",
+          "resolved",
+          "mttr_s"
+        ],
+        "title": "IncByCode",
+        "type": "object"
+      },
+      "IncByServer": {
+        "properties": {
+          "incidents": {
+            "title": "Incidents",
+            "type": "integer"
+          },
+          "server": {
+            "title": "Server",
+            "type": "string"
+          },
+          "server_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Id"
+          },
+          "total_s": {
+            "title": "Total S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "server",
+          "server_id",
+          "incidents",
+          "total_s"
+        ],
+        "title": "IncByServer",
+        "type": "object"
+      },
+      "IncFlapping": {
+        "properties": {
+          "active_now": {
+            "title": "Active Now",
+            "type": "boolean"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "occurrences": {
+            "title": "Occurrences",
+            "type": "integer"
+          },
+          "server": {
+            "title": "Server",
+            "type": "string"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "total_s": {
+            "title": "Total S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "code",
+          "server",
+          "occurrences",
+          "total_s",
+          "severity",
+          "active_now"
+        ],
+        "title": "IncFlapping",
+        "type": "object"
+      },
+      "IncLongest": {
+        "properties": {
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "duration_s": {
+            "title": "Duration S",
+            "type": "integer"
+          },
+          "opened_at": {
+            "title": "Opened At",
+            "type": "integer"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          },
+          "server_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Id"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          }
+        },
+        "required": [
+          "server",
+          "server_id",
+          "code",
+          "severity",
+          "opened_at",
+          "closed_at",
+          "duration_s"
+        ],
+        "title": "IncLongest",
+        "type": "object"
+      },
+      "IncTotals": {
+        "properties": {
+          "closed": {
+            "title": "Closed",
+            "type": "integer"
+          },
+          "critical_opened": {
+            "title": "Critical Opened",
+            "type": "integer"
+          },
+          "mttr_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mttr S"
+          },
+          "opened": {
+            "title": "Opened",
+            "type": "integer"
+          },
+          "still_open": {
+            "title": "Still Open",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "opened",
+          "closed",
+          "still_open",
+          "critical_opened",
+          "mttr_s"
+        ],
+        "title": "IncTotals",
         "type": "object"
       },
       "IncidentOut": {
@@ -440,6 +1867,70 @@
         "title": "IncidentOut",
         "type": "object"
       },
+      "IncidentsReport": {
+        "properties": {
+          "by_code": {
+            "items": {
+              "$ref": "#/components/schemas/IncByCode"
+            },
+            "title": "By Code",
+            "type": "array"
+          },
+          "by_server": {
+            "items": {
+              "$ref": "#/components/schemas/IncByServer"
+            },
+            "title": "By Server",
+            "type": "array"
+          },
+          "flapping": {
+            "items": {
+              "$ref": "#/components/schemas/IncFlapping"
+            },
+            "title": "Flapping",
+            "type": "array"
+          },
+          "longest": {
+            "items": {
+              "$ref": "#/components/schemas/IncLongest"
+            },
+            "title": "Longest",
+            "type": "array"
+          },
+          "retention_days": {
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "since": {
+            "title": "Since",
+            "type": "integer"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/IncTotals"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "until": {
+            "title": "Until",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "since",
+          "until",
+          "retention_days",
+          "totals",
+          "by_code",
+          "by_server",
+          "flapping",
+          "longest",
+          "truncated"
+        ],
+        "title": "IncidentsReport",
+        "type": "object"
+      },
       "Issue": {
         "properties": {
           "code": {
@@ -506,6 +1997,69 @@
           "evidence"
         ],
         "title": "Issue",
+        "type": "object"
+      },
+      "IssueBrief": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "recent_24h": {
+            "title": "Recent 24H",
+            "type": "integer"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          },
+          "server_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Id"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "suggestion": {
+            "title": "Suggestion",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "severity",
+          "server_id",
+          "server",
+          "code",
+          "title",
+          "evidence",
+          "suggestion",
+          "recent_24h"
+        ],
+        "title": "IssueBrief",
         "type": "object"
       },
       "IssueSummary": {
@@ -603,6 +2157,42 @@
           "evidence"
         ],
         "title": "IssueSummary",
+        "type": "object"
+      },
+      "IssuesBrief": {
+        "properties": {
+          "critical": {
+            "title": "Critical",
+            "type": "integer"
+          },
+          "info": {
+            "title": "Info",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IssueBrief"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "warning": {
+            "title": "Warning",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "critical",
+          "warning",
+          "info",
+          "items",
+          "truncated"
+        ],
+        "title": "IssuesBrief",
         "type": "object"
       },
       "IssuesHistory": {
@@ -1164,6 +2754,39 @@
         "title": "Latest",
         "type": "object"
       },
+      "LinkPairBytes": {
+        "properties": {
+          "in_bytes": {
+            "title": "In Bytes",
+            "type": "integer"
+          },
+          "out_bytes": {
+            "title": "Out Bytes",
+            "type": "integer"
+          },
+          "peer": {
+            "title": "Peer",
+            "type": "string"
+          },
+          "server": {
+            "title": "Server",
+            "type": "string"
+          },
+          "server_role": {
+            "title": "Server Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "server",
+          "server_role",
+          "peer",
+          "in_bytes",
+          "out_bytes"
+        ],
+        "title": "LinkPairBytes",
+        "type": "object"
+      },
       "LinkPoint": {
         "properties": {
           "in_bytes": {
@@ -1612,32 +3235,85 @@
         "title": "PasswordRequest",
         "type": "object"
       },
-      "PeakDay": {
+      "PathProblem": {
         "properties": {
-          "date": {
-            "title": "Date",
+          "detail": {
+            "title": "Detail",
             "type": "string"
           },
-          "rx": {
-            "title": "Rx",
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "server",
+          "detail",
+          "source"
+        ],
+        "title": "PathProblem",
+        "type": "object"
+      },
+      "PeakHour": {
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
             "type": "integer"
           },
-          "total": {
-            "title": "Total",
-            "type": "integer"
-          },
-          "tx": {
-            "title": "Tx",
+          "hour_start": {
+            "title": "Hour Start",
             "type": "integer"
           }
         },
         "required": [
-          "rx",
-          "tx",
-          "total",
-          "date"
+          "hour_start",
+          "bytes"
         ],
-        "title": "PeakDay",
+        "title": "PeakHour",
+        "type": "object"
+      },
+      "Penalty": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "max": {
+            "title": "Max",
+            "type": "integer"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "points",
+          "max",
+          "detail"
+        ],
+        "title": "Penalty",
         "type": "object"
       },
       "PingCell": {
@@ -1706,6 +3382,153 @@
         "title": "PingTarget",
         "type": "object"
       },
+      "Playbook": {
+        "properties": {
+          "causes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Causes",
+            "type": "array"
+          },
+          "checks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detector": {
+            "title": "Detector",
+            "type": "string"
+          },
+          "fixes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fixes",
+            "type": "array"
+          },
+          "never": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Never",
+            "type": "array"
+          },
+          "source": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source",
+            "type": "array"
+          },
+          "summary_fa": {
+            "title": "Summary Fa",
+            "type": "string"
+          },
+          "theme": {
+            "title": "Theme",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "theme",
+          "title",
+          "summary_fa",
+          "detector",
+          "causes",
+          "checks",
+          "fixes",
+          "never",
+          "source"
+        ],
+        "title": "Playbook",
+        "type": "object"
+      },
+      "PlaybookItem": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detector": {
+            "title": "Detector",
+            "type": "string"
+          },
+          "summary_fa": {
+            "title": "Summary Fa",
+            "type": "string"
+          },
+          "theme": {
+            "title": "Theme",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "theme",
+          "title",
+          "summary_fa",
+          "detector"
+        ],
+        "title": "PlaybookItem",
+        "type": "object"
+      },
+      "PlaybookList": {
+        "properties": {
+          "playbooks": {
+            "items": {
+              "$ref": "#/components/schemas/PlaybookItem"
+            },
+            "title": "Playbooks",
+            "type": "array"
+          },
+          "principles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Principles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "principles",
+          "playbooks"
+        ],
+        "title": "PlaybookList",
+        "type": "object"
+      },
+      "PlaybookOut": {
+        "properties": {
+          "matched": {
+            "title": "Matched",
+            "type": "boolean"
+          },
+          "playbook": {
+            "$ref": "#/components/schemas/Playbook"
+          }
+        },
+        "required": [
+          "matched",
+          "playbook"
+        ],
+        "title": "PlaybookOut",
+        "type": "object"
+      },
       "PollRequest": {
         "properties": {
           "challenge_id": {
@@ -1745,6 +3568,257 @@
           "status"
         ],
         "title": "PollResult",
+        "type": "object"
+      },
+      "QuotaRow": {
+        "properties": {
+          "days_left": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Left"
+          },
+          "per_day_gb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Day Gb"
+          },
+          "quota_gb": {
+            "title": "Quota Gb",
+            "type": "number"
+          },
+          "resets_in_days": {
+            "title": "Resets In Days",
+            "type": "number"
+          },
+          "runs_out": {
+            "title": "Runs Out",
+            "type": "boolean"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "integer"
+          },
+          "server_name": {
+            "title": "Server Name",
+            "type": "string"
+          },
+          "used_gb": {
+            "title": "Used Gb",
+            "type": "number"
+          },
+          "used_pct": {
+            "title": "Used Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "server_id",
+          "server_name",
+          "quota_gb",
+          "used_gb",
+          "used_pct",
+          "per_day_gb",
+          "days_left",
+          "resets_in_days",
+          "runs_out"
+        ],
+        "title": "QuotaRow",
+        "type": "object"
+      },
+      "RecurringBrief": {
+        "properties": {
+          "active_now": {
+            "title": "Active Now",
+            "type": "boolean"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "flapping": {
+            "title": "Flapping",
+            "type": "boolean"
+          },
+          "occurrences": {
+            "title": "Occurrences",
+            "type": "integer"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          },
+          "total_s": {
+            "title": "Total S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "server",
+          "code",
+          "occurrences",
+          "total_s",
+          "active_now",
+          "flapping"
+        ],
+        "title": "RecurringBrief",
+        "type": "object"
+      },
+      "RelayPair": {
+        "properties": {
+          "exit": {
+            "title": "Exit",
+            "type": "string"
+          },
+          "exit_id": {
+            "title": "Exit Id",
+            "type": "integer"
+          },
+          "in_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "In Bytes"
+          },
+          "loss_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loss Pct"
+          },
+          "out_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Out Bytes"
+          },
+          "relay": {
+            "title": "Relay",
+            "type": "string"
+          },
+          "relay_id": {
+            "title": "Relay Id",
+            "type": "integer"
+          },
+          "rtt_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rtt Ms"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "verdict": {
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "relay_id",
+          "relay",
+          "exit_id",
+          "exit",
+          "loss_pct",
+          "rtt_ms",
+          "samples",
+          "verdict",
+          "in_bytes",
+          "out_bytes"
+        ],
+        "title": "RelayPair",
+        "type": "object"
+      },
+      "RelaysReport": {
+        "properties": {
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/RelayPair"
+            },
+            "title": "Pairs",
+            "type": "array"
+          },
+          "ping_window_s": {
+            "title": "Ping Window S",
+            "type": "integer"
+          },
+          "problems": {
+            "title": "Problems",
+            "type": "integer"
+          },
+          "since": {
+            "title": "Since",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "until": {
+            "title": "Until",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "since",
+          "until",
+          "ping_window_s",
+          "pairs",
+          "truncated",
+          "problems",
+          "note"
+        ],
+        "title": "RelaysReport",
         "type": "object"
       },
       "Report": {
@@ -1957,6 +4031,72 @@
         "title": "ReportResult",
         "type": "object"
       },
+      "RoleCount": {
+        "properties": {
+          "offline": {
+            "title": "Offline",
+            "type": "integer"
+          },
+          "online": {
+            "title": "Online",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "online",
+          "offline",
+          "pending"
+        ],
+        "title": "RoleCount",
+        "type": "object"
+      },
+      "ServerBytes": {
+        "properties": {
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "rx": {
+            "title": "Rx",
+            "type": "integer"
+          },
+          "server": {
+            "title": "Server",
+            "type": "string"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "tx": {
+            "title": "Tx",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "server_id",
+          "server",
+          "role",
+          "rx",
+          "tx",
+          "total"
+        ],
+        "title": "ServerBytes",
+        "type": "object"
+      },
       "ServerCreate": {
         "properties": {
           "alias": {
@@ -2010,6 +4150,109 @@
           "install_command"
         ],
         "title": "ServerCreated",
+        "type": "object"
+      },
+      "ServerHealth": {
+        "properties": {
+          "band": {
+            "title": "Band",
+            "type": "string"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "gates": {
+            "items": {
+              "$ref": "#/components/schemas/Gate"
+            },
+            "title": "Gates",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "not_measured": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Not Measured",
+            "type": "array"
+          },
+          "open_issues": {
+            "title": "Open Issues",
+            "type": "integer"
+          },
+          "penalties": {
+            "items": {
+              "$ref": "#/components/schemas/Penalty"
+            },
+            "title": "Penalties",
+            "type": "array"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "variant": {
+            "title": "Variant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "server_id",
+          "name",
+          "role",
+          "country",
+          "category_id",
+          "status",
+          "variant",
+          "score",
+          "band",
+          "gates",
+          "penalties",
+          "open_issues",
+          "not_measured"
+        ],
+        "title": "ServerHealth",
         "type": "object"
       },
       "ServerOut": {
@@ -2337,7 +4580,7 @@
           "peak_day": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PeakDay"
+                "$ref": "#/components/schemas/app__features__traffic__router__PeakDay"
               },
               {
                 "type": "null"
@@ -2694,6 +4937,80 @@
         "title": "TopDay",
         "type": "object"
       },
+      "TopIssue": {
+        "properties": {
+          "active_now": {
+            "title": "Active Now",
+            "type": "boolean"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "occurrences": {
+            "title": "Occurrences",
+            "type": "integer"
+          },
+          "server": {
+            "title": "Server",
+            "type": "string"
+          },
+          "total_s": {
+            "title": "Total S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "server",
+          "code",
+          "occurrences",
+          "total_s",
+          "active_now"
+        ],
+        "title": "TopIssue",
+        "type": "object"
+      },
+      "TrafficBrief": {
+        "properties": {
+          "last_7d": {
+            "$ref": "#/components/schemas/ByteSplit"
+          },
+          "link_counting": {
+            "title": "Link Counting",
+            "type": "boolean"
+          },
+          "pairs_7d": {
+            "items": {
+              "$ref": "#/components/schemas/LinkPairBytes"
+            },
+            "title": "Pairs 7D",
+            "type": "array"
+          },
+          "today": {
+            "$ref": "#/components/schemas/ByteSplit"
+          },
+          "top_servers": {
+            "items": {
+              "$ref": "#/components/schemas/ServerBytes"
+            },
+            "title": "Top Servers",
+            "type": "array"
+          },
+          "yesterday": {
+            "$ref": "#/components/schemas/ByteSplit"
+          }
+        },
+        "required": [
+          "today",
+          "yesterday",
+          "last_7d",
+          "top_servers",
+          "pairs_7d",
+          "link_counting"
+        ],
+        "title": "TrafficBrief",
+        "type": "object"
+      },
       "TrafficPoint": {
         "properties": {
           "rx": {
@@ -2715,6 +5032,84 @@
           "tx"
         ],
         "title": "TrafficPoint",
+        "type": "object"
+      },
+      "TrafficReport": {
+        "properties": {
+          "daily": {
+            "items": {
+              "$ref": "#/components/schemas/DayBytes"
+            },
+            "title": "Daily",
+            "type": "array"
+          },
+          "fleet": {
+            "$ref": "#/components/schemas/ByteSplit"
+          },
+          "link_pairs": {
+            "items": {
+              "$ref": "#/components/schemas/LinkPairBytes"
+            },
+            "title": "Link Pairs",
+            "type": "array"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "peak_day": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__features__reports__schemas__PeakDay"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "peak_hour": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeakHour"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/ServerBytes"
+            },
+            "title": "Servers",
+            "type": "array"
+          },
+          "since": {
+            "title": "Since",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "until": {
+            "title": "Until",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "since",
+          "until",
+          "fleet",
+          "servers",
+          "daily",
+          "peak_day",
+          "peak_hour",
+          "link_pairs",
+          "truncated",
+          "note"
+        ],
+        "title": "TrafficReport",
         "type": "object"
       },
       "TrafficSeries": {
@@ -2957,6 +5352,52 @@
           "init_data"
         ],
         "title": "WebAppRequest",
+        "type": "object"
+      },
+      "app__features__reports__schemas__PeakDay": {
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "day_start": {
+            "title": "Day Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day_start",
+          "bytes"
+        ],
+        "title": "PeakDay",
+        "type": "object"
+      },
+      "app__features__traffic__router__PeakDay": {
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "rx": {
+            "title": "Rx",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "tx": {
+            "title": "Tx",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rx",
+          "tx",
+          "total",
+          "date"
+        ],
+        "title": "PeakDay",
         "type": "object"
       }
     }
@@ -4355,6 +6796,941 @@
         "summary": "Ping Matrix",
         "tags": [
           "overview"
+        ]
+      }
+    },
+    "/api/v1/reports/availability": {
+      "get": {
+        "description": "Per server percent of time reporting, from gaps between reports and offline incidents (default 7 days).",
+        "operationId": "reports_availability",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailabilityReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Availability",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/briefing": {
+      "get": {
+        "description": "One compact fleet briefing for an AI assistant to read first. format=md is the dense text, detail=full lifts the caps.",
+        "operationId": "reports_briefing",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "detail",
+            "required": false,
+            "schema": {
+              "default": "brief",
+              "title": "Detail",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Briefing"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Briefing",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/capacity": {
+      "get": {
+        "description": "Peak-hour CPU, steal, load, conntrack and RAM per server, sibling comparison and growth (default 7 days).",
+        "operationId": "reports_capacity",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapacityReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Capacity",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/changes": {
+      "get": {
+        "description": "The change log, newest first, at most 500 events (default last 24 h).",
+        "operationId": "reports_changes",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "in": "query",
+            "name": "server_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Server Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Changes",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/daily": {
+      "get": {
+        "description": "The digest: the last 24 h (or since..until) against the equal window before it.",
+        "operationId": "reports_daily",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Daily",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/health": {
+      "get": {
+        "description": "A 0-100 score and band per server, with the penalties and hard gates that fired and the signals not measured yet.",
+        "operationId": "reports_health",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/incidents": {
+      "get": {
+        "description": "Incident counts by code and server, MTTR, flapping issues and the longest outages (default 7 days).",
+        "operationId": "reports_incidents",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentsReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Incidents",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/playbooks": {
+      "get": {
+        "description": "Every fix guide (code, title, detector live or planned) plus the standing operating rules.",
+        "operationId": "reports_playbooks",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaybookList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Playbooks",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/playbooks/{code}": {
+      "get": {
+        "description": "Likely causes, read-only checks, safe fixes and never-do rules for an issue code (ping:<ip> works); unknown codes get the generic guide.",
+        "operationId": "reports_playbook",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaybookOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Playbook",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/relays": {
+      "get": {
+        "description": "Relay-by-exit matrix of loss, RTT and a path verdict, plus bytes per pair (default 7 days for bytes).",
+        "operationId": "reports_relays",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelaysReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Relays",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/traffic": {
+      "get": {
+        "description": "Fleet and per-server bytes, peak day and hour, relay-exit pair bytes (default 7 days).",
+        "operationId": "reports_traffic",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrafficReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Traffic",
+        "tags": [
+          "reports"
         ]
       }
     },
