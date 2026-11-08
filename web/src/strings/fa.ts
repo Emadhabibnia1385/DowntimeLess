@@ -29,6 +29,7 @@ export const fa = {
 	brand: {
 		name: "DowntimeLess",
 		tagline: "پایش ناوگان VPN",
+		logoAlt: "لوگوی DowntimeLess",
 	},
 	theme: {
 		light: "روشن",
@@ -473,5 +474,19 @@ export const fa = {
 	shell: {
 		logout: "خروج",
 		pageLoading: "در حال بارگذاری صفحه",
+		account: "حساب کاربری",
+	},
+	pwa: {
+		install: "نصب برنامه",
+		iosTitle: "افزودن به صفحهٔ اصلی",
+		iosLead: "در آیفون و آیپد نصب از منوی مرورگر انجام می‌شود:",
+		iosSteps: [
+			"در مرورگر Safari دکمهٔ «اشتراک‌گذاری» را بزنید.",
+			"گزینهٔ «افزودن به صفحهٔ اصلی» را انتخاب کنید.",
+			"روی «افزودن» بزنید تا DowntimeLess مثل یک برنامه باز شود.",
+		],
+		iosClose: "متوجه شدم",
+		updateTitle: "نسخهٔ تازهٔ پنل نصب شد",
+		updateReload: "بارگذاری دوباره",
 	},
 };

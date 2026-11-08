@@ -33,8 +33,9 @@ Colour tokens (set once in the Nasim palette, components only use tokens, never 
 | Light text | `#142019` |
 | Readable accent on light backgrounds (text, links, borders) | `#3F6E18` |
 
-Rules: `#A3E635` is for fills and buttons on dark and for filled buttons with dark text on light; on a light background
-use `#3F6E18` for any green text or thin line (contrast). Dark is the default theme, light is a toggle. Status is always a
+Rules: in dark mode the accent fill is `#A3E635` with `#0B1210` text. In light mode lime cannot reach readable contrast on white
+(about 1.5:1), so the accent is `#3F6E18` (white text on filled buttons, and for green text, links, focus rings and thin lines). Dark is the
+default theme, light is a toggle. The palette lives in `web/src/app/theme/palette.ts` and must keep passing Nasim's `checkPalette`. Status is always a
 word plus colour, never colour alone.
 
 ## Panel layout (modelled on KasbBook, see `docs/design/kasbbook-dashboard-reference.webp`)

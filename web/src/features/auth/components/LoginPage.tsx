@@ -8,6 +8,7 @@ import {
 	Spinner,
 	SubmitButton,
 	TextField,
+	useTheme,
 } from "@nyxon/nasim";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -16,6 +17,7 @@ import { z } from "zod";
 import { authTelegramWebapp, useAuthLogin } from "@/api/generated/auth/auth";
 import type { UserOut } from "@/api/generated/model";
 import { errorMessage } from "@/api/transport";
+import { brandLogo } from "@/shared/brand";
 import { Footer } from "@/shared/Footer";
 import { TelegramIcon } from "@/shared/icons";
 import { QRCode } from "@/shared/QRCode";
@@ -75,12 +77,21 @@ export function LoginPage({ redirect }: { redirect: string | undefined }) {
 	});
 	const problem = telegram.failure ?? (miniApp.error ? errorMessage(miniApp.error) : null);
 	const link = telegram.deepLink;
+	const { scheme } = useTheme();
 
 	return (
 		<div className="grid min-h-dvh place-items-center bg-background px-page py-10 text-foreground">
 			<div className="flex w-full max-w-sm flex-col gap-6">
 				<div className="flex flex-col items-center gap-2 text-center">
-					<h1 className="text-2xl font-bold">{t.brand.name}</h1>
+					<h1>
+						<img
+							src={brandLogo(scheme)}
+							alt={t.brand.logoAlt}
+							width={1200}
+							height={339}
+							className="mx-auto h-auto w-72 max-w-full"
+						/>
+					</h1>
 					<p className="text-sm text-muted">{t.login.lead}</p>
 				</div>
 

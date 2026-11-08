@@ -5,6 +5,8 @@ import { getAuthMeQueryKey } from "@/api/generated/auth/auth";
 import { DEFAULT_QUERY_OPTIONS } from "@/api/queryDefaults";
 import { ApiError } from "@/api/transport";
 import "@/index.css";
+import { watchInstallPrompt } from "./pwa/installPrompt";
+import { registerWorker } from "./pwa/registerWorker";
 import { AppProviders } from "./providers";
 import { router } from "./router";
 
@@ -21,6 +23,9 @@ const queryClient: QueryClient = new QueryClient({
 		},
 	}),
 });
+
+watchInstallPrompt();
+registerWorker();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("index.html has no #root");

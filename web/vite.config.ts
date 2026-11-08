@@ -5,6 +5,7 @@ import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import Icons from "unplugin-icons/vite";
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig, loadEnv } from "vite";
+import { serviceWorker } from "./scripts/serviceWorkerPlugin.ts";
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -21,6 +22,8 @@ export default defineConfig(({ mode }) => {
 			tailwindcss(),
 			// Solar icons as tree-shaken, offline SVG components (~icons/solar/*).
 			Icons({ compiler: "jsx", jsx: "react", autoInstall: false }),
+			// /sw.js: keeps the shell's assets for the installed app, never the API or a page.
+			serviceWorker(),
 		],
 		resolve: {
 			alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },

@@ -41,4 +41,13 @@ describe("AuthGate", () => {
 		await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
 		expect(router.state.location.href).toBe("/login?redirect=%2Fservers%2F3%3Frange%3D7d");
 	});
+
+	it("lands a signed-out visitor of / on /login without crashing, with the full logo above the form", async () => {
+		const router = signedOutRouter("/");
+		await screen.findByRole("button", { name: "ورود با تلگرام" });
+		await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
+		expect(screen.getByRole("img", { name: "لوگوی DowntimeLess" }).getAttribute("src")).toBe(
+			"/brand/logo-dark.webp",
+		);
+	});
 });
