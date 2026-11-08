@@ -244,7 +244,7 @@ export const fa = {
 				"به‌روزرسانی agent، ویرایش و حذف. زیرش نسخهٔ agent است: تیک یعنی به‌روز، ضربدر یعنی نیاز به به‌روزرسانی.",
 		},
 		coresOf: (busy: string, total: string) => `${busy} از ${total}`,
-		gigUsed: (used: string, total: string) => `${used} از ${total} گیگ`,
+		gigUsed: (used: string, total: string) => `${used} از ${total}`,
 		version: "نسخه",
 		upToDate: "agent به‌روز است",
 		updateNeeded: "نیاز به به‌روزرسانی دارد",

@@ -32,7 +32,7 @@ const rate = (value: number | null | undefined) =>
 function TrafficCell({ rx, tx }: { rx: number | null | undefined; tx: number | null | undefined }) {
 	if (rx == null && tx == null) return t.common.none;
 	return (
-		<div className="flex items-center gap-2 whitespace-nowrap">
+		<div className="flex items-center justify-center gap-2 whitespace-nowrap">
 			<span title={t.servers.download} className="inline-flex items-center gap-0.5">
 				<ArrowDownIcon aria-hidden className="size-3.5 text-muted" />
 				{rate(rx)}
@@ -103,7 +103,7 @@ export function ServersPage() {
 	const head = (label: string, key: SortKey, first: SortDirection = "desc", unit?: string) => (
 		<SortHeader label={label} unit={unit} sortKey={key} first={first} sort={sort} onSort={onSort} />
 	);
-	const columns: DataColumn<ServerOut>[] = [
+	const columnDefs: DataColumn<ServerOut>[] = [
 		{
 			id: "name",
 			header: head(t.servers.name, "name", "asc"),
@@ -114,7 +114,7 @@ export function ServersPage() {
 			id: "status",
 			header: head(t.servers.status, "status", "asc"),
 			cell: (server) => (
-				<div className="flex flex-col items-start gap-1">
+				<div className="flex flex-col items-center gap-1">
 					<ServerStatusChip status={server.status} />
 					<span className="text-xs text-muted">
 						{[roleLabel(server.role), names.get(server.category_id ?? -1)]
@@ -165,6 +165,8 @@ export function ServersPage() {
 				]
 			: []),
 	];
+	// every title and cell reads from the middle
+	const columns = columnDefs.map((column) => ({ ...column, className: "text-center" }));
 	return (
 		<div className="flex flex-col gap-6">
 			<PageHeader

@@ -58,8 +58,8 @@ export function ServerRowActions({ server }: { server: ServerOut }) {
 	};
 	const canUpdate = server.status === "online";
 	return (
-		<div className="flex flex-col items-start gap-1">
-			<div className="flex items-center gap-1">
+		<div className="flex flex-col items-center gap-1">
+			<div className="flex items-center justify-center gap-1">
 				{canUpdate ? (
 					<Button
 						isIconOnly
@@ -92,7 +92,7 @@ export function ServerRowActions({ server }: { server: ServerOut }) {
 				</Button>
 			</div>
 			{server.agent_version ? (
-				<p className="flex items-center gap-1 text-xs text-muted">
+				<p className="flex items-center justify-center gap-1 text-xs text-muted">
 					<RefreshIcon aria-hidden className="size-3.5" />
 					<span>{t.servers.version}</span>
 					<span dir="ltr" className="font-mono">
