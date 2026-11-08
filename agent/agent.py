@@ -19,10 +19,14 @@ import time
 import urllib.parse
 import urllib.request
 
-VERSION = "0.2.3"
+VERSION = "0.2.4"
 UA = "DowntimeLess-Agent/" + VERSION
 SELF_PATH = os.path.realpath(__file__)
-GEO_URLS = ("https://ipinfo.io/json", "https://ipwho.is/")
+# With no address they describe the caller's outbound address; with one, that address itself.
+GEO_URLS = (
+    lambda ip: "https://ipinfo.io/%sjson" % (ip + "/" if ip else ""),
+    lambda ip: "https://ipwho.is/" + ip,
+)
 GEO_TTL_S = 6 * 3600
 GEO_RETRY_S = 900
 SSL_TTL_S = 1800
@@ -241,22 +245,24 @@ def local_ipv4():
         return None
 
 
-def own_ipv4(looked_up):
-    """The server's own address when it is public (that is what people log in to), else the looked-up one."""
+def global_local_ipv4():
     local = local_ipv4()
     try:
-        if local and ipaddress.ip_address(local).is_global:
-            return local
+        return local if local and ipaddress.ip_address(local).is_global else None
     except ValueError:
-        pass
-    return looked_up if looked_up and ":" not in looked_up else None
+        return None
 
 
-def lookup_geo():
+def own_ipv4(looked_up):
+    """The server's own address when it is public (that is what people log in to), else the looked-up one."""
+    return global_local_ipv4() or (looked_up if looked_up and ":" not in looked_up else None)
+
+
+def lookup_geo(ip=""):
     for url, parse in zip(GEO_URLS, (parse_ipinfo, parse_ipwho)):
         try:
             with ipv4_only():
-                found = parse(json.loads(fetch_text(url)))
+                found = parse(json.loads(fetch_text(url(ip))))
         except Exception:
             continue
         if found:
@@ -267,7 +273,8 @@ def lookup_geo():
 def geo_cached(state):
     now = time.monotonic()
     if now >= state.get("geo_next", 0):
-        found = lookup_geo()
+        # place the server by its own address: a relay can exit the internet through a foreign transit
+        found = lookup_geo(global_local_ipv4() or "")
         if found:
             state["geo"] = found
         # a failed lookup retries sooner than a good one, so a boot-time network blip heals

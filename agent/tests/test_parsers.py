@@ -92,7 +92,7 @@ def test_geo_is_cached_and_failures_retry_sooner(monkeypatch):
     calls = []
     answers = [None, ("203.0.113.5", {"country": "DE"}), ("203.0.113.6", {"country": "DE"})]
     monkeypatch.setattr(agent.time, "monotonic", lambda: clock[0])
-    monkeypatch.setattr(agent, "lookup_geo", lambda: calls.append(1) or answers[len(calls) - 1])
+    monkeypatch.setattr(agent, "lookup_geo", lambda ip="": calls.append(1) or answers[len(calls) - 1])
     state = {}
     assert agent.geo_cached(state) == (None, None)  # failure is non-fatal
     clock[0] += 60
@@ -158,3 +158,21 @@ def test_ipv4_only_restricts_and_restores_lookups(monkeypatch):
         socket.getaddrinfo("example.com", 443)
     assert seen == [socket.AF_INET]
     assert socket.getaddrinfo is real
+
+
+def test_geo_is_asked_for_the_servers_own_address_when_it_is_public(monkeypatch):
+    asked = []
+    monkeypatch.setattr(agent, "local_ipv4", lambda: "94.139.179.119")
+    monkeypatch.setattr(agent, "lookup_geo", lambda ip="": asked.append(ip) or ("94.20.158.222", {"country": "IR"}))
+    agent.geo_cached(agent.new_state({"master": "http://x", "agent_key": "k"}))
+    assert asked == ["94.139.179.119"]
+    monkeypatch.setattr(agent, "local_ipv4", lambda: "10.0.0.5")
+    asked.clear()
+    agent.geo_cached(agent.new_state({"master": "http://x", "agent_key": "k"}))
+    assert asked == [""]  # behind NAT the outbound address is the only public one
+
+
+def test_geo_urls_name_the_address_or_the_caller():
+    ipinfo, ipwho = agent.GEO_URLS
+    assert (ipinfo(""), ipinfo("1.2.3.4")) == ("https://ipinfo.io/json", "https://ipinfo.io/1.2.3.4/json")
+    assert (ipwho(""), ipwho("1.2.3.4")) == ("https://ipwho.is/", "https://ipwho.is/1.2.3.4")

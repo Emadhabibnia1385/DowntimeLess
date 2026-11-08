@@ -7,6 +7,11 @@ describe("whereOf", () => {
 	it("shows an Iran relay as Iran whatever address it reports", () => {
 		expect(whereOf({ role: "relay", ...reported })).toEqual({ flag: "🇮🇷", place: "Iran" });
 	});
+	it("shows a relay's real city and provider once its agent places it in Iran", () => {
+		const w = whereOf({ role: "relay", country: "IR", city: "Tehran", org: "Atrin Information" });
+		expect(w.flag).toBe("🇮🇷");
+		expect(w.place).toContain("Tehran");
+	});
 	it("shows any other server where its report says", () => {
 		const w = whereOf({
 			role: "exit",

@@ -25,7 +25,7 @@ def master():
 @pytest.fixture(autouse=True)
 def offline(monkeypatch, tmp_path):
     monkeypatch.setenv("DL_AGENT_CONFIG", str(tmp_path / "etc" / "agent.json"))
-    monkeypatch.setattr(agent, "lookup_geo", lambda: ("203.0.113.5", GEO))
+    monkeypatch.setattr(agent, "lookup_geo", lambda ip="": ("203.0.113.5", GEO))
     real_sleep = agent.time.sleep
     monkeypatch.setattr(agent.time, "sleep", lambda s: real_sleep(min(s, 0.01)))
 
