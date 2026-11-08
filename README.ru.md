@@ -1,8 +1,13 @@
 <p align="center">
-  <img src="./assets/hero.svg" width="100%" alt="DowntimeLess: главный сервер следит за ретрансляторами и выходами через небольшие агенты">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/brand/logo-dark.webp">
+    <img src="./assets/brand/logo-light.webp" width="420" alt="DowntimeLess">
+  </picture>
 </p>
 
-<h1 align="center">DowntimeLess</h1>
+<p align="center">
+  <img src="./assets/hero.svg" width="100%" alt="DowntimeLess: главный сервер следит за ретрансляторами и выходами через небольшие агенты">
+</p>
 
 <p align="center">
   Мониторинг и управление VPN-флотом в одной панели:<br>
@@ -10,10 +15,10 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0-22d3ee?style=flat-square&labelColor=0b1220" alt="Version 0.1.0">
-  <img src="https://img.shields.io/badge/python-3.10%2B-a3e635?style=flat-square&labelColor=0b1220" alt="Python 3.10+">
-  <img src="https://img.shields.io/badge/UI-Persian%20%C2%B7%20RTL-22d3ee?style=flat-square&labelColor=0b1220" alt="Persian RTL UI">
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-a3e635?style=flat-square&labelColor=0b1220" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/version-0.1.0-A3E635?style=flat-square&labelColor=0B1210" alt="Version 0.1.0">
+  <img src="https://img.shields.io/badge/python-3.10%2B-A3E635?style=flat-square&labelColor=0B1210" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/UI-Persian%20%C2%B7%20RTL-A3E635?style=flat-square&labelColor=0B1210" alt="Persian RTL UI">
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-A3E635?style=flat-square&labelColor=0B1210" alt="MIT license"></a>
 </p>
 
 <p align="center">
