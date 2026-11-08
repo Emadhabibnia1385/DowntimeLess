@@ -2,6 +2,7 @@ import sqlite3
 import time
 from typing import Any, Dict, List, Optional
 
+from ..issues import acks
 from ..overview import service as overview
 from ..servers.service import latest_of, role_of, status_of
 from ..settings.router import thresholds
@@ -148,15 +149,16 @@ def compute(db: sqlite3.Connection, ws: int, found: Optional[List[Dict[str, Any]
                     if len(paths) >= 2 and all((p["loss"] or 0) >= th["loss_crit"] for p in paths):
                         gates.append({"key": "unreachable_from_all_relays", "detail": "loss >= %d%% from all %d relays" % (th["loss_crit"], len(paths))})
             score = max(0, 100 - sum(p["points"] for p in pens))
+        mine = per_server.get(s["id"], [])
+        score, gates, pens = acks.screen_health(st, score, gates, pens, acks.health_quiet(mine))
         not_measured = list(NOT_MEASURED[variant])
         if variant == "relay" and s["id"] not in quota_by:
             not_measured.append("quota (not set for this server)")
-        mine = per_server.get(s["id"], [])
         items.append({
             "server_id": s["id"], "name": name_of(s), "role": role_of(s),
             "country": s["country"], "category_id": s["category_id"], "status": st, "variant": variant,
             "score": score, "band": band(score, gates), "gates": gates, "penalties": sorted(pens, key=lambda p: -p["points"]),
-            "open_issues": len(mine), "not_measured": not_measured,
+            "open_issues": len(acks.loud(mine)), "acked_issues": len(acks.acked(mine)), "not_measured": not_measured,
         })
     order = {"failing": 0, "degraded": 1, "healthy": 2, "unknown": 3}
     items.sort(key=lambda i: (order[i["band"]], i["score"] if i["score"] is not None else 101, i["name"]))

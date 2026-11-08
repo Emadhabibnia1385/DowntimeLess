@@ -2,6 +2,7 @@ import sqlite3
 import time
 from typing import Any, Dict, List
 
+from ..issues import acks
 from ..servers.service import latest_of, status_of
 from ..settings.router import thresholds
 from ..ssl import service as ssl_svc
@@ -112,7 +113,7 @@ def issues(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
     if th["on_ssl"]:
         out.extend(ssl_svc.issues(db, ws))
     order = {"critical": 0, "warning": 1, "info": 2}
-    return sorted(out, key=lambda i: (order[i["severity"]], i["server_name"] or ""))
+    return acks.annotate(db, ws, sorted(out, key=lambda i: (order[i["severity"]], i["server_name"] or "")))
 
 
 def traffic_24h(db: sqlite3.Connection, ws: int) -> Dict[str, int]:

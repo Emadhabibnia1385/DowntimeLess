@@ -122,7 +122,7 @@ def test_the_switch_of_a_duration_rule_hides_it(owner, rule, fields, n):
 
 # ---- events ---------------------------------------------------------------------------------------
 
-def test_a_drop_in_uptime_is_a_reboot_that_stays_thirty_minutes(owner):
+def test_a_drop_in_uptime_is_a_reboot_that_stays_ten_minutes(owner):
     sid, key = make_server(owner, "iran-1", "relay")
     report(owner, key, uptime_s=5000)
     report(owner, key, uptime_s=5030)
@@ -133,9 +133,12 @@ def test_a_drop_in_uptime_is_a_reboot_that_stays_thirty_minutes(owner):
     report(owner, key, uptime_s=75)  # counting up again does not clear it
     assert "rebooted" in codes(owner)
     db = connect()
-    db.execute("UPDATE servers SET rebooted_at=? WHERE id=?", (int(time.time()) - 1801, sid))
+    db.execute("UPDATE servers SET rebooted_at=? WHERE id=?", (int(time.time()) - 590, sid))
+    assert "rebooted" in codes(owner)  # still inside the ten minutes
+    db.execute("UPDATE servers SET rebooted_at=? WHERE id=?", (int(time.time()) - 601, sid))
     db.close()
     assert "rebooted" not in codes(owner)
+    assert detectors.REBOOT_KEEP_S == 600
 
 
 def test_no_reboot_without_a_previous_uptime_and_the_switch_hides_it(owner):

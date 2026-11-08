@@ -2,6 +2,7 @@ import sqlite3
 import time
 from typing import Any, Dict, List
 
+from ..issues import acks
 from ..issues import service as incidents_svc
 from ..overview import service as overview
 from ..servers.service import current_agent_version, server_out
@@ -88,7 +89,8 @@ def build(db: sqlite3.Connection, ws: int, detail: str = "brief", now: int = 0) 
     cats = {r["id"]: r["name"] for r in db.execute("SELECT id, name FROM categories WHERE workspace_id=?", (ws,))}
     for r, raw in zip(rows, raw_servers):
         r["_category"] = cats.get(raw["category_id"], "-")
-    found = overview.issues(db, ws)
+    every = overview.issues(db, ws)
+    found = acks.loud(every)  # acknowledged issues are listed apart, never counted or checked first
     recent = incidents_svc.recent_counts(db, ws, now)
     sev_counts = {s: sum(1 for i in found if i["severity"] == s) for s in SEV}
     issue_items = [{
@@ -102,7 +104,7 @@ def build(db: sqlite3.Connection, ws: int, detail: str = "brief", now: int = 0) 
     from_issues = [{"kind": i["code"], "server": i["server_name"], "detail": i["title"], "source": "issue"} for i in found if i["code"] in paths.PATH_VERDICTS]
     from_matrix = _group_matrix([p for p in matrix if p["verdict"] in paths.PATH_VERDICTS])
     problems = from_issues or from_matrix
-    hs = health_svc.compute(db, ws, found, now)
+    hs = health_svc.compute(db, ws, every, now)
     attention = [{
         "server_id": h["server_id"], "name": h["name"], "role": h["role"], "score": h["score"], "band": h["band"],
         "gates": [g["key"] for g in h["gates"]], "top_penalty": h["penalties"][0]["detail"] if h["penalties"] else None,
@@ -145,5 +147,6 @@ def build(db: sqlite3.Connection, ws: int, detail: str = "brief", now: int = 0) 
         "changes_24h": [{"ts": r["ts"], "server": names.get(r["server_id"]), "kind": r["kind"], "title": r["title"]} for r in changes[: lim["changes"]]],
         "issue_events_24h": counted,
         "check_first": check,
+        "acknowledged": acks.brief(every)[: lim["issues"]],
         "not_measured": NOT_MEASURED + (["quota (no quota set on any server)"] if not quota else []),
     }

@@ -176,7 +176,8 @@ def test_the_existing_owner_sees_the_same_panel_after_the_upgrade(tmp_path, monk
 def test_pending_migrations_run_in_name_order_only_when_not_recorded(migrated):
     db, _ = migrated
     names = [r[0] for r in db.execute("SELECT name FROM schema_migrations ORDER BY name")]
-    assert names[-3:] == ["013_events.sql", "014_workspaces.sql", "015_acct_default.sql"]
+    start = names.index("013_events.sql")  # later migrations may follow
+    assert names[start:start + 3] == ["013_events.sql", "014_workspaces.sql", "015_acct_default.sql"]
     # whether 015 ran before 014 (production) or after it (fresh), every server ends with counting on
     assert {r[0] for r in db.execute("SELECT acct_on FROM servers")} == {1}
     assert {r[0] for r in db.execute("SELECT workspace_id FROM servers")} == {1}

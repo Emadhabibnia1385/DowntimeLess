@@ -120,6 +120,7 @@ def create_app() -> FastAPI:
             "Raw data:\n"
             "- GET /api/v1/snapshot: whole fleet, issues and ping matrix in one document.\n"
             "- GET /api/v1/issues: current problems with evidence and a suggested next step.\n"
+            "- POST /api/v1/issues/ack {key, mode: until_resolved|24h|7d|always, note} (operator+, sessions or a full key) acknowledges a current issue: listed with acked=true, not counted, no Telegram, until it closes, expires or gets worse; DELETE /api/v1/issues/ack?key= undoes it.\n"
             "- GET /api/v1/issues/history?range=24h|7d|30d: every issue that was active in the range (occurrences, time active, each incident).\n"
             "- GET /api/v1/links/traffic?since=&until=: bytes each server exchanged with each peer server (relay to exit), per window; /links/traffic/series adds the hourly series. Needs counting switched on per server (PATCH acct_on).\n"
             "- GET /api/v1/traffic/summary?since=&until=, /api/v1/traffic/series?range=24h|7d|30d|90d or since=&until=&server_id=: download/upload per server (total, peak day, share) and by hour or day.\n"

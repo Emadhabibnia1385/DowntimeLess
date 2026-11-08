@@ -43,6 +43,11 @@ def briefing_md(b: Dict[str, Any]) -> str:
             for i in rows)))
     if iss["truncated"]:
         out.append("(list truncated; detail=full or GET /api/v1/issues for all)")
+    if b.get("acknowledged"):
+        out.append("\n## Acknowledged by the team (quiet: not counted above, no alerts; undo DELETE /api/v1/issues/ack?key=)")
+        out.append(table(["server", "code", "severity", "mode", "until", "by", "note"], (
+            [a["server"] or "-", a["code"], a["severity"], a["mode"], stamp(a["until"]) if a["until"] else "-", a["by"] or "-", a["note"] or "-"]
+            for a in b["acknowledged"])))
     if b["recurring_24h"]:
         out.append("\n## Recurring in 24h")
         out.append(table(["server", "code", "times", "active", "state"], (
@@ -85,7 +90,8 @@ def briefing_md(b: Dict[str, Any]) -> str:
     else:
         out.append("None.")
     out.append("\nNot measured yet: " + "; ".join(b["not_measured"]) + ".")
-    out.append("Playbooks: GET /api/v1/reports/playbooks/{code}. Health model: /api/v1/reports/health.")
+    out.append("Playbooks: GET /api/v1/reports/playbooks/{code}. Health model: /api/v1/reports/health. "
+               "A known issue the team accepts: POST /api/v1/issues/ack {key, mode}.")
     return "\n".join(out) + "\n"
 
 

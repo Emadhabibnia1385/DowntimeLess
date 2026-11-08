@@ -9,7 +9,7 @@ from test_workspace_guard import NOT_SCOPED, NOT_SCOPED_EXACT
 from ws_world import A_MARKS, B_MARKS, build, dump, switch
 
 NOT_FOUND = {"server.not_found", "category.not_found", "domain.not_found", "key.not_found", "channel.not_found",
-             "member.not_found"}
+             "member.not_found", "issue.not_found", "ack.not_found"}
 
 
 @pytest.fixture
@@ -47,6 +47,8 @@ def requests_into_b(w):
         ("GET", "/api/v1/ping-matrix"): ("GET", "/api/v1/ping-matrix", None, "list"),
         ("GET", "/api/v1/snapshot"): ("GET", "/api/v1/snapshot", None, "list"),
         ("GET", "/api/v1/issues/history"): ("GET", "/api/v1/issues/history?range=30d", None, "list"),
+        ("POST", "/api/v1/issues/ack"): ("POST", "/api/v1/issues/ack", {"key": "server:%d:disk" % bx, "mode": "always"}, "nf"),
+        ("DELETE", "/api/v1/issues/ack"): ("DELETE", "/api/v1/issues/ack?key=server:%d:disk" % bx, None, "nf"),
         ("GET", "/api/v1/settings"): ("GET", "/api/v1/settings", None, "list"),
         ("PUT", "/api/v1/settings"): ("PUT", "/api/v1/settings", {"cpu_warn": 12}, (200, None)),
         ("GET", "/api/v1/keys"): ("GET", "/api/v1/keys", None, "list"),

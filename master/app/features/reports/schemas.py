@@ -156,6 +156,18 @@ class CheckStep(BaseModel):
     why: str
 
 
+class AckBrief(BaseModel):
+    severity: str
+    server_id: Optional[int]
+    server: Optional[str]
+    code: str
+    title: str
+    mode: Optional[str]
+    until: Optional[int]
+    by: Optional[str]
+    note: Optional[str]
+
+
 class Briefing(BaseModel):
     generated_at: int
     detail: str
@@ -172,6 +184,7 @@ class Briefing(BaseModel):
     changes_24h: List[ChangeBrief]
     issue_events_24h: int
     check_first: List[CheckStep]
+    acknowledged: List[AckBrief] = []
     not_measured: List[str]
 
 
@@ -233,6 +246,7 @@ class ServerHealth(BaseModel):
     gates: List[Gate]
     penalties: List[Penalty]
     open_issues: int
+    acked_issues: int = 0
     not_measured: List[str]
 
 

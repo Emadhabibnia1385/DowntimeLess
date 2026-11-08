@@ -111,6 +111,8 @@ def _fill(client, ws, prefix, ips, chat):
                    (ids[relay], ips["bee-twin"], now - now % 3600 - 3600, 5, 6))
     db.execute("INSERT INTO alert_state (workspace_id, key, level) VALUES (?,?,?)", (ws, "ssl:d%d" % dom, "ok"))
     db.execute("INSERT INTO flapping (workspace_id, key, since) VALUES (?,?,?)", (ws, prefix + "-flap", now))
+    db.execute("INSERT INTO issue_acks (workspace_id, key, mode, severity, note, created_at) VALUES (?,?,'always','warning',?,?)",
+               (ws, "server:%d:disk" % ids[exit_], prefix + "-incident", now))
     db.close()
     return {"servers": ids, "agent_keys": keys, "category": cat, "key": key["id"], "key_token": key["token"], "channel": chan,
             "job": job, "domain": dom}
@@ -144,7 +146,7 @@ def dump(ws):
     try:
         out = {}
         for table in ("servers", "categories", "domains", "settings", "api_keys", "telegram_channels", "rule_routes",
-                      "incidents", "events", "alert_state", "flapping"):
+                      "incidents", "events", "alert_state", "flapping", "issue_acks"):
             out[table] = sorted(tuple(r) for r in db.execute("SELECT * FROM %s WHERE workspace_id=?" % table, (ws,)))
         for table in ("jobs", "metrics", "pings", "link_traffic", "link_prev"):
             out[table] = sorted(tuple(r) for r in db.execute(

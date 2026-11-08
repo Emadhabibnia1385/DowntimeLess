@@ -9,7 +9,7 @@ from ..servers.service import status_of
 
 GIB = 1024 ** 3
 DAY = 86400
-REBOOT_KEEP_S = 1800
+REBOOT_KEEP_S = 600
 EVENT_KEEP_S = DAY
 # consecutive reports an alert must hold before it opens
 HOLD = {"cpu": 5, "steal": 3, "conntrack": 3, "load": 5}

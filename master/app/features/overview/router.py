@@ -24,6 +24,13 @@ class Issue(BaseModel):
     suggestion: str
     evidence: Dict[str, Any]
     recent_24h: int = 0
+    # acknowledged by the team: still listed, not counted and not sent to Telegram
+    acked: bool = False
+    acked_by: Optional[str] = None
+    acked_at: Optional[int] = None
+    acked_until: Optional[int] = None
+    ack_mode: Optional[str] = None
+    ack_note: Optional[str] = None
 
 
 class PingCell(BaseModel):
@@ -52,7 +59,7 @@ class Overview(BaseModel):
 def overview(_: Actor = Depends(require("viewer")), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
     servers = [server_out(r) for r in db.execute("SELECT * FROM servers WHERE workspace_id=?", (ws,))]
     count = lambda st: sum(1 for s in servers if s["status"] == st)  # noqa: E731
-    found, t = svc.issues(db, ws), svc.traffic_24h(db, ws)
+    found, t = [i for i in svc.issues(db, ws) if not i["acked"]], svc.traffic_24h(db, ws)
     return {
         "servers_total": len(servers), "online": count("online"), "offline": count("offline"), "pending": count("pending"),
         "issues_critical": sum(1 for i in found if i["severity"] == "critical"),
