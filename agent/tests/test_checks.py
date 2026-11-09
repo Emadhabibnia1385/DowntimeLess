@@ -624,11 +624,12 @@ def test_real_collectors_on_a_host_without_any_tool_give_none_or_empty_parts(mon
     FakeHost().install(monkeypatch, {})
     monkeypatch.setattr(agent, "TUNNEL_GLOBS", ())
     monkeypatch.setattr(agent, "SYS_NET", str(tmp_path))
+    monkeypatch.setattr(agent, "SYSCTL_FILES", ())
     checks, errors, panel, panel_error = run_once({}, Clock())
     assert set(checks) == {"listeners", "units", "conntrack", "containers", "nft", "tunnels", "kernel", "security",
-                           "container_logs", "apt"}
+                           "container_logs", "apt", "drift"}
     assert errors == [] and panel is None and panel_error is None
-    for name in ("listeners", "units", "containers", "nft", "tunnels", "container_logs", "apt"):
+    for name in ("listeners", "units", "containers", "nft", "tunnels", "container_logs", "apt", "drift"):
         assert checks[name] is None
     assert checks["security"]["sshd_ports"] is None
 
@@ -749,3 +750,57 @@ def test_a_listener_on_loopback_and_on_all_addresses_keeps_the_public_one():
     lines = ('tcp LISTEN 0 4096 127.0.0.1:8443 0.0.0.0:* users:(("xray",pid=1,fd=3))\n'
              'tcp LISTEN 0 4096 [::]:8443 [::]:* users:(("xray",pid=1,fd=4))\n')
     assert agent.parse_ss_listeners(lines) == [{"proto": "tcp", "port": 8443, "proc": "xray", "addr": "[::]"}]
+
+
+# ---- drift: live state against the files that rebuild it (agent 0.3.3) ----
+
+ACCESS_CONF = '''# nyxon-access
+API_TOKEN=s3cr3t-value-that-must-not-leave
+TRUSTED_SOURCES="198.51.100.10 198.51.100.11
+  203.0.113.0/24 198.51.100.10"  # duplicate counted once
+PORTS="443 853"
+'''
+IPSET_T = "Name: nyxon_trusted\nType: hash:net\nNumber of entries: 2\nName: other\nNumber of entries: 9\n"
+DNAT_FILE = "table ip relay_dnat {\n chain pre {\n  tcp dport 21001 counter dnat to 198.51.100.10:21001\n" \
+            "  tcp dport 21003 counter dnat to 198.51.100.12:21003\n }\n}\n"
+SYSCTL_A = "net.ipv4.ip_forward = 1\nnet.netfilter.nf_conntrack_max=262144\n-net.nope.key = 1\n# c\n"
+SYSCTL_B = "net.ipv4.tcp_congestion_control = bbr\n"
+
+
+def drift_host(monkeypatch, files, exists):
+    host = FakeHost({"ipset", "nft"}).on(["ipset", "list", "-t"], IPSET_T).on(["nft", "list", "ruleset"], cx.NFT_RULESET)
+    host.install(monkeypatch, files)
+    monkeypatch.setattr(agent.os.path, "exists", lambda p: p in exists)
+    monkeypatch.setattr(agent.glob, "glob", lambda pat: sorted(p for p in exists if __import__("fnmatch").fnmatch(p, pat)))
+
+
+def test_drift_counts_access_entries_ipsets_dnat_and_sysctl_without_contents(monkeypatch):
+    files = {"/etc/nyxon/access.conf": ACCESS_CONF, "/etc/nftables-relay-dnat.nft": DNAT_FILE,
+             "/etc/sysctl.d/99-relay-dnat.conf": SYSCTL_A, "/etc/sysctl.d/98-bbr.conf": SYSCTL_B,
+             "/proc/sys/net/ipv4/ip_forward": "1\n", "/proc/sys/net/netfilter/nf_conntrack_max": "65536\n",
+             "/proc/sys/net/ipv4/tcp_congestion_control": "bbr\n"}
+    exists = set(files) - {"/proc/sys/net/nope/key"}
+    drift_host(monkeypatch, files, exists)
+    got = agent.collect_drift({})
+    [ips] = got["ipset"]
+    assert ips["set"] == "nyxon_trusted" and ips["live"] == 2 and ips["file"] == 3 and len(ips["file_hash"]) == 12
+    [dn] = got["dnat"]
+    assert dn["table"] == "relay_dnat" and dn["live"] == 2 and dn["file_rules"] == 2 and dn["ports"] == [21002, 21003]
+    assert dn["live_hash"] != dn["file_hash"]
+    sc = got["sysctl"]
+    assert sc["checked"] == 4 and sc["absent"] == ["net.nope.key"]
+    assert sc["mismatch"] == [{"key": "net.netfilter.nf_conntrack_max", "live": "65536", "file": "262144",
+                               "source": "/etc/sysctl.d/99-relay-dnat.conf"}]
+    text = json.dumps(got)
+    assert "s3cr3t" not in text and "198.51.100" not in text  # counts and hashes, never the list itself
+
+
+def test_drift_without_tools_or_files_is_empty_not_an_error(monkeypatch):
+    drift_host(monkeypatch, {}, set())
+    monkeypatch.setattr(agent, "has", lambda b: False)
+    assert agent.collect_drift({}) is None
+
+
+def test_shell_vars_and_ipset_save_parsing():
+    assert agent.parse_shell_vars('A=1\nB="x y"\nexport C=\'z\'\n')["C"] == "z"
+    assert agent.parse_ipset_save("create s hash:ip\nadd s 1.2.3.4\nadd s 1.2.3.5\ncreate t hash:ip\n") == {"s": 2, "t": 0}

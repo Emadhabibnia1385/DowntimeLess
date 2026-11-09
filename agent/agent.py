@@ -9,6 +9,7 @@ import http.client
 import ipaddress
 import json
 import glob
+import hashlib
 import os
 import platform
 import re
@@ -1527,6 +1528,165 @@ def collect_tunnels(memo):
     return {"configs": found[:LIST_MAX], "links": links}
 
 
+# -- drift: live state against the files that rebuild it at boot (counts, hashes, ports, sysctl numbers only) --
+
+# access list file, the variable in it, the ipset its service builds from it (vpnopsnyx fleet: nyxon-access)
+ACCESS_LISTS = (("/etc/nyxon/access.conf", "TRUSTED_SOURCES", "nyxon_trusted"),)
+IPSET_FILES = ("/etc/iptables/ipsets", "/etc/ipset.conf")  # ipset-persistent / `ipset save` files
+SYSCTL_FILES = ("/etc/sysctl.d/*.conf", "/etc/sysctl.conf")
+SYSCTL_KEY_RE = re.compile(r"^[a-z0-9_]+(\.[A-Za-z0-9_-]+)+$")
+SYSCTL_VALUE_RE = re.compile(r"^[A-Za-z0-9 _.,:/-]{1,64}$")
+NET_RE = re.compile(r"(?<![\d.])(\d{1,3}(?:\.\d{1,3}){3}(?:/\d{1,2})?)(?![\d.])")
+SET_NAME_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,31}$")
+DRIFT_MAX = 50
+
+
+def short_hash(items):
+    return hashlib.sha256("\n".join(sorted(items)).encode()).hexdigest()[:12]
+
+
+def parse_shell_vars(text):
+    """{NAME: value} of `NAME=value` / `NAME="a b"` lines; a quoted value may span lines. Comments dropped."""
+    out, name, buf, quote = {}, None, [], None
+    for line in text.splitlines():
+        if name is not None:
+            end = line.find(quote)
+            buf.append(line if end < 0 else line[:end])
+            if end >= 0:
+                out[name], name = " ".join(buf), None
+            continue
+        m = re.match(r"""^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(["']?)(.*)$""", line)
+        if not m:
+            continue
+        key, q, rest = m.groups()
+        if q and q not in rest:
+            name, buf, quote = key, [rest], q
+        else:
+            out[key] = rest.split(q)[0] if q else rest.split("#")[0]
+    if name is not None:
+        out[name] = " ".join(buf)
+    return out
+
+
+def access_entries(value):
+    """The distinct IPv4 addresses and networks named in an access list value."""
+    return sorted(set(NET_RE.findall(value or "")))
+
+
+def parse_ipset_headers(text):
+    """{set name: entries} from `ipset list -t`."""
+    out, name = {}, None
+    for line in text.splitlines():
+        if line.startswith("Name:"):
+            name = line.split(":", 1)[1].strip()
+        elif line.startswith("Number of entries:") and name and SET_NAME_RE.match(name):
+            n = line.split(":", 1)[1].strip()
+            out[name] = int(n) if n.isdigit() else None
+    return out
+
+
+def parse_ipset_save(text):
+    """{set name: add lines} of an `ipset save` file."""
+    out = {}
+    for line in text.splitlines():
+        f = line.split()
+        if len(f) >= 3 and f[0] == "add" and SET_NAME_RE.match(f[1]):
+            out[f[1]] = out.get(f[1], 0) + 1
+        elif len(f) >= 2 and f[0] == "create" and SET_NAME_RE.match(f[1]):
+            out.setdefault(f[1], 0)
+    return out
+
+
+def drift_ipset():
+    if not has("ipset"):
+        return None
+    live = parse_ipset_headers(check_out(["ipset", "list", "-t"]))
+    out = []
+    for path, key, name in ACCESS_LISTS:
+        if os.path.exists(path) and name in live:
+            entries = access_entries(parse_shell_vars(read(path)[:1 << 20]).get(key))
+            out.append({"set": name, "live": live[name], "file": len(entries), "source": path, "key": key,
+                        "file_hash": short_hash(entries)})
+    for path in IPSET_FILES:
+        if os.path.exists(path):
+            for name, n in parse_ipset_save(read(path)[:16 << 20]).items():
+                if name in live and not any(x["set"] == name for x in out):
+                    out.append({"set": name, "live": live[name], "file": n, "source": path, "key": None, "file_hash": None})
+    return out[:DRIFT_MAX]
+
+
+def nft_file_of(table):
+    """/etc/nftables-relay-dnat.nft for table relay_dnat (the boot unit of scripts/relay/dnat.sh)."""
+    return "/etc/nftables-%s.nft" % table.replace("_", "-")
+
+
+def drift_dnat():
+    if not has("nft"):
+        return None
+    _, on_line = nft_dnat_counter()
+    if stream_lines(["nft", "list", "ruleset"], on_line, CMD_TIMEOUT_S) != 0:
+        raise RuntimeError("nft list ruleset failed")
+    live = {}
+    for r in on_line.rules:
+        live.setdefault(r["table"], set()).add((r["proto"], r["port"], r["to"], r["to_port"]))
+    tables = set(live) | {os.path.basename(p)[9:-4].replace("-", "_") for p in glob.glob("/etc/nftables-*dnat*.nft")}
+    out = []
+    for table in sorted(tables)[:DRIFT_MAX]:
+        if "dnat" not in table or not TUNNEL_NAME_RE.match(table):
+            continue
+        path = nft_file_of(table)
+        file_rules = None
+        if os.path.exists(path):
+            file_rules = {parse_dnat_rule(line) for line in read(path)[:1 << 20].splitlines() if "dnat" in line}
+            file_rules.discard(None)
+        have = live.get(table, set())
+        fmt = lambda rules: ["%s/%d>%s:%d" % r for r in rules]  # noqa: E731
+        differ = sorted({r[1] for r in have ^ (file_rules or set())}) if file_rules is not None else []
+        out.append({"table": table, "file": path if file_rules is not None else None, "live": len(have),
+                    "file_rules": None if file_rules is None else len(file_rules), "live_hash": short_hash(fmt(have)),
+                    "file_hash": None if file_rules is None else short_hash(fmt(file_rules)), "ports": differ[:DRIFT_MAX]})
+    return out
+
+
+def parse_sysctl_file(text):
+    out = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line[0] in "#;":
+            continue
+        key, sep, value = line.lstrip("-").partition("=")
+        key = key.strip().replace("/", ".")
+        if sep and SYSCTL_KEY_RE.match(key):
+            out[key] = " ".join(value.split())
+    return out
+
+
+def drift_sysctl():
+    wanted, source = {}, {}
+    for pattern in SYSCTL_FILES:
+        for path in sorted(glob.glob(pattern)):  # later files win, /etc/sysctl.conf last, as sysctl --system does
+            for k, v in parse_sysctl_file(read(path)[:1 << 20]).items():
+                wanted[k], source[k] = v, path
+    if not wanted:
+        return None
+    bad, absent = [], []
+    for key in sorted(wanted):
+        path = "/proc/sys/" + key.replace(".", "/")
+        if not os.path.exists(path):
+            absent.append(key)
+            continue
+        live = " ".join(read(path).split())
+        if live != wanted[key]:
+            safe = lambda v: v if SYSCTL_VALUE_RE.match(v) else "[%d chars]" % len(v)  # noqa: E731
+            bad.append({"key": key, "live": safe(live), "file": safe(wanted[key]), "source": source[key]})
+    return {"checked": len(wanted), "mismatch": bad[:DRIFT_MAX], "absent": absent[:DRIFT_MAX]}
+
+
+def collect_drift(memo):
+    out = {"ipset": soft(drift_ipset), "dnat": soft(drift_dnat), "sysctl": soft(drift_sysctl)}
+    return out if any(v is not None for v in out.values()) else None
+
+
 # -- PasarGuard panel: one fixed read-only script inside the panel's own container --
 
 # Runs as `docker exec -i -w /code CONTAINER python -`. It reads the panel's own database settings inside the
@@ -1751,6 +1911,7 @@ COLLECTORS = (
     ("security", collect_security, 300),
     ("container_logs", collect_container_logs, 300),
     ("apt", collect_apt, 600),
+    ("drift", collect_drift, 300),
 )
 PANEL_COLLECTOR = ("panel", collect_panel, 60)
 
