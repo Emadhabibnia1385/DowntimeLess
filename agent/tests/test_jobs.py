@@ -51,7 +51,8 @@ def test_whitelist_is_closed():
     assert set(agent.JOBS) == {"ping", "tcp_check", "speedtest_down", "speedtest_up",
                                "apt_upgrade_safe", "reboot", "self_update", "cert_renew", "cert_delete",
                                "processes", "ports", "disk_usage", "journal", "traceroute", "http_check",
-                               "dns_check", "service_restart", "vacuum_logs"}
+                               "dns_check", "service_restart", "vacuum_logs", "nft_reload", "sysctl_apply", "ipset_sync",
+                               "tunnel_restart"}
 
 
 @pytest.mark.parametrize("kind", ["rm_rf", "shell", "", None, "PING", "ping ", "../reboot"])

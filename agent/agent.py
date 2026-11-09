@@ -45,7 +45,8 @@ BACKUP_RE = re.compile(r"\.bak|\.old$|\.orig$|backup", re.I)
 CERT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$")
 DOMAIN_RE = re.compile(r"^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
 # self_update only swaps this file for the master's copy, so it needs no permission level (the master agrees)
-MUTATING = ("apt_upgrade_safe", "reboot", "cert_renew", "cert_delete", "service_restart", "vacuum_logs")
+MUTATING = ("apt_upgrade_safe", "reboot", "cert_renew", "cert_delete", "service_restart", "vacuum_logs",
+            "nft_reload", "sysctl_apply", "ipset_sync", "tunnel_restart")
 HOLD_PKGS = ("docker-ce", "docker-ce-cli", "containerd.io", "docker-compose-plugin", "docker-buildx-plugin")
 # Hold only what is not held already, and release only our own holds afterwards.
 APT_SCRIPT = """
@@ -2330,6 +2331,134 @@ def job_vacuum_logs(args, state):
     return output_of(text + ("\n" + apt if apt else ""))
 
 
+# ---- one-click fixes: fixed commands from the vpnopsnyx playbooks, a pre-check first, a backup of the live state ----
+
+BACKUP_DIR = "/var/backups/downtimeless"
+ACCESS_UNIT = "nyxon-access.service"
+DNAT_FILE_GLOB = "/etc/nftables-*dnat*.nft"
+TUNNEL_UNIT_RE = re.compile(r"^(backpack-|backhaul|gre-|wattun@|rathole|frps@|frpc@|gost)[A-Za-z0-9@._-]{0,80}\.service$")
+
+
+def no_args(args):
+    if args:
+        raise ValueError("this job takes no arguments")
+
+
+def write_backup(name, text):
+    """Saves the live state before a fix, 0600 under BACKUP_DIR; returns the path."""
+    os.makedirs(BACKUP_DIR, mode=0o700, exist_ok=True)
+    path = os.path.join(BACKUP_DIR, "%s-%s" % (time.strftime("%Y%m%d%H%M%S"), name))
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
+    return path
+
+
+def unit_loaded(unit):
+    text, code = run_cmd(["systemctl", "show", "-p", "LoadState", "--value", "--", unit])
+    return code == 0 and text.strip() == "loaded"
+
+
+def restart_unit(unit):
+    text, code = run_cmd(["systemctl", "restart", "--", unit], timeout=60)
+    active, _ = run_cmd(["systemctl", "is-active", "--", unit])
+    if code != 0:
+        raise RuntimeError(("%s: restart failed: %s" % (unit, text))[:300])
+    return active.strip()
+
+
+def job_nft_reload(args, state):
+    """Reloads every DNAT boot file through its own unit (scripts/relay/dnat.sh), after `nft -c -f` passes for all."""
+    no_args(args)
+    if not shutil.which("nft"):
+        raise RuntimeError("nft is not installed on this server")
+    items = []
+    for path in sorted(glob.glob(DNAT_FILE_GLOB))[:10]:
+        stem = os.path.basename(path)[len("nftables-"):-len(".nft")]
+        if re.fullmatch(r"[a-z0-9-]{1,40}", stem) and unit_loaded(stem + ".service"):
+            items.append((path, stem.replace("-", "_"), stem + ".service"))
+    if not items:
+        raise RuntimeError("no DNAT boot file with a loaded unit (%s)" % DNAT_FILE_GLOB)
+    for path, _, _ in items:
+        text, code = run_cmd(["nft", "-c", "-f", path])
+        if code != 0:
+            raise RuntimeError(("pre-check failed, nothing reloaded: nft -c -f %s: %s" % (path, text))[:300])
+    lines, backups = [], []
+    for path, table, unit in items:
+        live, code = run_cmd(["nft", "list", "table", "ip", table])
+        if code == 0:
+            backups.append(write_backup(table + ".nft", live + "\n"))
+        lines.append("%s (%s): %s" % (unit, path, restart_unit(unit)))
+    return {"output": "\n".join(lines), "backups": backups,
+            "rollback": "nft delete table ip TABLE ; nft -f BACKUP (the backup is the live table before the reload)"}
+
+
+def job_sysctl_apply(args, state):
+    """sysctl --system after saving the live value of every key the files set."""
+    no_args(args)
+    wanted = {}
+    for pattern in SYSCTL_FILES:
+        for path in sorted(glob.glob(pattern)):
+            wanted.update(parse_sysctl_file(read(path)[:1 << 20]))
+    if not wanted:
+        raise RuntimeError("no sysctl file to apply")
+    live = lambda k: " ".join(read("/proc/sys/" + k.replace(".", "/")).split())  # noqa: E731
+    present = [k for k in sorted(wanted) if os.path.exists("/proc/sys/" + k.replace(".", "/"))]
+    before = {k: live(k) for k in present}
+    backup = write_backup("sysctl.conf", "".join("%s = %s\n" % kv for kv in before.items()))
+    text, code = run_cmd(["sysctl", "--system"], timeout=30)
+    differ = [k for k in present if live(k) != wanted[k]]
+    fixed = [k for k in present if before[k] != wanted[k] and k not in differ]
+    out = "%d keys in the files, %d changed now, %d still differ%s" % (len(wanted), len(fixed), len(differ),
+                                                                       "" if code == 0 else " (sysctl exited %d)" % code)
+    return {"output": out, "changed": fixed[:50], "still_differ": differ[:50], "backups": [backup],
+            "rollback": "sysctl -p BACKUP (the live values before the change)"}
+
+
+def job_ipset_sync(args, state):
+    """Restarts nyxon-access so it rebuilds its set from the access list; refuses an empty or shrinking list."""
+    no_args(args)
+    path, key, name = ACCESS_LISTS[0]
+    if not shutil.which("ipset") or not os.path.exists(path):
+        raise RuntimeError("ipset or %s is missing on this server" % path)
+    entries = access_entries(parse_shell_vars(read(path)[:1 << 20]).get(key))
+    if not entries:
+        raise RuntimeError("pre-check failed: %s has no %s entries; a restart would drop every trusted source" % (path, key))
+    live = parse_ipset_headers(run_cmd(["ipset", "list", "-t", name])[0]).get(name)
+    if live is not None and len(entries) < live:
+        raise RuntimeError("pre-check failed: the file has fewer entries (%d) than the live set (%d); "
+                           "removing trusted sources is done by hand" % (len(entries), live))
+    if not unit_loaded(ACCESS_UNIT):
+        raise RuntimeError("%s is not installed on this server" % ACCESS_UNIT)
+    saved, code = run_cmd(["ipset", "save", name])
+    backups = [write_backup("ipset-%s" % name, saved + "\n")] if code == 0 else []
+    active = restart_unit(ACCESS_UNIT)
+    after = parse_ipset_headers(run_cmd(["ipset", "list", "-t", name])[0]).get(name)
+    return {"output": "%s: %s; %s live %s -> %s, %d in %s" % (ACCESS_UNIT, active, name, live, after, len(entries), path),
+            "equal": after == len(entries), "backups": backups, "rollback": "ipset restore -exist < BACKUP"}
+
+
+def tunnel_units():
+    found = (collect_tunnels({}) or {}).get("configs") or []
+    return {t["unit"] for t in found if t.get("unit")}
+
+
+def job_tunnel_restart(args, state):
+    """Restarts one tunnel unit this server runs (a tunnel config's unit, or an enabled gre- unit)."""
+    unit = args.get("unit") if isinstance(args, dict) else None
+    if set(args) - {"unit"} or not isinstance(unit, str) or not TUNNEL_UNIT_RE.match(unit):
+        raise ValueError("args.unit must be one tunnel unit of this server")
+    if not unit_loaded(unit):
+        raise RuntimeError("%s is not loaded on this server" % unit)
+    if unit not in tunnel_units():
+        enabled, _ = run_cmd(["systemctl", "is-enabled", "--", unit])
+        if not (unit.startswith("gre-") and enabled.strip() == "enabled"):
+            raise RuntimeError("%s is not a tunnel unit of this server" % unit)
+    active = restart_unit(unit)
+    return {"output": "%s: %s" % (unit, active), "active": active == "active",
+            "rollback": "nothing to restore; if it does not come back: journalctl -u %s -n 50 --no-pager" % unit}
+
+
 JOBS = {
     "ping": job_ping,
     "tcp_check": job_tcp_check,
@@ -2349,6 +2478,10 @@ JOBS = {
     "dns_check": job_dns_check,
     "service_restart": job_service_restart,
     "vacuum_logs": job_vacuum_logs,
+    "nft_reload": job_nft_reload,
+    "sysctl_apply": job_sysctl_apply,
+    "ipset_sync": job_ipset_sync,
+    "tunnel_restart": job_tunnel_restart,
 }
 
 
