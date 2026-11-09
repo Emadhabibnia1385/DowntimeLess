@@ -192,28 +192,40 @@ def quota_pairs(servers: List[Tuple[Any, Dict[str, Any]]]) -> List[Dict[str, Any
 
 
 # ---- cause of a failing path ---------------------------------------------------------------------
+# Verdicts come from TCP connections to proven ports only (two relays, each with a full window of samples).
+# ICMP loss alone is a note: many paths drop or rate-limit ping while the data flows.
+
+def tcp_measured(w: Dict[str, Any]) -> bool:
+    return w.get("tcp_loss") is not None
+
+
+def _icmp_at(w: Dict[str, Any], level: float) -> bool:
+    return w.get("loss") is not None and w["loss"] >= level
+
 
 def classify_paths(th: Dict[str, float], names: Dict[int, Any], by_target: Dict[int, List[Dict[str, Any]]]) -> Tuple[List[Dict[str, Any]], Set[int]]:
-    """Name the cause of a failing relay-to-server path; also returns the targets whose plain ping issue it replaces."""
+    """Name the cause of a failing relay-to-server path from TCP; also returns the targets whose plain issue it replaces."""
     out: List[Dict[str, Any]] = []
     replaced: Set[int] = set()
     hard, fine = th["loss_crit"], th["loss_warn"]
     cut_off: Dict[int, List[Tuple[Any, Dict[str, Any], List[str]]]] = {}
     for to_id, links in by_target.items():
         target = names.get(to_id)
-        if not target or status_of(target) != "online" or len(links) < 2:
+        measured = [w for w in links if tcp_measured(w)]
+        if not target or status_of(target) != "online" or len(measured) < 2:
             continue
-        down = [w for w in links if w["loss"] is not None and w["loss"] >= hard]
-        if len(down) == len(links):
+        down = [w for w in measured if w["tcp_loss"] >= hard]
+        if len(down) == len(measured):
             if th["on_blacklisted"]:
                 replaced.add(to_id)
                 out.append(make(target, "blacklisted", "critical", "IP از داخل ایران مسدود شده",
-                                "همهٔ رله‌ها هم‌نظرند و خود سرور آنلاین است؛ آی‌پی جدید بگیرید یا مسیر را از دیتاسنتر دیگری بگذرانید و با TCP تأیید کنید.",
-                                relays=sorted(w["from_name"] for w in links), measured_by=len(links),
-                                loss_pct=round(sum(w["loss"] for w in links) / len(links), 1)))
+                                "همهٔ رله‌ها با اتصال TCP هم‌نظرند و خود سرور آنلاین است؛ آی‌پی جدید بگیرید یا مسیر را از دیتاسنتر دیگری بگذرانید.",
+                                probe="tcp", relays=sorted(w["from_name"] for w in measured), measured_by=len(measured),
+                                loss_pct=round(sum(w["tcp_loss"] for w in measured) / len(measured), 1),
+                                icmp_loss_pct=_avg_icmp(measured)))
         elif len(down) == 1:
-            rest = [w for w in links if w is not down[0]]
-            if all(w["loss"] is not None and w["loss"] < fine for w in rest):
+            rest = [w for w in measured if w is not down[0]]
+            if all(w["tcp_loss"] < fine for w in rest):
                 cut_off.setdefault(down[0]["server_id"], []).append((target, down[0], sorted(w["from_name"] for w in rest)))
     for relay_id, items in cut_off.items():
         relay = names.get(relay_id)
@@ -222,12 +234,57 @@ def classify_paths(th: Dict[str, float], names: Dict[int, Any], by_target: Dict[
         label = relay["alias"] or relay["name"]
         if len(items) >= 2 and th["on_relay_filtered"]:
             out.append(make(relay, "relay_filtered", "warning", "رلهٔ %s به چند سرور خارجی همزمان نمی‌رسد" % label,
-                            "فیلتر ICMP یا مسیر در سطح دیتاسنتر رله محتمل است؛ با TCP تأیید کنید و اگر پایدار ماند رله را به دیتاسنتر دیگری ببرید.",
-                            targets=sorted(t["alias"] or t["name"] for t, _, _ in items), count=len(items),
-                            loss_pct=round(sum(w["loss"] for _, w, _ in items) / len(items), 1)))
+                            "اتصال TCP از این رله به چند سرور شکست می‌خورد در حالی که رله‌های دیگر می‌رسند؛ فیلتر در سطح دیتاسنتر رله محتمل است.",
+                            probe="tcp", targets=sorted(t["alias"] or t["name"] for t, _, _ in items), count=len(items),
+                            loss_pct=round(sum(w["tcp_loss"] for _, w, _ in items) / len(items), 1)))
         elif len(items) == 1 and th["on_relay_egress"]:
             target, w, reached = items[0]
             out.append(make(relay, "relay_egress", "warning", "رلهٔ %s به %s نمی‌رسد ولی رله‌های دیگر می‌رسند" % (label, target["alias"] or target["name"]),
-                            "فیلتر خروجی روی همین رله محتمل است؛ با TCP از خود رله تست کنید و ترافیک را موقتاً به رلهٔ دیگر بدهید.",
-                            target=target["alias"] or target["name"], target_ip=w["target"], loss_pct=round(w["loss"], 1), reached_by=reached))
+                            "اتصال TCP فقط از همین رله شکست می‌خورد؛ فیلتر خروجی همین رله محتمل است؛ ترافیک را موقتاً به رلهٔ دیگر بدهید.",
+                            probe="tcp", target=target["alias"] or target["name"], target_ip=w["target"], loss_pct=round(w["tcp_loss"], 1),
+                            icmp_loss_pct=None if w.get("loss") is None else round(w["loss"], 1), reached_by=reached))
     return out, replaced
+
+
+def _avg_icmp(links: List[Dict[str, Any]]) -> Optional[float]:
+    vals = [w["loss"] for w in links if w.get("loss") is not None]
+    return round(sum(vals) / len(vals), 1) if vals else None
+
+
+def path_issues(th: Dict[str, float], names: Dict[int, Any], by_target: Dict[int, List[Dict[str, Any]]],
+                replaced: Set[int]) -> List[Dict[str, Any]]:
+    """The plain loss issue per foreign server: TCP decides its level; ICMP-only loss is an info note."""
+    out: List[Dict[str, Any]] = []
+    for to_id, links in by_target.items():
+        target = names.get(to_id)
+        if not target or to_id in replaced:
+            continue
+        label = target["alias"] or target["name"]
+        measured = [w for w in links if tcp_measured(w)]
+        tcp_bad = [w for w in measured if w["tcp_loss"] >= th["loss_warn"]]
+        icmp_bad = [w for w in links if _icmp_at(w, th["loss_warn"])]
+        if len(tcp_bad) >= 2:
+            loss = sum(w["tcp_loss"] for w in tcp_bad) / len(tcp_bad)
+            rtt = [w["tcp_rtt"] for w in tcp_bad if w.get("tcp_rtt") is not None]
+            out.append(make(target, "ping:%s" % target["public_ip"], "critical" if loss >= th["loss_crit"] else "warning",
+                            "اتصال رله‌های ایران به %s قطع یا ناپایدار است" % label,
+                            "چند رله با اتصال TCP هم‌نظرند. با یک تست حجمی مسیر را بسنجید و فقط بعد از تأیید دو مبدأ DNS را تغییر دهید.",
+                            probe="tcp", relays=sorted(w["from_name"] for w in tcp_bad), measured_by=len(measured), loss_pct=round(loss, 1),
+                            rtt_ms=round(sum(rtt) / len(rtt), 1) if rtt else None, icmp_loss_pct=_avg_icmp(tcp_bad)))
+        elif len(tcp_bad) == 1 and len(measured) == 1:
+            out.append(make(target, "ping:%s" % target["public_ip"], "info",
+                            "اتصال TCP به %s فقط از یک رله ناپایدار دیده شده (تأیید نشده)" % label,
+                            "برای حکم دو رله لازم است؛ با رلهٔ دوم یا یک تست حجمی تأیید کنید.",
+                            probe="tcp", relays=[tcp_bad[0]["from_name"]], measured_by=1, loss_pct=round(tcp_bad[0]["tcp_loss"], 1)))
+        elif icmp_bad and not tcp_bad and (len(icmp_bad) >= 2 or len(links) == 1):
+            tcp_fine = [w for w in icmp_bad if tcp_measured(w)]
+            title = ("افت ICMP به %s دیده می‌شود ولی اتصال TCP سالم است" if tcp_fine
+                     else "افت ICMP به %s دیده می‌شود (با TCP تأیید نشده)") % label
+            hint = ("ping روی این مسیر محدود می‌شود ولی داده عبور می‌کند؛ کاری لازم نیست مگر کاربران مشکل گزارش کنند." if tcp_fine
+                    else "پینگ ICMP روی بعضی مسیرها محدود می‌شود؛ تا پورت‌های داده با TCP سنجیده نشوند این فقط یک یادداشت است.")
+            loss = sum(w["loss"] for w in icmp_bad) / len(icmp_bad)
+            rtt = [w["rtt"] for w in icmp_bad if w.get("rtt") is not None]
+            out.append(make(target, "ping:%s" % target["public_ip"], "info", title, hint,
+                            probe="icmp", relays=sorted(w["from_name"] for w in icmp_bad), measured_by=len(links), loss_pct=round(loss, 1),
+                            rtt_ms=round(sum(rtt) / len(rtt), 1) if rtt else None, tcp_ok=bool(tcp_fine)))
+    return out

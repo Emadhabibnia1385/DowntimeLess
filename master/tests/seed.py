@@ -38,12 +38,16 @@ def seed_fleet(owner):
     rep = json.loads(db.execute("SELECT last_report FROM servers WHERE id=?", (ids["panel-1"],)).fetchone()["last_report"])
     rep["ssl"] = {"certs": certs, "renew": {"certbot_timer_enabled": True, "certbot_timer_active": True}}
     db.execute("UPDATE servers SET last_report=? WHERE id=?", (json.dumps(rep), ids["panel-1"]))
-    # pings from every online relay to every exit, 8 samples inside the last 10 minutes
+    # pings and TCP probes (port 443, proven) from every online relay to every exit, 8 samples inside the last 10 minutes
     for r in ("ir-1", "ir-2", "ir-4", "ir-5"):
         for e in EXITS:
             loss = 100.0 if e == "de-1" or (e == "fi-1" and r == "ir-2") else 0.0
             for k in range(8):
                 db.execute("INSERT INTO pings (server_id, ts, target, loss, rtt) VALUES (?,?,?,?,?)", (ids[r], now - 30 - k * 60, IPS[e], loss, None if loss == 100 else 40.0 + k))
+                db.execute("INSERT INTO probes (server_id, ts, target, port, ok, rtt, error) VALUES (?,?,?,?,?,?,?)",
+                           (ids[r], now - 30 - k * 60, IPS[e], 443, int(loss == 0), None if loss else 40.0 + k, "timeout" if loss else None))
+    for e in EXITS:
+        db.execute("INSERT OR REPLACE INTO probe_ports (workspace_id, target, port, last_ok) VALUES (1,?,?,?)", (IPS[e], 443, now))
     # a week of half-hourly metrics
     rows = []
     for name, sid in ids.items():

@@ -13,6 +13,7 @@ from ..checks import memory as checks_memory
 from ..servers import events
 from ..servers.service import swap_pct
 from ..links import service as links_svc
+from ..overview import probes as probes_svc
 from ..reports import events as changelog
 from ..ssl.service import adopt_domains
 from .schemas import EnrollRequest, EnrollResult, Report, ReportResult
@@ -81,6 +82,10 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
             db.execute(  # ws: agent_server - readers join targets inside the same workspace
                 "INSERT INTO pings (server_id, ts, target, loss, rtt) VALUES (?,?,?,?,?)", (sid, now, str(p["target"]), p.get("loss_pct"), p.get("rtt_ms"))
             )
+    try:
+        probes_svc.record(db, server, extra.get("probes"), now)
+    except Exception:  # a malformed probe list must never cost the whole report
+        log.exception("probes of server %d failed", sid)
     for j in body.jobs_done:
         changelog.job_done(db, server, j.id, j.status)
         db.execute(  # ws: agent_server - only its own jobs
@@ -100,5 +105,6 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
         "SELECT * FROM jobs WHERE server_id=? AND status='queued' ORDER BY id", (sid,))]  # ws: agent_server - its own jobs
     if jobs:
         db.execute("UPDATE jobs SET status='sent' WHERE server_id=? AND status='queued'", (sid,))  # ws: agent_server - its own jobs
-    return {"interval_s": get_settings().interval_s, "permission": "full", "ping_targets": targets, "jobs": jobs,
+    probe_targets = probes_svc.targets_for_relay(db, ws, now) if server["role"] == "relay" else []
+    return {"interval_s": get_settings().interval_s, "permission": "full", "ping_targets": targets, "probe_targets": probe_targets, "jobs": jobs,
             "acct_peers": links_svc.peers_for(db, server)}

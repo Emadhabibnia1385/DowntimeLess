@@ -6,6 +6,7 @@
  */
 import type { JobToRun } from "./jobToRun";
 import type { PingTarget } from "./pingTarget";
+import type { ProbeTarget } from "./probeTarget";
 
 export interface ReportResult {
 	acct_peers?: string[];
@@ -13,4 +14,5 @@ export interface ReportResult {
 	jobs: JobToRun[];
 	permission: string;
 	ping_targets: PingTarget[];
+	probe_targets?: ProbeTarget[];
 }

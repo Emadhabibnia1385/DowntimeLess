@@ -239,7 +239,8 @@ def relays_md(r: Dict[str, Any]) -> str:
             if not p:
                 return "-"
             rtt = "" if p["rtt_ms"] is None else " %sms" % p["rtt_ms"]
-            return "%s%%%s%s" % (pct(p["loss_pct"]).rstrip("%"), rtt, "" if p["verdict"] == "ok" else " " + p["verdict"])
+            tcp = "" if p.get("tcp_fail_pct") is None else " tcp %s" % pct(p["tcp_fail_pct"])
+            return "%s%%%s%s%s" % (pct(p["loss_pct"]).rstrip("%"), rtt, tcp, "" if p["verdict"] == "ok" else " " + p["verdict"])
 
         out.append(table(["relay \\ exit"] + exits, ([rel] + [cellf(cellmap.get((rel, e))) for e in exits] for rel in relays)))
         pb = [p for p in r["pairs"] if p["in_bytes"] is not None]

@@ -673,6 +673,9 @@ export const ReportsRelaysHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const reportsRelaysResponsePairsItemTcpSamplesDefault = 0;
+export const reportsRelaysResponsePairsItemTlsFailedDefault = 0;
+
 export const ReportsRelaysResponse = zod.object({
 	note: zod.string(),
 	pairs: zod.array(
@@ -686,6 +689,10 @@ export const ReportsRelaysResponse = zod.object({
 			relay_id: zod.int(),
 			rtt_ms: zod.union([zod.number(), zod.null()]),
 			samples: zod.int(),
+			tcp_fail_pct: zod.union([zod.number(), zod.null()]).optional(),
+			tcp_rtt_ms: zod.union([zod.number(), zod.null()]).optional(),
+			tcp_samples: zod.int().default(reportsRelaysResponsePairsItemTcpSamplesDefault),
+			tls_failed: zod.int().default(reportsRelaysResponsePairsItemTlsFailedDefault),
 			verdict: zod.string(),
 		}),
 	),

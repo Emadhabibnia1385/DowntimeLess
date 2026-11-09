@@ -28,7 +28,7 @@ that runs a PasarGuard panel), `panel_error` (short class name, only when the pa
 
 | Field | Source | Cadence | Cost per run | What it is for |
 |---|---|---|---|---|
-| `checks.listeners` `[{proto, port, proc}]` | `ss -H -tulnp`; ports 0 and >32768 dropped unless the process is a tunnel, xray, nginx or sshd | every report | 1 command, ~10 ms | an expected location, tunnel or SSH port stopped listening (panel says connected, Xray listens on nothing) |
+| `checks.listeners` `[{proto, port, proc, addr}]` | `ss -H -tulnp`; ports 0 and >32768 dropped unless the process is a tunnel, xray, nginx or sshd; `addr` (0.3.2) is the bind address, a public one wins over loopback for the same port | every report | 1 command, ~10 ms | an expected location, tunnel or SSH port stopped listening (panel says connected, Xray listens on nothing) |
 | `checks.units` `[{name, enabled, active, sub, restarts}]` | `systemctl list-unit-files --state=enabled`, `systemctl list-units --all`, one `systemctl show -p Id,ActiveState,SubState,NRestarts,UnitFileState`; names `^(backpack-\|relay-dnat\|backhaul\|gre-\|wattun@\|dl-\|xray\|x-ui\|pasarguard\|panel-dnat\|mobin-dnat\|nginx\|fail2ban)` that are enabled, plus any unit in `auto-restart` | every report | 3 commands, ~30 ms | tunnel enabled but stopped; crash loops that `systemctl --failed` never shows |
 | `checks.conntrack` `{module_loaded, count, max, tcp_established_timeout, insert_failed, drop, early_drop}` | `/proc/sys/net/netfilter/*`, `/proc/net/stat/nf_conntrack` (hex, summed over CPUs) | every report | file reads, <1 ms | limits reset to defaults after a reboot, table full, drops; module not loaded on a DNAT relay |
 | `checks.containers` `[{name, image, state, status, restarts, health, policy, exit_code, oom_killed, started_at}]` (≤50) | `docker ps -a --format` (id, name, image, state, status) and one `docker inspect --format` asking only restart count, restart policy, health, state, exit code, OOM flag, start time, image; `image` is repo:tag, digest dropped | 60 s | 2 commands, ~100–300 ms | node or panel container down or looping |
@@ -41,6 +41,15 @@ that runs a PasarGuard panel), `panel_error` (short class name, only when the pa
 | `checks.apt` `{dpkg_audit, held_docker, reboot_required_pkgs}` | `dpkg --audit` (line count), `apt-mark showhold`, `/var/run/reboot-required.pkgs` | 600 s | 2 commands, ~200 ms | an upgrade that would make the next reboot fail |
 | `ssl.node_certs` `[{name, source, not_after, days_left, ips, domains}]` | `openssl x509` on `/var/lib/*/certs/ssl_cert.pem`; listed apart from `ssl.certs` so the master offers no certbot action on them | with the ssl scan (1800 s) | 1 command per cert | node cert expiry; cert SAN IP differs from the server's address after a move |
 | `panel` `{container, version, nodes, usage, admins, inbounds_without_group, user_status, errors}` | see below | 60 s (discovery 300 s) | 1 `docker exec`, 0.3–2 s, hard limit 8 s (7 s inside) | panel truth: node status and message, usage collapse per node, reseller quota, inbounds nobody receives, user status surges, panel version |
+
+## TCP/TLS probes (agent 0.3.2)
+
+`probes [{target, port, ok, rtt_ms, error, tls}]` in the report: one entry per item of the master's `probe_targets`
+(at most 32 kept, each a valid host and a TCP port). Each is one `socket.create_connection` with a 3 s timeout,
+and when the master marks the port `tls` one TLS handshake (no SNI, no verification) on the same socket, then close:
+no data is sent. 8 run in parallel in a thread beside the ICMP pings, within a 12 s budget; one still running at the
+budget is left out instead of reported as failed. Standard library only (`socket`, `ssl`). The master's side (which
+ports, proven ports, verdicts) is in `docs/DETECTION-CATALOG.md`, "TCP probes".
 
 ## The panel reader
 

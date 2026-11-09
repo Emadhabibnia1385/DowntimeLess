@@ -264,8 +264,9 @@ def relays_report(db: sqlite3.Connection, ws: int, since: int, until: int) -> Di
     rows, truncated = cap(pairs, 200)
     return {
         "since": since, "until": until, "ping_window_s": 600, "pairs": rows, "truncated": truncated,
-        "problems": sum(1 for p in pairs if p["verdict"] not in ("ok",)),
-        "note": "Loss and RTT are ICMP averages of the last 10 minutes (6+ samples); verdicts are hypotheses to confirm with a data test and a second vantage point. Bytes need acct_on.",
+        "problems": sum(1 for p in pairs if p["verdict"] not in ("ok", "icmp_only")),
+        "note": "Last 10 minutes, 6+ samples. Verdicts come from TCP connections to ports that answered before (tcp_fail_pct); "
+                "loss_pct and rtt_ms are ICMP and alone only make icmp_only. Confirm with a data test before touching DNS. Bytes need acct_on.",
     }
 
 

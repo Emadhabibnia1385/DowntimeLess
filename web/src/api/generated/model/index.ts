@@ -135,6 +135,7 @@ export * from "./playbookList";
 export * from "./playbookOut";
 export * from "./pollRequest";
 export * from "./pollResult";
+export * from "./probeTarget";
 export * from "./quotaRow";
 export * from "./recurringBrief";
 export * from "./relayPair";

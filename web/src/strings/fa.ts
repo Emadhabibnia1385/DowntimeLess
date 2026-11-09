@@ -287,7 +287,7 @@ export const fa = {
 			failed_units: "سرویس‌های ناموفق systemd",
 			reboot_required: "نیاز به ریبوت",
 			agent_missing: "agent نصب نشده",
-			ping: "اتصال رله‌های ایران قطع یا ناپایدار",
+			ping: "مسیر رله‌های ایران به سرور خارج",
 			ssl_expiry: "گواهی نزدیک انقضا یا منقضی",
 			ssl_auto_renew_off: "تمدید خودکار گواهی غیرفعال",
 			ssl_renew_failed: "آخرین تمدید گواهی ناموفق",

@@ -44,6 +44,12 @@ class PingTarget(BaseModel):
     tcp_port: Optional[int] = None
 
 
+class ProbeTarget(BaseModel):
+    target: str
+    port: int
+    tls: bool = False  # also try a TLS handshake after the TCP connection
+
+
 class JobToRun(BaseModel):
     id: int
     kind: str
@@ -55,4 +61,5 @@ class ReportResult(BaseModel):
     permission: str
     acct_peers: List[str] = []
     ping_targets: List[PingTarget]
+    probe_targets: List[ProbeTarget] = []  # agent 0.3.2+; older agents ignore it
     jobs: List[JobToRun]

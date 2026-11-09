@@ -201,55 +201,123 @@ def test_fewer_cores_or_less_ram_means_resized(owner):
     assert "resized" not in codes(owner)
 
 
-# ---- cause of a failing path ---------------------------------------------------------------------
+# ---- cause of a failing path: TCP decides, ICMP alone is a note -----------------------------------
 
 @pytest.fixture
 def fast_pings(monkeypatch):
     monkeypatch.setattr(overview, "PING_MIN_SAMPLES", 1)
 
 
-def fleet(owner, exits, relays):
-    """exits: {name: ip}; relays: [{target ip: loss}], one dict per relay named iran-1.."""
+XRAY = {"listeners": [{"proto": "tcp", "port": 443, "proc": "xray", "addr": "0.0.0.0"}]}
+
+
+def tcp(ip, fail_pct, port=443, error="timeout", n=10):
+    bad = round(n * fail_pct / 100)
+    return [{"target": ip, "port": port, "ok": k >= bad, "rtt_ms": 80 if k >= bad else None,
+             "error": None if k >= bad else error, "tls": None} for k in range(n)]
+
+
+def prove(*ips, port=443):
+    db = connect()
+    for ip in ips:
+        db.execute("INSERT OR REPLACE INTO probe_ports (workspace_id, target, port, last_ok) VALUES (1,?,?,?)", (ip, port, int(time.time())))
+    db.close()
+
+
+def fleet(owner, exits, relays, icmp=None, proven=True):
+    """exits: {name: ip}; relays: [{target ip: TCP failure %}], one per relay named iran-1..; icmp: the same shape for ping loss."""
     for name, ip in exits.items():
         _, k = make_server(owner, name, "exit")
-        report(owner, k, public_ip=ip)
-    for n, losses in enumerate(relays, 1):
+        report(owner, k, public_ip=ip, checks=XRAY)
+    if proven:
+        prove(*exits.values())
+    for n, fails in enumerate(relays, 1):
         _, k = make_server(owner, "iran-%d" % n, "relay")
-        report(owner, k, public_ip="203.0.113.%d" % n, ping=[{"target": ip, "loss_pct": loss, "rtt_ms": 90} for ip, loss in losses.items()])
+        losses = (icmp or [{}] * len(relays))[n - 1]
+        report(owner, k, public_ip="203.0.113.%d" % n,
+               ping=[{"target": ip, "loss_pct": loss, "rtt_ms": 90} for ip, loss in losses.items()],
+               probes=[p for ip, f in fails.items() for p in tcp(ip, f)])
 
 
-def test_an_online_exit_failing_from_every_relay_is_blacklisted(owner, fast_pings):
+def test_an_online_exit_failing_tcp_from_every_relay_is_blacklisted(owner, fast_pings):
     fleet(owner, {"nl-1": "198.51.100.2"}, [{"198.51.100.2": 100}, {"198.51.100.2": 100}])
     issue = one(owner, "blacklisted")
     assert issue["severity"] == "critical" and issue["title"] == "IP از داخل ایران مسدود شده" and issue["server_name"] == "nl-1"
-    assert issue["evidence"]["relays"] == ["iran-1", "iran-2"]
+    assert issue["evidence"]["relays"] == ["iran-1", "iran-2"] and issue["evidence"]["probe"] == "tcp"
     assert codes(owner, "ping:") == []  # the cause replaces the plain loss issue
 
 
+def test_icmp_loss_with_healthy_tcp_is_only_an_info_note(owner, fast_pings):
+    ip = "198.51.100.2"
+    fleet(owner, {"nl-1": ip}, [{ip: 0}, {ip: 0}], icmp=[{ip: 100}, {ip: 100}])
+    found = owner.get("/api/v1/issues").json()
+    assert not [i for i in found if i["code"] in ("blacklisted", "relay_egress", "relay_filtered")]
+    note = one(owner, "ping:" + ip)
+    assert note["severity"] == "info" and note["evidence"]["probe"] == "icmp" and note["evidence"]["tcp_ok"] is True
+
+
+def test_icmp_loss_without_any_tcp_data_never_blacklists(owner, fast_pings):
+    ip = "198.51.100.2"
+    fleet(owner, {"nl-1": ip}, [{}, {}], icmp=[{ip: 100}, {ip: 100}])  # agents older than 0.3.2 only ping
+    assert "blacklisted" not in codes(owner)
+    note = one(owner, "ping:" + ip)
+    assert note["severity"] == "info" and note["evidence"]["tcp_ok"] is False
+
+
+def test_a_port_that_never_answered_decides_nothing(owner, fast_pings):
+    ip = "198.51.100.2"
+    fleet(owner, {"nl-1": ip}, [{ip: 100}, {ip: 100}], proven=False)  # firewalled or local-only: not a blocked path
+    assert "blacklisted" not in codes(owner) and codes(owner, "ping:") == []
+
+
+def test_a_refused_connection_proves_the_address_is_reachable(owner, fast_pings):
+    ip = "198.51.100.2"
+    for name in ("nl-1",):
+        _, k = make_server(owner, name, "exit")
+        report(owner, k, public_ip=ip, checks=XRAY)
+    prove(ip)
+    for n in (1, 2):
+        _, k = make_server(owner, "iran-%d" % n, "relay")
+        report(owner, k, public_ip="203.0.113.%d" % n, probes=tcp(ip, 100, error="refused"))
+    assert "blacklisted" not in codes(owner) and codes(owner, "ping:") == []
+
+
 def test_blacklisted_needs_two_relays_agreeing_and_an_online_server(owner, fast_pings):
-    fleet(owner, {"nl-1": "198.51.100.2"}, [{"198.51.100.2": 100}])
-    assert "blacklisted" not in codes(owner) and codes(owner, "ping:")  # one relay stays the unconfirmed info
+    ip = "198.51.100.2"
+    fleet(owner, {"nl-1": ip}, [{ip: 100}])
+    assert "blacklisted" not in codes(owner)
+    assert one(owner, "ping:" + ip)["severity"] == "info"  # one relay stays the unconfirmed info
     sid, key = make_server(owner, "iran-9", "relay")
-    report(owner, key, public_ip="203.0.113.9", ping=[{"target": "198.51.100.2", "loss_pct": 100, "rtt_ms": None}])
+    report(owner, key, public_ip="203.0.113.9", probes=tcp(ip, 100))
     assert "blacklisted" in codes(owner)
     db = connect()
     db.execute("UPDATE servers SET last_seen=? WHERE name='nl-1'", (int(time.time()) - 3600,))
     db.close()
     found = codes(owner)
-    assert "blacklisted" not in found and "offline" in found and "ping:198.51.100.2" in found  # silent agent: an outage
+    assert "blacklisted" not in found and "offline" in found and "ping:" + ip in found  # silent agent: an outage
 
 
-def test_partial_loss_from_all_relays_stays_a_plain_ping_issue(owner, fast_pings):
-    fleet(owner, {"nl-1": "198.51.100.2"}, [{"198.51.100.2": 30}, {"198.51.100.2": 30}])
-    assert "blacklisted" not in codes(owner) and codes(owner, "ping:") == ["ping:198.51.100.2"]
+def test_partial_tcp_failure_from_all_relays_stays_a_plain_ping_issue(owner, fast_pings):
+    ip = "198.51.100.2"
+    fleet(owner, {"nl-1": ip}, [{ip: 30}, {ip: 30}])
+    assert "blacklisted" not in codes(owner) and codes(owner, "ping:") == ["ping:" + ip]
+    issue = one(owner, "ping:" + ip)
+    assert issue["severity"] == "warning" and issue["evidence"]["probe"] == "tcp" and issue["evidence"]["loss_pct"] == 30
 
 
 def test_exactly_one_failing_relay_is_an_egress_filter_on_that_relay(owner, fast_pings):
-    fleet(owner, {"nl-1": "198.51.100.2"}, [{"198.51.100.2": 100}, {"198.51.100.2": 0}, {"198.51.100.2": 0}])
+    ip = "198.51.100.2"
+    fleet(owner, {"nl-1": ip}, [{ip: 100}, {ip: 0}, {ip: 0}])
     issue = one(owner, "relay_egress")
     assert issue["severity"] == "warning" and issue["server_name"] == "iran-1"
     assert issue["evidence"]["target"] == "nl-1" and issue["evidence"]["reached_by"] == ["iran-2", "iran-3"]
     assert "blacklisted" not in codes(owner)
+
+
+def test_one_relay_losing_only_icmp_is_no_egress_filter(owner, fast_pings):
+    ip = "198.51.100.2"
+    fleet(owner, {"nl-1": ip}, [{ip: 0}, {ip: 0}, {ip: 0}], icmp=[{ip: 100}, {ip: 0}, {ip: 0}])
+    assert "relay_egress" not in codes(owner) and "relay_filtered" not in codes(owner)
 
 
 def test_a_relay_failing_to_several_servers_is_one_filtered_relay(owner, fast_pings):
@@ -273,6 +341,59 @@ def test_egress_and_filter_switches(owner, fast_pings):
     fleet(owner, {"nl-1": "198.51.100.2", "de-1": "198.51.100.3"}, [both, {"198.51.100.2": 0, "198.51.100.3": 0}])
     switch(owner, on_relay_filtered=0)
     assert "relay_filtered" not in codes(owner) and "relay_egress" not in codes(owner)
+
+
+def test_without_the_fast_fixture_a_verdict_needs_six_samples_per_relay(owner):
+    ip = "198.51.100.2"
+    _, k = make_server(owner, "nl-1", "exit")
+    report(owner, k, public_ip=ip, checks=XRAY)
+    prove(ip)
+    keys = []
+    for n in (1, 2):
+        _, rk = make_server(owner, "iran-%d" % n, "relay")
+        keys.append(rk)
+        report(owner, rk, public_ip="203.0.113.%d" % n, probes=tcp(ip, 100, n=5))
+    assert "blacklisted" not in codes(owner)
+    for rk in keys:
+        report(owner, rk, public_ip="203.0.113.9", probes=tcp(ip, 100, n=1))
+    assert "blacklisted" in codes(owner)
+
+
+# ---- which ports a relay probes ------------------------------------------------------------------
+
+def test_relays_get_the_public_data_ports_of_foreign_servers_and_exits_get_none(owner):
+    _, ek = make_server(owner, "nl-1", "exit")
+    listeners = {"listeners": [
+        {"proto": "tcp", "port": 22, "proc": "sshd", "addr": "0.0.0.0"},
+        {"proto": "tcp", "port": 10085, "proc": "xray", "addr": "127.0.0.1"},
+        {"proto": "tcp", "port": 8080, "proc": "xray", "addr": "0.0.0.0"},
+        {"proto": "tcp", "port": 443, "proc": "xray", "addr": "*"},
+        {"proto": "udp", "port": 443, "proc": "xray"},
+        {"proto": "tcp", "port": 2096, "proc": "xray"},
+    ]}
+    assert report(owner, ek, public_ip="198.51.100.2", checks=listeners).json()["probe_targets"] == []
+    _, rk = make_server(owner, "iran-1", "relay")
+    got = report(owner, rk, public_ip="203.0.113.1").json()["probe_targets"]
+    assert got[0] == {"target": "198.51.100.2", "port": 443, "tls": True}
+    assert len(got) == 2 and got[1]["port"] in (2096, 8080)
+    assert not {22, 10085} & {t["port"] for t in got}
+    prove("198.51.100.2", port=8080)
+    got = report(owner, rk, public_ip="203.0.113.1").json()["probe_targets"]
+    assert got[0] == {"target": "198.51.100.2", "port": 8080, "tls": False}  # a proven port first
+
+
+def test_probe_results_about_other_addresses_are_dropped_and_successes_prove_the_port(owner):
+    _, ek = make_server(owner, "nl-1", "exit")
+    report(owner, ek, public_ip="198.51.100.2", checks=XRAY)
+    _, rk = make_server(owner, "iran-1", "relay")
+    bad = [{"target": "192.0.2.77", "port": 443, "ok": True}, {"target": "198.51.100.2", "port": 0, "ok": True},
+           {"target": "198.51.100.2", "port": 443, "ok": "yes"}, "junk"]
+    assert report(owner, rk, public_ip="203.0.113.1", probes=bad + tcp("198.51.100.2", 0, n=1)).status_code == 200
+    db = connect()
+    rows = [tuple(r) for r in db.execute("SELECT target, port, ok FROM probes")]
+    proven = [tuple(r) for r in db.execute("SELECT target, port FROM probe_ports")]
+    db.close()
+    assert rows == [("198.51.100.2", 443, 1)] and proven == [("198.51.100.2", 443)]
 
 
 # ---- quota ---------------------------------------------------------------------------------------

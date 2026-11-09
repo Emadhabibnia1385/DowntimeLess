@@ -17,8 +17,9 @@ NOT_SCOPED_EXACT = {
 }
 # tables that carry workspace_id themselves, and tables that reach it through server_id
 DIRECT = ("servers", "categories", "domains", "settings", "api_keys", "telegram_channels", "rule_routes", "incidents",
-          "events", "alert_state", "flapping", "issue_acks", "listener_baseline", "check_state", "check_ignores", "node_usage")
-CHILD = ("metrics", "pings", "jobs", "link_traffic", "link_prev")
+          "events", "alert_state", "flapping", "issue_acks", "listener_baseline", "check_state", "check_ignores", "node_usage",
+          "probe_ports")
+CHILD = ("metrics", "pings", "probes", "jobs", "link_traffic", "link_prev")
 SCOPED = re.compile(r"\b(%s)\b" % "|".join(DIRECT + CHILD))
 REF = re.compile(r"\b(FROM|JOIN|INTO|UPDATE)\s+(%s)\b(?:\s+(?:AS\s+)?(\w+))?" % "|".join(DIRECT + CHILD), re.I)
 NOT_ALIAS = {"where", "on", "join", "left", "inner", "set", "values", "group", "order", "limit", "as", "using", "natural", "cross"}

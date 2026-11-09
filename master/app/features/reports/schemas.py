@@ -525,9 +525,13 @@ class RelayPair(BaseModel):
     relay: str
     exit_id: int
     exit: str
-    loss_pct: Optional[float]
+    loss_pct: Optional[float]  # ICMP
     rtt_ms: Optional[float]
     samples: int
+    tcp_fail_pct: Optional[float] = None  # share of TCP connections to proven ports that failed
+    tcp_rtt_ms: Optional[float] = None
+    tcp_samples: int = 0
+    tls_failed: int = 0  # TLS handshakes that failed after the TCP connection was accepted
     verdict: str
     in_bytes: Optional[int]
     out_bytes: Optional[int]

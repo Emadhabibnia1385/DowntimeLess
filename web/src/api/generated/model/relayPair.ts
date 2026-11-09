@@ -15,5 +15,9 @@ export interface RelayPair {
 	relay_id: number;
 	rtt_ms: number | null;
 	samples: number;
+	tcp_fail_pct?: number | null;
+	tcp_rtt_ms?: number | null;
+	tcp_samples?: number;
+	tls_failed?: number;
 	verdict: string;
 }

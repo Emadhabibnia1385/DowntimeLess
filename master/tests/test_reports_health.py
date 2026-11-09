@@ -16,6 +16,19 @@ def _ping(sid, target, loss, n=8):
     db.close()
 
 
+def _tcp(sid, target, fail_pct, n=8, port=443):
+    """n TCP probes from relay sid to target:port, fail_pct of them timing out; the port is proven."""
+    db = connect()
+    now = int(time.time())
+    bad = round(n * fail_pct / 100)
+    for k in range(n):
+        ok = k >= bad
+        db.execute("INSERT INTO probes (server_id, ts, target, port, ok, rtt, error) VALUES (?,?,?,?,?,?,?)",
+                   (sid, now - 20 - k * 40, target, port, int(ok), 40.0 if ok else None, None if ok else "timeout"))
+    db.execute("INSERT OR REPLACE INTO probe_ports (workspace_id, target, port, last_ok) VALUES (1,?,?,?)", (target, port, now))
+    db.close()
+
+
 def test_a_quiet_relay_is_healthy_with_a_perfect_score(owner):
     sid, key = make_server(owner, "ir-1", "relay")
     report(owner, key)
@@ -38,7 +51,7 @@ def test_many_penalties_make_it_failing_without_any_gate(owner):
     exit_id, ek = make_server(owner, "de-1", "exit")
     report(owner, ek, public_ip="198.51.100.9")
     report(owner, key, tcp_retrans_pct=7.0, conntrack_pct=75.0, cpu_pct=95.0, steal_pct=45.0, ram_avail_mb=40, disk_used_gb=96, failed_units=["x.service"])
-    _ping(sid, "198.51.100.9", 15.0)
+    _tcp(sid, "198.51.100.9", 15.0, n=20)
     h = _health(owner)["ir-1"]
     assert h["gates"] == [] and h["score"] == 38 and h["band"] == "failing"
     assert sum(p["points"] for p in h["penalties"]) == 100 - h["score"]
@@ -61,8 +74,8 @@ def test_offline_pending_and_unreachable_exits(owner):
     r2, k2 = make_server(owner, "ir-2", "relay")
     report(owner, k1)
     report(owner, k2)
-    _ping(r1, "198.51.100.9", 100.0)
-    _ping(r2, "198.51.100.9", 100.0)
+    _tcp(r1, "198.51.100.9", 100.0)
+    _tcp(r2, "198.51.100.9", 100.0)
     db = connect()
     db.execute("UPDATE servers SET last_seen=? WHERE id=?", (int(time.time()) - 900, off))
     db.close()
@@ -81,11 +94,29 @@ def test_one_relay_failing_is_a_penalty_not_a_gate_for_the_exit(owner):
     r2, k2 = make_server(owner, "ir-2", "relay")
     report(owner, k1)
     report(owner, k2)
-    _ping(r1, "198.51.100.9", 100.0)
-    _ping(r2, "198.51.100.9", 0.0)
+    _tcp(r1, "198.51.100.9", 100.0)
+    _tcp(r2, "198.51.100.9", 0.0)
     h = _health(owner)
     assert h["de-1"]["gates"] == [] and h["de-1"]["score"] == 100 - 13 and h["de-1"]["band"] == "healthy"
     assert h["ir-1"]["gates"][0]["key"] == "all_exits_lossy"  # its only measured exit is unreachable from it
+
+
+def test_icmp_only_loss_is_a_small_penalty_and_never_a_gate(owner):
+    ex, ek = make_server(owner, "de-1", "exit")
+    report(owner, ek, public_ip="198.51.100.9")
+    r1, k1 = make_server(owner, "ir-1", "relay")
+    r2, k2 = make_server(owner, "ir-2", "relay")
+    report(owner, k1)
+    report(owner, k2)
+    _ping(r1, "198.51.100.9", 100.0)
+    _ping(r2, "198.51.100.9", 100.0)
+    h = _health(owner)
+    assert h["de-1"]["gates"] == [] and h["ir-1"]["gates"] == []
+    pen = {p["key"]: p for p in h["de-1"]["penalties"]}["relay_reachability"]
+    assert pen["points"] == round(25 * 0.3) and "ICMP" in pen["detail"]
+    _tcp(r1, "198.51.100.9", 0.0)
+    _tcp(r2, "198.51.100.9", 0.0)
+    assert _health(owner)["de-1"]["penalties"] == []  # TCP fine: the ICMP loss no longer counts
 
 
 def test_quota_gate_and_penalty_switch_on_when_quota_columns_exist(owner):

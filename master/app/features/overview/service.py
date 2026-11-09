@@ -1,13 +1,13 @@
 import sqlite3
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from ..checks import service as checks_svc
 from ..issues import acks
 from ..servers.service import latest_of, status_of
 from ..settings.router import thresholds
 from ..ssl import service as ssl_svc
-from . import detectors
+from . import detectors, probes
 from .detectors import make as _issue
 
 
@@ -31,19 +31,42 @@ def ping_matrix(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
 
 # ICMP is rate-limited or dropped by many hosts, so a link counts as bad only on a window of samples
 # and only when at least two Iran relays agree; one relay disagreeing with the rest is an artefact.
+# The same window and sample count apply to the TCP probes, which alone decide a path verdict.
 PING_WINDOW_S = 600
 PING_MIN_SAMPLES = 6
 
 
-def ping_windows(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
-    """Average loss per Iran relay and foreign server of one workspace over the last window, with the number of samples."""
+def path_windows(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
+    """Per Iran relay and foreign server of one workspace over the last window: ICMP loss and TCP results on proven ports.
+
+    `loss`/`rtt`/`n` are ICMP (loss None below PING_MIN_SAMPLES); `tcp_loss` is the share of connections that failed
+    (None below PING_MIN_SAMPLES attempts), `tcp_n` the attempts, `tls_ok`/`tls_fail` handshakes on TLS ports."""
+    since = int(time.time()) - PING_WINDOW_S
     rows = db.execute(
         "SELECT p.server_id, s.name AS from_name, t.id AS to_id, t.public_ip AS target, AVG(p.loss) AS loss, AVG(p.rtt) AS rtt, COUNT(p.loss) AS n "
         "FROM pings p JOIN servers s ON s.id=p.server_id JOIN servers t ON t.public_ip=p.target AND t.workspace_id=s.workspace_id "
         "WHERE s.workspace_id=? AND s.role='relay' AND t.role<>'relay' AND p.ts>=? GROUP BY p.server_id, t.id",
-        (ws, int(time.time()) - PING_WINDOW_S),
+        (ws, since),
     ).fetchall()
-    return [dict(r) for r in rows if r["n"] >= PING_MIN_SAMPLES]
+    out: Dict[Tuple[int, int], Dict[str, Any]] = {}
+    for r in rows:
+        w = dict(r)
+        if w["n"] < PING_MIN_SAMPLES:
+            w["loss"] = w["rtt"] = None
+        out[(w["server_id"], w["to_id"])] = w
+    tcp = probes.windows(db, ws, since)
+    if any(key not in out for key in tcp):
+        servers = {r["id"]: r for r in db.execute("SELECT id, name, public_ip FROM servers WHERE workspace_id=?", (ws,))}
+        for key in tcp:
+            if key not in out and key[0] in servers and key[1] in servers:
+                out[key] = {"server_id": key[0], "from_name": servers[key[0]]["name"], "to_id": key[1],
+                            "target": servers[key[1]]["public_ip"], "loss": None, "rtt": None, "n": 0}
+    for key, w in out.items():
+        t = tcp.get(key) or {}
+        n = t.get("tcp_n") or 0
+        w.update(tcp_n=n, tcp_loss=t.get("tcp_loss") if n >= PING_MIN_SAMPLES else None, tcp_rtt=t.get("tcp_rtt"),
+                 tls_ok=t.get("tls_ok") or 0, tls_fail=t.get("tls_fail") or 0)
+    return [w for w in out.values() if w["loss"] is not None or w["tcp_loss"] is not None]
 
 
 def issues(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
@@ -85,36 +108,14 @@ def issues(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
             out.append(_issue(s, "reboot_required", "info", "سرور برای اعمال آپدیت نیاز به ریبوت دارد", "در ساعت کم‌ترافیک و با تأیید خودتان ریبوت کنید؛ رله‌ها را یکی‌یکی."))
     names = {s["id"]: s for s in servers}
     by_target: Dict[int, List[Dict[str, Any]]] = {}
-    for w in ping_windows(db, ws):
+    for w in path_windows(db, ws):
         by_target.setdefault(w["to_id"], []).append(w)
     classified, replaced = detectors.classify_paths(th, names, by_target)
     out.extend(classified)
     if th["on_quota_pair"]:
         out.extend(detectors.quota_pairs(forecasts))
-    for to_id, links in by_target.items():
-        target = names.get(to_id)
-        if to_id in replaced:
-            continue
-        bad = [w for w in links if w["loss"] is not None and w["loss"] >= th["loss_warn"]]
-        if not th["on_ping"] or not target or not bad:
-            continue
-        loss = sum(w["loss"] for w in bad) / len(bad)
-        rtt = [w["rtt"] for w in bad if w["rtt"] is not None]
-        evidence = {"relays": sorted(w["from_name"] for w in bad), "measured_by": len(links), "loss_pct": round(loss, 1),
-                    "rtt_ms": round(sum(rtt) / len(rtt), 1) if rtt else None}
-        if len(bad) >= 2:
-            out.append(_issue(
-                target, "ping:%s" % target["public_ip"], "critical" if loss >= th["loss_crit"] else "warning",
-                "اتصال رله‌های ایران به %s قطع یا ناپایدار است" % (target["alias"] or target["name"]),
-                "چند رله هم‌نظرند. با TCP یا یک تست حجمی مسیر را بسنجید و فقط بعد از تأیید دو مبدأ DNS را تغییر دهید.",
-                **evidence,
-            ))
-        elif len(links) == 1:
-            out.append(_issue(
-                target, "ping:%s" % target["public_ip"], "info",
-                "اتصال به %s فقط از یک رله ناپایدار دیده شده (تأیید نشده)" % (target["alias"] or target["name"]),
-                "پینگ ICMP روی بعضی میزبان‌ها محدود می‌شود؛ با رلهٔ دوم یا تست TCP تأیید کنید.", **evidence,
-            ))
+    if th["on_ping"]:
+        out.extend(detectors.path_issues(th, names, by_target, replaced))
     if th["on_ssl"]:
         out.extend(ssl_svc.issues(db, ws))
     order = {"critical": 0, "warning": 1, "info": 2}

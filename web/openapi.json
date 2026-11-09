@@ -5194,6 +5194,29 @@
         "title": "PollResult",
         "type": "object"
       },
+      "ProbeTarget": {
+        "properties": {
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "tls": {
+            "default": false,
+            "title": "Tls",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "target",
+          "port"
+        ],
+        "title": "ProbeTarget",
+        "type": "object"
+      },
       "QuotaRow": {
         "properties": {
           "basis": {
@@ -5382,6 +5405,38 @@
           },
           "samples": {
             "title": "Samples",
+            "type": "integer"
+          },
+          "tcp_fail_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tcp Fail Pct"
+          },
+          "tcp_rtt_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tcp Rtt Ms"
+          },
+          "tcp_samples": {
+            "default": 0,
+            "title": "Tcp Samples",
+            "type": "integer"
+          },
+          "tls_failed": {
+            "default": 0,
+            "title": "Tls Failed",
             "type": "integer"
           },
           "verdict": {
@@ -5648,6 +5703,14 @@
               "$ref": "#/components/schemas/PingTarget"
             },
             "title": "Ping Targets",
+            "type": "array"
+          },
+          "probe_targets": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ProbeTarget"
+            },
+            "title": "Probe Targets",
             "type": "array"
           }
         },

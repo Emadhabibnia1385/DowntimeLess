@@ -19,7 +19,7 @@ from app.db import MIGRATIONS, migrate  # noqa: E402
 # tables a migration may only add rows to, never lose them from
 KEEP = ("users", "sessions", "servers", "metrics", "pings", "jobs", "settings", "api_keys", "domains", "alert_state",
         "categories", "incidents", "link_traffic", "link_prev", "telegram_channels", "rule_routes", "flapping", "events",
-        "listener_baseline", "check_state", "check_ignores", "node_usage")
+        "listener_baseline", "check_state", "check_ignores", "node_usage", "probes", "probe_ports")
 
 
 def counts(db):

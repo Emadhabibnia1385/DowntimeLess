@@ -27,10 +27,10 @@ Rules that every detector follows:
 2. **Event detectors**: `uptime_s` dropped (reboot, starts the post-reboot checklist); `public_ip`
    changed (the eight-place checklist: GRE local/remote, dial addresses, DNS, allowlists, nft rules that
    match the old IP, SSH alias, re-measure); `cpu_cores` or `ram_total_mb` dropped (resized or rebuilt).
-3. **Cause classification across servers**: an exit that reports but fails from every relay is
-   blacklisted in-country; exactly one relay failing to an exit is an egress filter on that relay; several
-   sources failing the same relay at once is a datacenter-level ICMP filter (one grouped issue); a silent
-   agent plus failed probes from others is an outage, not a filter.
+3. **Cause classification across servers** (TCP since agent 0.3.2, see "TCP probes" below): an exit that
+   reports but fails TCP from every relay is blacklisted in-country; exactly one relay failing to an exit is an
+   egress filter on that relay; one relay failing to several exits is a datacenter-level filter (one grouped
+   issue); a silent agent plus failed probes from others is an outage, not a filter. ICMP loss alone is an info note.
 4. **Duration and tiers**: CPU and conntrack alerts need a duration; steal tiers (>10 warn, >15 strong,
    >40 critical for a host with users); `load1 / cpu_cores`.
 5. **More probe pairs**: exit to relay (reverse tunnels depend on it), panel to node, and `1.1.1.1` as an
@@ -69,7 +69,7 @@ log (`UPDATE FAILED`, rollback), failed logins per source.
 
 ### Phase 4: probes and external data (large)
 
-TCP + TLS (with the camouflage SNI) probes from relays; panel and subscription path probes through
+TCP + TLS probes from relays (done in agent 0.3.2, without the camouflage SNI so far; see below); panel and subscription path probes through
 every DNS address (GET size and time, a wrong-password POST must answer 401 fast); Cloudflare read
 (records that point at dead relays, names with fewer than two healthy IPs, proxied records);
 domain expiry and hold through RDAP; a quota ledger.
@@ -95,11 +95,39 @@ and conntrack, and Telegram for the existing critical issues. All use existing d
 | Certificates and DNS | node and panel certs, renewed but not deployed, dead-relay records, proxied records, domain expiry |
 | Access and security | sshd listener lost, password login on, fail2ban banned a relay, tampered `/etc/hosts` |
 
+## TCP probes (agent 0.3.2, migration 021)
+
+ICMP is dropped or rate-limited on many relay-to-exit paths while the data flows, and once in a while the reverse.
+So the path verdicts come from TCP:
+
+- **Ports.** With each report reply the master gives a relay `probe_targets`: per foreign server of its workspace
+  (role other than relay) at most 2 TCP ports, 24 in all, taken from that server's own `checks.listeners`: TCP,
+  a data-plane process (xray, sing-box, haproxy, nginx, hysteria, backhaul, docker-proxy, ...), not bound to
+  loopback (`addr`, sent from 0.3.2), never sshd. Ports that answered before ("proven", table `probe_ports`, 30 days)
+  come first, 443 next; the other candidates take turns every 5 minutes. `tls` is set for 443, 8443 and the
+  Cloudflare TLS ports, or an nginx/haproxy/caddy listener.
+- **Probe.** The relay's agent connects (3 s timeout, 8 in parallel, 12 s budget, running beside the pings) and,
+  when `tls` is set, does a TLS handshake without SNI or verification and closes. Nothing is sent after it. A probe
+  still running at the budget is left out, never reported as a failure. Results: `ok`, `rtt_ms`,
+  `error` (`timeout`, `refused`, `unreachable`, `error`), `tls` (null, true, false); stored in `probes` (2 days).
+- **Proven ports only.** Only ports that accepted a connection at least once in 30 days count, so a firewalled or
+  local-only port never looks like a blocked path. A refused connection means the address answered: it is not a
+  path failure (a closed port is `listener_missing`'s job).
+- **Verdicts** (window 10 minutes, at least 6 TCP attempts per relay, two relays): every measuring relay at
+  `loss_crit` (50%) failures or more, server online: `blacklisted` (critical); one relay at `loss_crit` while the others
+  stay under `loss_warn` (10%): `relay_egress`, or `relay_filtered` when that relay fails 2+ servers (warning);
+  2+ relays at `loss_warn`: `ping:<ip>` warning/critical with `probe: "tcp"`; one relay measuring alone: `ping:<ip>` info.
+- **ICMP alone** (TCP fine, or not measured because the agents are older than 0.3.2 or no port is proven yet):
+  `ping:<ip>` info with `probe: "icmp"` and `tcp_ok`, never a filtering verdict and never a health gate.
+- **Health.** Path penalties use the TCP failure share; a path measured only by ICMP counts for at most 30% of its
+  weight and never gates. The relays report shows `tcp_fail_pct`, `tcp_samples`, `tls_failed` beside the ICMP loss
+  and the verdict `icmp_only` for ICMP-only loss.
+
 ## Health scores (proposal)
 
 **Relay.** Hard gates (any one means failing): agent offline; a configured forward port not listening or
 the DNAT table missing; conntrack at 85% or a "table full" log line; quota exhausted; loss at 50% or more
-to every exit. Otherwise 100 minus penalties: reachability from abroad (25), forward integrity (20),
+to every exit (by TCP). Otherwise 100 minus penalties: reachability from abroad (25), forward integrity (20),
 peer paths (15), real-user quality per peer (15), kernel capacity (10), CPU and steal (8), headroom (7),
 quota burn (5), memory and pool ratio (5). 80 or more healthy, 50 to 79 degraded, below 50 failing.
 **Exit/node** has the same shape with listener completeness and container state first, relay-to-exit

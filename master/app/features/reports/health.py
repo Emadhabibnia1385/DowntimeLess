@@ -50,9 +50,12 @@ CHECK_PENALTIES = {
 GATES = {"listener_missing": "forward_port_closed", "dnat_missing": "dnat_missing", "ip_forward_off": "ip_forward_off"}
 DESCRIPTION = (
     "100 minus penalties; bands: healthy >= 80, degraded 50-79, failing < 50 or any hard gate. Hard gates: agent offline, "
-    "conntrack at the critical threshold, relay with >= 50% loss to every exit, exit with >= 50% loss from every relay (2+ relays), quota exhausted, "
-    "relay with a baseline forward port not listening, its DNAT table gone or ip_forward off (critical issues)."
+    "conntrack at the critical threshold, relay whose TCP probes fail >= 50% to every exit, exit whose TCP probes fail >= 50% from every relay "
+    "(2+ relays), quota exhausted, "
+    "relay with a baseline forward port not listening, its DNAT table gone or ip_forward off (critical issues). Path penalties use TCP "
+    "probes to proven ports; a path measured only by ICMP counts for at most 30% of its weight and never gates."
 )
+ICMP_ONLY_SHARE = 0.3
 
 
 def band(score: Optional[int], gates: List[Dict[str, Any]]) -> str:
@@ -71,6 +74,27 @@ def _loss_tier(loss: Optional[float], th: Dict[str, float]) -> float:
     if loss >= th["loss_warn"]:
         return 0.6
     return 0.2 if loss >= 2 else 0.0
+
+
+def _path_tier(p: Dict[str, Any], th: Dict[str, float]) -> float:
+    if p.get("tcp_loss") is not None:
+        return _loss_tier(p["tcp_loss"], th)
+    return _loss_tier(p.get("loss"), th) * ICMP_ONLY_SHARE
+
+
+def _path_detail(paths: List[Dict[str, Any]], what: str) -> str:
+    tcp = [p["tcp_loss"] for p in paths if p.get("tcp_loss") is not None]
+    icmp = [p["loss"] for p in paths if p.get("loss") is not None]
+    parts = ["%d %s" % (len(paths), what)]
+    if tcp:
+        parts.append("worst TCP failure %.0f%% (%d by TCP)" % (max(tcp), len(tcp)))
+    if icmp:
+        parts.append("worst ICMP loss %.0f%%" % max(icmp))
+    return ", ".join(parts)
+
+
+def _all_tcp_dead(paths: List[Dict[str, Any]], th: Dict[str, float]) -> bool:
+    return bool(paths) and all(p.get("tcp_loss") is not None and p["tcp_loss"] >= th["loss_crit"] for p in paths)
 
 
 def variant_of(role: str) -> str:
@@ -150,7 +174,7 @@ def compute(db: sqlite3.Connection, ws: int, found: Optional[List[Dict[str, Any]
             per_server.setdefault(i["server_id"], []).append(i)
     by_relay: Dict[int, List[Dict[str, Any]]] = {}
     by_exit: Dict[int, List[Dict[str, Any]]] = {}
-    for w in overview.ping_windows(db, ws):
+    for w in overview.path_windows(db, ws):
         by_relay.setdefault(w["server_id"], []).append(w)
         by_exit.setdefault(w["to_id"], []).append(w)
     quotas = quota_svc.forecast(db, ws, now)
@@ -175,10 +199,10 @@ def compute(db: sqlite3.Connection, ws: int, found: Optional[List[Dict[str, Any]
             if variant == "relay":
                 paths = by_relay.get(s["id"], [])
                 if paths:
-                    _pen(pens, "peer_paths", w["peer_paths"], sum(_loss_tier(p["loss"], th) for p in paths) / len(paths),
-                         "%d exits measured, worst loss %.0f%%" % (len(paths), max(p["loss"] or 0 for p in paths)))
-                    if all((p["loss"] or 0) >= th["loss_crit"] for p in paths):
-                        gates.append({"key": "all_exits_lossy", "detail": "loss >= %d%% to all %d exits" % (th["loss_crit"], len(paths))})
+                    _pen(pens, "peer_paths", w["peer_paths"], sum(_path_tier(p, th) for p in paths) / len(paths),
+                         _path_detail(paths, "exits measured"))
+                    if _all_tcp_dead(paths, th):
+                        gates.append({"key": "all_exits_lossy", "detail": "TCP failure >= %d%% to all %d exits" % (th["loss_crit"], len(paths))})
                 q = quota_by.get(s["id"])
                 if q:
                     free = " (upload free, only download counted)" if q["basis"] == "download" else ""
@@ -191,10 +215,10 @@ def compute(db: sqlite3.Connection, ws: int, found: Optional[List[Dict[str, Any]
             elif variant == "exit":
                 paths = by_exit.get(s["id"], [])
                 if paths:
-                    _pen(pens, "relay_reachability", w["relay_reachability"], sum(_loss_tier(p["loss"], th) for p in paths) / len(paths),
-                         "%d relays measure it, worst loss %.0f%%" % (len(paths), max(p["loss"] or 0 for p in paths)))
-                    if len(paths) >= 2 and all((p["loss"] or 0) >= th["loss_crit"] for p in paths):
-                        gates.append({"key": "unreachable_from_all_relays", "detail": "loss >= %d%% from all %d relays" % (th["loss_crit"], len(paths))})
+                    _pen(pens, "relay_reachability", w["relay_reachability"], sum(_path_tier(p, th) for p in paths) / len(paths),
+                         _path_detail(paths, "relays measure it"))
+                    if len(paths) >= 2 and _all_tcp_dead(paths, th):
+                        gates.append({"key": "unreachable_from_all_relays", "detail": "TCP failure >= %d%% from all %d relays" % (th["loss_crit"], len(paths))})
             _check_penalties(pens, gates, per_server.get(s["id"], []), variant, w)
             score = max(0, 100 - sum(p["points"] for p in pens))
         mine = per_server.get(s["id"], [])

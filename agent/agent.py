@@ -4,6 +4,7 @@ import argparse
 import calendar
 import concurrent.futures
 import contextlib
+import errno
 import http.client
 import ipaddress
 import json
@@ -13,6 +14,7 @@ import platform
 import re
 import shutil
 import socket
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -22,7 +24,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 UA = "DowntimeLess-Agent/" + VERSION
 SELF_PATH = os.path.realpath(__file__)
 # With no address they describe the caller's outbound address; with one, that address itself.
@@ -429,9 +431,81 @@ def run_pings(items, budget=20.0):
     return out
 
 
+# ---- TCP/TLS probes: a relay connects to real listening ports of the foreign servers (read-only) ----
+
+PROBE_MAX = 32
+PROBE_TIMEOUT_S = 3.0
+PROBE_BUDGET_S = 12.0
+PROBE_WORKERS = 8
+UNREACHABLE = (errno.ENETUNREACH, errno.EHOSTUNREACH)
+
+
+def probe_targets(items):
+    """The master's probe list, checked and capped: a host name or address and a TCP port each."""
+    out = []
+    for x in items if isinstance(items, list) else []:
+        if not isinstance(x, dict):
+            continue
+        target, port = x.get("target"), x.get("port")
+        if valid_host(target) and isinstance(port, int) and not isinstance(port, bool) and 0 < port < 65536:
+            out.append({"target": target, "port": port, "tls": x.get("tls") is True})
+    return out[:PROBE_MAX]
+
+
+def _tls_handshake(sock, timeout):
+    """A TLS handshake without verification or SNI: it says only whether TLS gets through, nothing is sent after it."""
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    sock.settimeout(timeout)
+    try:
+        ctx.wrap_socket(sock, do_handshake_on_connect=True).close()
+        return True
+    except (ssl.SSLError, OSError, ValueError):
+        return False
+
+
+def tcp_probe(item, timeout=PROBE_TIMEOUT_S):
+    target, port = item["target"], item["port"]
+    res = {"target": target, "port": port, "ok": False, "rtt_ms": None, "error": None, "tls": None}
+    start = time.perf_counter()
+    try:
+        sock = socket.create_connection((target, port), timeout=timeout)
+    except socket.timeout:
+        res["error"] = "timeout"
+        return res
+    except ConnectionRefusedError:
+        res["error"] = "refused"
+        return res
+    except OSError as e:
+        res["error"] = "unreachable" if e.errno in UNREACHABLE else "error"
+        return res
+    res["ok"], res["rtt_ms"] = True, round((time.perf_counter() - start) * 1000, 1)
+    try:
+        if item.get("tls"):
+            res["tls"] = _tls_handshake(sock, timeout)
+    finally:
+        sock.close()
+    return res
+
+
+def run_probes(items, budget=PROBE_BUDGET_S):
+    """Probe results in order; a probe still running at the budget is left out, never reported as a failure."""
+    if not items:
+        return []
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=PROBE_WORKERS)
+    futures = [pool.submit(tcp_probe, i) for i in items]
+    done, _ = concurrent.futures.wait(futures, timeout=budget)
+    pool.shutdown(wait=False)
+    return [f.result() for f in futures if f in done and f.exception() is None]
+
+
 def build_report(state):
     # the read-only checks run in the background during the sampling pause and the pings
     checks_at = start_checks(state)
+    probes = {}
+    prober = threading.Thread(target=lambda: probes.update(out=run_probes(state.get("probe_targets") or [])), daemon=True)
+    prober.start()
     a = sample()
     time.sleep(1)
     b = sample()
@@ -485,10 +559,16 @@ def build_report(state):
         "reboot_required": os.path.exists("/var/run/reboot-required"),
         "ssl": ssl_cached(state),
         "ping": run_pings(state["ping_targets"]),
+        "probes": _joined(prober, probes),
         "jobs_done": list(state["jobs_done"]),
         **acct_fields(state),
         **checks_fields(state, checks_at),
     }
+
+
+def _joined(thread, box):
+    thread.join(PROBE_BUDGET_S + 1)
+    return box.get("out") or []
 
 
 # ---- link accounting: counter-only nftables table, one in/out counter per peer server ----
@@ -879,24 +959,32 @@ SS_PROC_RE = re.compile(r'users:\(\("([^"]{1,64})"')
 UDP_COLLAPSE_OVER = 12
 
 
+def _local(addr):
+    return addr.startswith("127.") or addr in ("::1", "[::1]", "localhost")
+
+
 def parse_ss_listeners(text):
-    seen, out = set(), []
+    seen, out = {}, []
     for line in text.splitlines():
         f = line.split()
         if len(f) < 5 or f[0] not in ("tcp", "udp"):
             continue
-        port = f[4].rsplit(":", 1)[-1]
+        addr, _, port = f[4].rpartition(":")
         if not port.isdigit():
             continue
         port = int(port)
+        # the bind address tells the master whether a relay could connect to it (127.0.0.1 never)
+        addr = clean_text(addr.split("%", 1)[0], 64) or "*"
         m = SS_PROC_RE.search(line)
         proc = clean_text(m.group(1), 40) if m else None
         if port == 0 or (port > 32768 and not (proc and KEEP_PROC_RE.search(proc))):
             continue
         key = (f[0], port, proc)
         if key not in seen:
-            seen.add(key)
-            out.append({"proto": f[0], "port": port, "proc": proc})
+            seen[key] = {"proto": f[0], "port": port, "proc": proc, "addr": addr}
+            out.append(seen[key])
+        elif _local(seen[key]["addr"]) and not _local(addr):
+            seen[key]["addr"] = addr
     # a process holding many UDP sockets (xray keeps one per client flow) is one summary row, not a list
     udp_by_proc = {}
     for x in out:
@@ -1988,7 +2076,7 @@ def run_job(job, state):
 
 def new_state(cfg):
     return {"master": cfg["master"], "key": cfg["agent_key"], "permission": cfg.get("permission", "none"),
-            "ping_targets": [], "jobs_done": [], "flush": False, "restart": False}
+            "ping_targets": [], "probe_targets": [], "jobs_done": [], "flush": False, "restart": False}
 
 
 def run_cycle(state):
@@ -1998,6 +2086,7 @@ def run_cycle(state):
     if isinstance(resp.get("permission"), str):
         state["permission"] = resp["permission"]
     state["ping_targets"] = [t for t in resp.get("ping_targets") or [] if isinstance(t, dict)]
+    state["probe_targets"] = probe_targets(resp.get("probe_targets"))
     state["acct_peers"] = resp.get("acct_peers") or []
     if not state["restart"]:
         for job in resp.get("jobs") or []:

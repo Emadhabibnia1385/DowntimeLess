@@ -7,6 +7,7 @@ from .db import connect
 from .features.issues import acks
 from .features.issues import service as incidents_svc
 from .features.links import service as links_svc
+from .features.overview import probes as probes_svc
 from .features.overview import service as overview
 from .features.reports import events as changelog
 from .features.servers.service import status_of
@@ -31,6 +32,7 @@ def sweep(tg: Telegram) -> None:
         cut = int(time.time())
         db.execute("DELETE FROM metrics WHERE ts<?", (cut - 90 * 86400,))  # ws: retention - by age, every workspace alike
         db.execute("DELETE FROM pings WHERE ts<?", (cut - 7 * 86400,))  # ws: retention - by age, every workspace alike
+        probes_svc.prune(db, cut)
         links_svc.prune(db, cut)
         changelog.prune(db, cut)
         db.execute("DELETE FROM sessions WHERE expires_at<?", (cut,))

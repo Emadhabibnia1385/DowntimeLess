@@ -83,13 +83,13 @@ def docker_host():
 def test_listeners_are_deduplicated_and_ephemeral_ports_dropped_unless_a_tunnel_owns_them():
     got = agent.parse_ss_listeners(cx.SS_TULNP)
     assert got == [
-        {"proto": "tcp", "port": 22, "proc": "sshd"},
-        {"proto": "udp", "port": 53, "proc": "systemd-resolve"},
-        {"proto": "tcp", "port": 80, "proc": "nginx"},
-        {"proto": "tcp", "port": 443, "proc": "backhaul"},
-        {"proto": "udp", "port": 443, "proc": "backhaul"},
-        {"proto": "tcp", "port": 2222, "proc": "sshd"},
-        {"proto": "tcp", "port": 62789, "proc": "xray"},
+        {"proto": "tcp", "port": 22, "proc": "sshd", "addr": "0.0.0.0"},
+        {"proto": "udp", "port": 53, "proc": "systemd-resolve", "addr": "127.0.0.53"},
+        {"proto": "tcp", "port": 80, "proc": "nginx", "addr": "0.0.0.0"},
+        {"proto": "tcp", "port": 443, "proc": "backhaul", "addr": "*"},
+        {"proto": "udp", "port": 443, "proc": "backhaul", "addr": "0.0.0.0"},
+        {"proto": "tcp", "port": 2222, "proc": "sshd", "addr": "0.0.0.0"},
+        {"proto": "tcp", "port": 62789, "proc": "xray", "addr": "127.0.0.1"},
     ]
     assert agent.parse_ss_listeners("") == []
 
@@ -724,5 +724,11 @@ def test_a_process_with_hundreds_of_udp_sockets_is_one_summary_row():
     text += '\ntcp LISTEN 0 4096 0.0.0.0:443 0.0.0.0:* users:(("xray",pid=7,fd=3))\n'
     got = agent.parse_ss_listeners(text)
     assert {"proto": "udp", "port": 0, "proc": "xray", "count": 300} in got
-    assert {"proto": "tcp", "port": 443, "proc": "xray"} in got
+    assert {"proto": "tcp", "port": 443, "proc": "xray", "addr": "0.0.0.0"} in got
     assert len(got) == 2
+
+
+def test_a_listener_on_loopback_and_on_all_addresses_keeps_the_public_one():
+    lines = ('tcp LISTEN 0 4096 127.0.0.1:8443 0.0.0.0:* users:(("xray",pid=1,fd=3))\n'
+             'tcp LISTEN 0 4096 [::]:8443 [::]:* users:(("xray",pid=1,fd=4))\n')
+    assert agent.parse_ss_listeners(lines) == [{"proto": "tcp", "port": 8443, "proc": "xray", "addr": "[::]"}]

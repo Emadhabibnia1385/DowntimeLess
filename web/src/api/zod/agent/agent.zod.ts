@@ -67,6 +67,8 @@ export const AgentReportBody = zod.object({
 });
 
 export const agentReportResponseAcctPeersDefault = [];
+export const agentReportResponseProbeTargetsItemTlsDefault = false;
+export const agentReportResponseProbeTargetsDefault = [];
 
 export const AgentReportResponse = zod.object({
 	acct_peers: zod.array(zod.string()).default(agentReportResponseAcctPeersDefault),
@@ -85,4 +87,13 @@ export const AgentReportResponse = zod.object({
 			tcp_port: zod.union([zod.int(), zod.null()]).optional(),
 		}),
 	),
+	probe_targets: zod
+		.array(
+			zod.object({
+				port: zod.int(),
+				target: zod.string(),
+				tls: zod.boolean().default(agentReportResponseProbeTargetsItemTlsDefault),
+			}),
+		)
+		.default(agentReportResponseProbeTargetsDefault),
 });

@@ -1,0 +1,1 @@
+import{$i as e,Ni as t}from"./auth-B5PZd0E3.js";var n=t();function r(){let t=(0,n.c)(2),r=e(),i;return t[0]===r?i=t[1]:(i=()=>r.invalidateQueries(),t[0]=r,t[1]=i),i}export{r as t};

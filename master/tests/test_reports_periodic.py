@@ -149,6 +149,9 @@ def test_one_relay_failing_to_two_exits_is_a_relay_level_filter(owner):
         for relay, bad in ((r1, name != "de-3"), (r2, False)):
             for n in range(8):
                 db.execute("INSERT INTO pings (server_id, ts, target, loss, rtt) VALUES (?,?,?,?,?)", (relay, now - 20 - n * 30, ip, 100.0 if bad else 0.0, 40.0))
+                db.execute("INSERT INTO probes (server_id, ts, target, port, ok, error) VALUES (?,?,?,?,?,?)",
+                           (relay, now - 20 - n * 30, ip, 443, int(not bad), "timeout" if bad else None))
+        db.execute("INSERT INTO probe_ports (workspace_id, target, port, last_ok) VALUES (1,?,?,?)", (ip, 443, now))
     db.close()
     v = {(p["relay"], p["exit"]): p["verdict"] for p in _get(owner, "relays").json()["pairs"]}
     assert v[("ir-1", "de-1")] == "relay_filtered" and v[("ir-1", "de-2")] == "relay_filtered" and v[("ir-1", "de-3")] == "ok"
@@ -158,3 +161,25 @@ def test_reports_work_on_an_empty_panel(owner):
     for path in PERIODIC:
         assert _get(owner, path).status_code == 200
         assert _get(owner, path, format="md").text.startswith("# ")
+
+
+def test_icmp_loss_with_healthy_tcp_is_icmp_only_in_the_relay_matrix(owner):
+    rel = [make_server(owner, "ir-%d" % n, "relay") for n in (1, 2)]
+    for _, k in rel:
+        report(owner, k)
+    _, k = make_server(owner, "de-1", "exit")
+    report(owner, k, public_ip="198.51.100.1")
+    db = connect()
+    now = int(time.time())
+    for relay, _ in rel:
+        for n in range(8):
+            db.execute("INSERT INTO pings (server_id, ts, target, loss, rtt) VALUES (?,?,?,?,?)", (relay, now - 20 - n * 30, "198.51.100.1", 100.0, None))
+            db.execute("INSERT INTO probes (server_id, ts, target, port, ok, rtt, tls) VALUES (?,?,?,?,?,?,?)",
+                       (relay, now - 20 - n * 30, "198.51.100.1", 443, 1, 41.0, 0))
+    db.execute("INSERT INTO probe_ports (workspace_id, target, port, last_ok) VALUES (1,?,?,?)", ("198.51.100.1", 443, now))
+    db.close()
+    r = _get(owner, "relays").json()
+    assert {p["verdict"] for p in r["pairs"]} == {"icmp_only"} and r["problems"] == 0
+    pair = r["pairs"][0]
+    assert (pair["loss_pct"], pair["tcp_fail_pct"], pair["tcp_samples"], pair["tls_failed"]) == (100.0, 0.0, 8, 8)
+    assert "tcp 0%" in _get(owner, "relays", format="md").text

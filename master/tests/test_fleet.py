@@ -164,13 +164,13 @@ def _ping_issues(owner):
     return [i for i in owner.get("/api/v1/issues").json() if i["code"].startswith("ping:")]
 
 
-def test_a_link_is_bad_only_when_two_relays_agree(owner, monkeypatch):
+def test_two_relays_agreeing_on_icmp_loss_is_only_a_note_without_tcp(owner, monkeypatch):
     from app.features.overview import service as overview
 
     monkeypatch.setattr(overview, "PING_MIN_SAMPLES", 1)
     _fleet_with_relays(owner, [100, 100, 0])
     (issue,) = _ping_issues(owner)
-    assert issue["severity"] == "critical" and issue["server_name"] == "nl-1"
+    assert issue["severity"] == "info" and issue["server_name"] == "nl-1"  # TCP probes decide (test_detectors)
     assert issue["evidence"]["relays"] == ["iran-1", "iran-2"] and issue["evidence"]["measured_by"] == 3
 
 

@@ -10,7 +10,7 @@ from fakes import AGENT_KEY, FakeMaster
 REPORT_KEYS = {
     "agent_version", "ts", "hostname", "public_ip", "geo", "uptime_s", "cpu_cores", "cpu_pct", "steal_pct", "load1",
     "ram_total_mb", "ram_avail_mb", "disk_total_gb", "disk_used_gb", "net", "tcp_retrans_pct",
-    "conntrack_pct", "failed_units", "reboot_required", "ssl", "ping", "jobs_done",
+    "conntrack_pct", "failed_units", "reboot_required", "ssl", "ping", "probes", "jobs_done",
     "load5", "load15", "swap_total_mb", "swap_used_mb", "tcp_established", "info",
     "checks", "checks_error",
 }
