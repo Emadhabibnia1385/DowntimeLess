@@ -66,6 +66,9 @@ export const MembersInvitesResponseItem = zod.object({
 	expires_at: zod.int(),
 	id: zod.int(),
 	name: zod.string(),
+	pending_at: zod.union([zod.int(), zod.null()]).optional(),
+	pending_name: zod.union([zod.string(), zod.null()]).optional(),
+	pending_tg_id: zod.union([zod.int(), zod.null()]).optional(),
 	role: zod.string(),
 	tg_username: zod.string(),
 });
@@ -91,6 +94,9 @@ export const MembersInviteResponse = zod.object({
 	expires_at: zod.int(),
 	id: zod.int(),
 	name: zod.string(),
+	pending_at: zod.union([zod.int(), zod.null()]).optional(),
+	pending_name: zod.union([zod.string(), zod.null()]).optional(),
+	pending_tg_id: zod.union([zod.int(), zod.null()]).optional(),
 	role: zod.string(),
 	tg_username: zod.string(),
 });
@@ -107,6 +113,34 @@ export const MembersCancelInviteHeader = zod.object({
 });
 
 export const MembersCancelInviteResponse = zod.void();
+
+/**
+ * Let in the person who asked to join through this invite (their numeric Telegram id is in the list).
+ * @summary Approve Invite
+ */
+export const MembersApproveInviteParams = zod.object({
+	invite_id: zod.int(),
+});
+
+export const MembersApproveInviteHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const MembersApproveInviteResponse = zod.void();
+
+/**
+ * Turn down the request; the invite stays open for the person it was meant for.
+ * @summary Reject Invite
+ */
+export const MembersRejectInviteParams = zod.object({
+	invite_id: zod.int(),
+});
+
+export const MembersRejectInviteHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const MembersRejectInviteResponse = zod.void();
 
 /**
  * Take a person out of this workspace; their own workspace and other memberships stay as they are.

@@ -3,7 +3,7 @@ import sqlite3
 import time
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from ... import appsettings, invites
@@ -44,6 +44,9 @@ class InviteOut(BaseModel):
     name: str
     created_at: int
     expires_at: int
+    pending_tg_id: Optional[int] = None  # someone with this username asked to join; approve only if it is the right person
+    pending_name: Optional[str] = None
+    pending_at: Optional[int] = None
 
 
 class InviteCreate(BaseModel):
@@ -228,3 +231,22 @@ def remove_member(user_id: int, actor: Actor = Depends(_owner), ws: int = Depend
         db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
     db.execute("DELETE FROM api_keys WHERE workspace_id=? AND created_by=?", (ws, user_id))
     changelog.record(db, ws, "member_removed", "%s: %s" % (_label(row), row["role"]), None, {"user_id": user_id, "role": row["role"]})
+
+
+@router.post("/invites/{invite_id}/approve", status_code=204, operation_id="members_approve_invite")
+def approve_invite(invite_id: int, request: Request, actor: Actor = Depends(_owner), ws: int = Depends(current_workspace),
+                   db: sqlite3.Connection = Depends(get_db)):
+    """Let in the person who asked to join through this invite (their numeric Telegram id is in the list)."""
+    hit("members:%d" % actor.user_id, 30, 3600)
+    got = invites.approve(db, ws, invite_id, actor.user_id)
+    tg = getattr(request.app.state, "tg", None)
+    if tg is not None and got["tg_id"]:
+        tg.send(got["tg_id"], "✅ درخواست شما پذیرفته شد؛ حالا از پنل با تلگرام وارد شوید.")
+
+
+@router.post("/invites/{invite_id}/reject", status_code=204, operation_id="members_reject_invite")
+def reject_invite(invite_id: int, actor: Actor = Depends(_owner), ws: int = Depends(current_workspace),
+                  db: sqlite3.Connection = Depends(get_db)):
+    """Turn down the request; the invite stays open for the person it was meant for."""
+    hit("members:%d" % actor.user_id, 30, 3600)
+    invites.reject(db, ws, invite_id)

@@ -16,4 +16,6 @@ def put(db: sqlite3.Connection, key: str, value: str) -> None:
 
 
 def registration_open(db: sqlite3.Connection) -> bool:
-    return get(db, "registration_open") == "1"
+    """Open only when the switch is on AND the panel already has an owner (a fresh install is claimed first)."""
+    owner = db.execute("SELECT owner_user_id FROM workspaces WHERE id=1").fetchone()
+    return get(db, "registration_open") == "1" and owner is not None and owner["owner_user_id"] is not None

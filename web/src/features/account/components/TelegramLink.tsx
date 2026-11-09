@@ -169,6 +169,10 @@ function Flow({ started, onEnd }: { started: LinkStart; onEnd: () => void }) {
 			{status === "confirmed" && data ? (
 				<div className="flex flex-col gap-3">
 					<h3 className="font-semibold">{L.step2}</h3>
+					<Notice tone="warning">{L.notYouWarning}</Notice>
+					<p className="text-sm font-semibold" dir="auto">
+						{who(data)}
+					</p>
 					{data.merge ? (
 						<Merge
 							plan={data.merge}

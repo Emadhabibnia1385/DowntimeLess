@@ -45,7 +45,12 @@ const MEMBERS = [
 
 type Call = { method: string; url: string; body: unknown };
 
-function boot(role = "owner", panelOwner = role === "owner", registrationOpen = true) {
+function boot(
+	role = "owner",
+	panelOwner = role === "owner",
+	registrationOpen = true,
+	invitesList: unknown[] = [],
+) {
 	const calls: Call[] = [];
 	vi.stubGlobal(
 		"fetch",
@@ -67,7 +72,7 @@ function boot(role = "owner", panelOwner = role === "owner", registrationOpen = 
 								expires_at: 2,
 							}
 						: url.endsWith("/members/invites")
-							? []
+							? invitesList
 							: url.endsWith("/members") && method === "POST"
 								? member({ user_id: 3, name: "رضا", tg_id: 555666 })
 								: url.endsWith("/members")
@@ -75,8 +80,9 @@ function boot(role = "owner", panelOwner = role === "owner", registrationOpen = 
 									: url.includes("/members/")
 										? member({ role: "admin" })
 										: [];
-			return new Response(method === "DELETE" ? null : JSON.stringify(body), {
-				status: method === "DELETE" ? 204 : 200,
+			const empty = method === "DELETE" || /\/members\/invites\/\d+\/(approve|reject)$/.test(url);
+			return new Response(empty ? null : JSON.stringify(body), {
+				status: empty ? 204 : 200,
 				headers: { "Content-Type": "application/json" },
 			});
 		}),
@@ -208,5 +214,28 @@ describe("members and access", () => {
 	it("puts the members page in the owner's navigation", async () => {
 		boot();
 		expect((await screen.findAllByRole("link", { name: "اعضا" })).length).toBeGreaterThan(0);
+	});
+
+	it("shows who asked to join an invite and approves only on the owner's press", async () => {
+		const asked = {
+			id: 9,
+			tg_username: "new_friend",
+			role: "viewer",
+			name: "",
+			created_at: 1,
+			expires_at: 2_000_000_000,
+			pending_tg_id: 7500,
+			pending_name: "Squat",
+			pending_at: 5,
+		};
+		const calls = boot("owner", true, true, [asked]);
+		expect(await screen.findByText(/Squat/)).toBeTruthy();
+		expect(calls.some((c) => c.url.endsWith("/approve"))).toBe(false);
+		await userEvent.click(await screen.findByRole("button", { name: "تأیید درخواست @new_friend" }));
+		await waitFor(() =>
+			expect(
+				calls.some((c) => c.method === "POST" && c.url.endsWith("/members/invites/9/approve")),
+			).toBe(true),
+		);
 	});
 });

@@ -10,6 +10,9 @@ export interface InviteOut {
 	expires_at: number;
 	id: number;
 	name: string;
+	pending_at?: number | null;
+	pending_name?: string | null;
+	pending_tg_id?: number | null;
 	role: string;
 	tg_username: string;
 }

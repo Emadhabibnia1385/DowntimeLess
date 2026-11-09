@@ -29,29 +29,24 @@ def handle(tg: Telegram, update: Dict[str, Any]) -> None:
         db.close()
 
 
-def notify_claims(tg: Telegram, db, claimed, tg_id: int, username: str, name: str) -> None:
-    """Tell each inviter who claimed their invite (numeric id and name, so a username squatter is seen), and the person."""
+def notify_requests(tg: Telegram, db, reqs, tg_id: int, username: str, name: str) -> None:
+    """Tell each inviter who asked to join (numeric id and name, so a username squatter is seen) and to approve in the panel."""
     who = "@%s (شناسهٔ <code>%d</code>%s)" % (escape(username or ""), tg_id, "، " + escape(name) if name else "")
-    for c in claimed:
+    for c in reqs:
         inviter = db.execute("SELECT tg_id FROM users WHERE id=?", (c["invited_by"],)).fetchone() if c["invited_by"] else None
         if inviter and inviter["tg_id"]:
-            tg.send(inviter["tg_id"], "📨 %s دعوت شما به فضای کار «%s» را با نقش %s پذیرفت.\nاگر این همان کسی نیست که دعوت کردید، "
-                    "او را از صفحهٔ اعضا حذف کنید." % (who, escape(c["workspace"]), c["role"]))
-        if c["added"]:
-            tg.send(tg_id, "✅ شما به فضای کار «%s» اضافه شدید. از پنل وارد شوید." % escape(c["workspace"]))
+            tg.send(inviter["tg_id"], "📨 %s درخواست پیوستن به فضای کار «%s» را با نقش %s داده است.\nاگر همان کسی است که دعوت کردید، "
+                    "در صفحهٔ اعضا تأیید کنید؛ وگرنه رد کنید یا دعوت را لغو کنید. تا تأیید شما هیچ دسترسی ندارد."
+                    % (who, escape(c["workspace"]), c["role"]))
 
 
-def _claim_invites(tg: Telegram, db, frm: Dict[str, Any]) -> None:
-    """Someone invited by @username starts the bot: their account (made now if needed) takes the open invites."""
-    username = frm.get("username")
-    if not invites.has_open(db, username):
-        return
-    user = db.execute("SELECT id FROM users WHERE tg_id=?", (frm["id"],)).fetchone()
-    uid = user["id"] if user else db.execute(
-        "INSERT INTO users (tg_id, tg_username, name, role, created_at) VALUES (?,?,?,'none',?)",
-        (frm["id"], username, _name(frm)[:64], int(time.time())),
-    ).lastrowid
-    notify_claims(tg, db, invites.claim(db, uid, frm["id"], username), frm["id"], username, _name(frm))
+def _offer_invites(tg: Telegram, db, frm: Dict[str, Any], chat: int) -> None:
+    """A plain /start from someone with a Telegram username that was invited: ask them, never grant anything."""
+    for r in invites.offers(db, frm.get("username")):
+        by = r["by_name"] or r["by_username"] or "?"
+        tg.send(chat, "📨 <b>دعوت به فضای کار</b>\n«%s»، از طرف %s، با نقش %s.\n\nفقط اگر این دعوت را انتظار داشتید و دعوت‌کننده را "
+                "می‌شناسید ادامه دهید. بعد از «بله» دعوت‌کننده باید تأیید کند." % (escape(r["ws_name"]), escape(by), r["role"]),
+                [[{"text": "✅ بله", "callback_data": "inv:ok:%d" % r["id"]}, {"text": "❌ نه", "callback_data": "inv:no:%d" % r["id"]}]])
 
 
 LINK_REFUSED = {
@@ -87,8 +82,8 @@ def _ask_link(tg: Telegram, db, chat: int, frm: Dict[str, Any], row) -> None:
 def _message(tg: Telegram, db, msg: Dict[str, Any]) -> None:
     frm, chat, text = msg["from"], msg["chat"]["id"], msg["text"].strip()
     arg = text.split(" ", 1)[1].strip() if text.startswith("/start ") else ""
-    if text.startswith("/start") and not arg.startswith(("ln_", "claim_")):
-        _claim_invites(tg, db, frm)  # a linking account claims its invites when the panel confirms, as itself
+    if text == "/start":  # only a plain start, never a login or link start: an invite is offered, not pushed
+        _offer_invites(tg, db, frm, chat)
     if arg.startswith("ln_"):
         row = linking.bot_seen(db, arg[3:], frm["id"], frm.get("username"), _name(frm))
         if not row:
@@ -123,6 +118,19 @@ def _message(tg: Telegram, db, msg: Dict[str, Any]) -> None:
 
 def _callback(tg: Telegram, db, cb: Dict[str, Any]) -> None:
     parts = cb.get("data", "").split(":")
+    if len(parts) == 3 and parts[0] == "inv" and parts[2].isdigit():
+        frm = cb["from"]
+        if parts[1] == "ok":
+            reqs = invites.request(db, None, frm["id"], frm.get("username"), _name(frm), only=int(parts[2]))
+            tg.answer(cb["id"], "ثبت شد" if reqs else "منقضی شده")
+            notify_requests(tg, db, reqs, frm["id"], frm.get("username") or "", _name(frm))
+            label = "⏳ درخواست شما فرستاده شد؛ بعد از تأیید دعوت‌کننده وارد شوید." if reqs else "⌛ این دعوت دیگر معتبر نیست."
+        else:
+            tg.answer(cb["id"], "ثبت شد")
+            label = "❌ دعوت را رد کردید."
+        if "message" in cb:
+            tg.edit(cb["message"]["chat"]["id"], cb["message"]["message_id"], label)
+        return
     if len(parts) == 3 and parts[0] == "ln" and parts[2].isdigit():
         code = linking.bot_decide(db, int(parts[2]), cb["from"]["id"], parts[1] == "ok")
         tg.answer(cb["id"], "ثبت شد" if code is not None else "منقضی شده")

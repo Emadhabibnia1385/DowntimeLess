@@ -88,6 +88,8 @@ def requests_into_b(w):
         ("GET", "/api/v1/members/invites"): ("GET", "/api/v1/members/invites", None, "list"),
         ("POST", "/api/v1/members/invites"): ("POST", "/api/v1/members/invites", {"tg_username": "@a_newcomer", "role": "viewer"}, (201, None)),
         ("DELETE", "/api/v1/members/invites/{invite_id}"): ("DELETE", "/api/v1/members/invites/%d" % b["invite"], None, "nf"),
+        ("POST", "/api/v1/members/invites/{invite_id}/approve"): ("POST", "/api/v1/members/invites/%d/approve" % b["invite"], None, "nf"),
+        ("POST", "/api/v1/members/invites/{invite_id}/reject"): ("POST", "/api/v1/members/invites/%d/reject" % b["invite"], None, "nf"),
         ("PATCH", "/api/v1/members/{user_id}"): ("PATCH", "/api/v1/members/%d" % w["carol_id"], {"role": "viewer"}, "nf"),
         ("DELETE", "/api/v1/members/{user_id}"): ("DELETE", "/api/v1/members/%d" % w["carol_id"], None, "nf"),
         # also with an id of A, to prove A's own rows still answer: the ping matrix must name A's exit, not B's twin

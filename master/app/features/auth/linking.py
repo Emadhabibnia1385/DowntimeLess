@@ -233,7 +233,7 @@ def confirm(db: sqlite3.Connection, link_id: int, user_id: int, session_id: int,
             "UPDATE users SET tg_id=?, tg_username=?, name=CASE WHEN name='' THEN ? ELSE name END WHERE id=?",
             (row["tg_id"], row["tg_username"], row["tg_name"], survivor),
         )
-        claimed = invites.claim(db, survivor, row["tg_id"], row["tg_username"])
+        claimed = invites.request(db, survivor, row["tg_id"], row["tg_username"], row["tg_name"])
         db.execute("COMMIT")
     except BaseException:
         db.execute("ROLLBACK")

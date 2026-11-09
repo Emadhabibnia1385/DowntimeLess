@@ -576,6 +576,179 @@ export const useMembersCancelInvite = <TError = ErrorType<HTTPValidationError>, 
 > => {
 	return useMutation(getMembersCancelInviteMutationOptions(options), queryClient);
 };
+export const getMembersApproveInviteUrl = (inviteId: number) => {
+	return `/api/v1/members/invites/${inviteId}/approve`;
+};
+
+/**
+ * Let in the person who asked to join through this invite (their numeric Telegram id is in the list).
+ * @summary Approve Invite
+ */
+export const membersApproveInvite = async (
+	inviteId: number,
+	options?: Parameters<typeof apiFetch>[1],
+): Promise<void> => {
+	return apiFetch<void>(getMembersApproveInviteUrl(inviteId), {
+		...options,
+		method: "POST",
+	});
+};
+
+export const getMembersApproveInviteMutationKey = () => ["membersApproveInvite"] as const;
+
+export const getMembersApproveInviteMutationOptions = <
+	TError = ErrorType<HTTPValidationError>,
+	TContext = unknown,
+>(options?: {
+	mutation?: UseMutationOptions<
+		Awaited<ReturnType<typeof membersApproveInvite>>,
+		TError,
+		MembersApproveInviteMutationVariables,
+		TContext
+	>;
+	request?: SecondParameter<typeof apiFetch>;
+}): UseMutationOptions<
+	Awaited<ReturnType<typeof membersApproveInvite>>,
+	TError,
+	MembersApproveInviteMutationVariables,
+	TContext
+> => {
+	const mutationKey = getMembersApproveInviteMutationKey();
+	const { mutation: mutationOptions, request: requestOptions } = options
+		? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+			? options
+			: { ...options, mutation: { ...options.mutation, mutationKey } }
+		: { mutation: { mutationKey }, request: undefined };
+
+	const mutationFn: MutationFunction<
+		Awaited<ReturnType<typeof membersApproveInvite>>,
+		MembersApproveInviteMutationVariables
+	> = (props) => {
+		const { inviteId } = props ?? {};
+
+		return membersApproveInvite(inviteId, requestOptions);
+	};
+
+	return { mutationFn, ...mutationOptions };
+};
+
+export type MembersApproveInviteMutationResult = NonNullable<
+	Awaited<ReturnType<typeof membersApproveInvite>>
+>;
+
+export type MembersApproveInviteMutationError = ErrorType<HTTPValidationError>;
+export type MembersApproveInviteMutationVariables = { inviteId: number };
+
+/**
+ * @summary Approve Invite
+ */
+export const useMembersApproveInvite = <
+	TError = ErrorType<HTTPValidationError>,
+	TContext = unknown,
+>(
+	options?: {
+		mutation?: UseMutationOptions<
+			Awaited<ReturnType<typeof membersApproveInvite>>,
+			TError,
+			MembersApproveInviteMutationVariables,
+			TContext
+		>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseMutationResult<
+	Awaited<ReturnType<typeof membersApproveInvite>>,
+	TError,
+	MembersApproveInviteMutationVariables,
+	TContext
+> => {
+	return useMutation(getMembersApproveInviteMutationOptions(options), queryClient);
+};
+export const getMembersRejectInviteUrl = (inviteId: number) => {
+	return `/api/v1/members/invites/${inviteId}/reject`;
+};
+
+/**
+ * Turn down the request; the invite stays open for the person it was meant for.
+ * @summary Reject Invite
+ */
+export const membersRejectInvite = async (
+	inviteId: number,
+	options?: Parameters<typeof apiFetch>[1],
+): Promise<void> => {
+	return apiFetch<void>(getMembersRejectInviteUrl(inviteId), {
+		...options,
+		method: "POST",
+	});
+};
+
+export const getMembersRejectInviteMutationKey = () => ["membersRejectInvite"] as const;
+
+export const getMembersRejectInviteMutationOptions = <
+	TError = ErrorType<HTTPValidationError>,
+	TContext = unknown,
+>(options?: {
+	mutation?: UseMutationOptions<
+		Awaited<ReturnType<typeof membersRejectInvite>>,
+		TError,
+		MembersRejectInviteMutationVariables,
+		TContext
+	>;
+	request?: SecondParameter<typeof apiFetch>;
+}): UseMutationOptions<
+	Awaited<ReturnType<typeof membersRejectInvite>>,
+	TError,
+	MembersRejectInviteMutationVariables,
+	TContext
+> => {
+	const mutationKey = getMembersRejectInviteMutationKey();
+	const { mutation: mutationOptions, request: requestOptions } = options
+		? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+			? options
+			: { ...options, mutation: { ...options.mutation, mutationKey } }
+		: { mutation: { mutationKey }, request: undefined };
+
+	const mutationFn: MutationFunction<
+		Awaited<ReturnType<typeof membersRejectInvite>>,
+		MembersRejectInviteMutationVariables
+	> = (props) => {
+		const { inviteId } = props ?? {};
+
+		return membersRejectInvite(inviteId, requestOptions);
+	};
+
+	return { mutationFn, ...mutationOptions };
+};
+
+export type MembersRejectInviteMutationResult = NonNullable<
+	Awaited<ReturnType<typeof membersRejectInvite>>
+>;
+
+export type MembersRejectInviteMutationError = ErrorType<HTTPValidationError>;
+export type MembersRejectInviteMutationVariables = { inviteId: number };
+
+/**
+ * @summary Reject Invite
+ */
+export const useMembersRejectInvite = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+	options?: {
+		mutation?: UseMutationOptions<
+			Awaited<ReturnType<typeof membersRejectInvite>>,
+			TError,
+			MembersRejectInviteMutationVariables,
+			TContext
+		>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseMutationResult<
+	Awaited<ReturnType<typeof membersRejectInvite>>,
+	TError,
+	MembersRejectInviteMutationVariables,
+	TContext
+> => {
+	return useMutation(getMembersRejectInviteMutationOptions(options), queryClient);
+};
 export const getMembersRemoveUrl = (userId: number) => {
 	return `/api/v1/members/${userId}`;
 };

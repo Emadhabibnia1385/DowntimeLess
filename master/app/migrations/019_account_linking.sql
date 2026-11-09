@@ -52,7 +52,13 @@ CREATE TABLE workspace_invites (
   expires_at INTEGER NOT NULL,
   claimed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
   claimed_tg_id INTEGER,
-  claimed_at INTEGER
+  claimed_at INTEGER,
+  -- someone with that username asked to join (said yes in Telegram, or linked it); nothing is granted until the inviting
+  -- workspace's owner approves it in the panel, seeing the numeric Telegram id, so a username squatter is stopped first
+  pending_tg_id INTEGER,
+  pending_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  pending_name TEXT,
+  pending_at INTEGER
 );
 CREATE UNIQUE INDEX workspace_invites_open ON workspace_invites(workspace_id, tg_username) WHERE claimed_at IS NULL;
 CREATE INDEX workspace_invites_username ON workspace_invites(tg_username);

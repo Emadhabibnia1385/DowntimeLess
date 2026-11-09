@@ -59,6 +59,19 @@ def register(app, username, password=PW, password2=None, **headers):
     return c, r
 
 
+def plain_start(tg, tg_id, username=None, name="Tara"):
+    frm = {"id": tg_id, "first_name": name}
+    if username:
+        frm["username"] = username
+    bot.handle(tg, {"update_id": 20, "message": {"from": frm, "chat": {"id": tg_id}, "text": "/start"}})
+    return frm
+
+
+def say_yes_to_invite(tg, frm, invite_id, yes=True):
+    bot.handle(tg, {"update_id": 21, "callback_query": {"id": "y", "from": frm, "data": "inv:%s:%d" % ("ok" if yes else "no", invite_id),
+                                                       "message": {"chat": {"id": frm["id"]}, "message_id": 1}}})
+
+
 def tg_start(tg, tg_id, token, username=None, name="Tara"):
     frm = {"id": tg_id, "first_name": name}
     if username:
@@ -382,16 +395,18 @@ def test_t9_only_accounts_really_made_count_toward_the_global_sign_up_limit(owne
     assert register(owner.app, "still.ok")[1].status_code == 201
 
 
-def test_t9_people_added_by_other_owners_get_capped_workspaces_and_a_closed_door(owner, tg):
+def test_t9_people_let_in_by_other_owners_get_capped_workspaces_and_a_closed_door(owner, tg):
     reg, _ = register(owner.app, "inviter.z")
     reg_ws = [w for w in reg.get("/api/v1/auth/workspaces").json() if w["is_personal"]][0]["id"]
     reg.headers["X-Workspace-Id"] = str(reg_ws)
     assert reg.post("/api/v1/members", json={"who": "8200", "role": "viewer"}).status_code == 403  # no consent step: panel owner only
-    assert reg.post("/api/v1/members/invites", json={"tg_username": "@invited_kid", "role": "viewer"}).status_code in (201, 403)
-    bot.handle(tg, {"update_id": 9, "message": {"from": {"id": 8201, "username": "invited_kid"}, "chat": {"id": 8201}, "text": "/start"}})
-    kid = login(owner.app, tg, 8201)
+    inv = reg.post("/api/v1/members/invites", json={"tg_username": "@invited_kid", "role": "viewer"}).json()
+    frm = plain_start(tg, 8201, "invited_kid")
+    say_yes_to_invite(tg, frm, inv["id"])
+    assert reg.post("/api/v1/members/invites/%d/approve" % inv["id"]).status_code == 204
+    login(owner.app, tg, 8201)
     caps = q("SELECT server_cap, domain_cap FROM workspaces WHERE owner_user_id=(SELECT id FROM users WHERE tg_id=8201)")
-    assert caps == [(20, 30)]
+    assert caps == [(20, 30)]  # not let in by the panel owner: the self-service caps
 
 
 def test_t9_a_colleague_cannot_register_your_private_chat_as_their_alert_target(owner, tg):
@@ -412,8 +427,10 @@ def test_t5_username_invites_never_grant_admin_and_never_change_a_membership(own
     db = connect()
     db.execute("UPDATE users SET tg_username='existing_admin' WHERE tg_id=7400")
     db.close()
-    assert owner.post("/api/v1/members/invites", json={"tg_username": "Existing_Admin", "role": "viewer"}).status_code == 201
-    bot.handle(tg, {"update_id": 3, "message": {"from": {"id": 7400, "username": "Existing_Admin"}, "chat": {"id": 7400}, "text": "/start"}})
+    made = owner.post("/api/v1/members/invites", json={"tg_username": "Existing_Admin", "role": "viewer"}).json()
+    frm = plain_start(tg, 7400, "Existing_Admin")
+    say_yes_to_invite(tg, frm, made["id"])
+    assert owner.post("/api/v1/members/invites/%d/approve" % made["id"]).status_code == 204
     assert q("SELECT role FROM workspace_members WHERE workspace_id=1 AND user_id=(SELECT id FROM users WHERE tg_id=7400)") == [("admin",)]
     assert owner.get("/api/v1/members/invites").json() == []  # spent, without a demotion
 
@@ -429,18 +446,42 @@ def test_t5_only_a_signed_in_workspace_owner_invites(owner, tg):
     assert r.status_code == 403
 
 
-def test_t6_a_claim_happens_once_and_the_inviter_sees_who_claimed(owner, tg):
-    assert owner.post("/api/v1/members/invites", json={"tg_username": "@new_friend", "role": "operator", "name": "Friend"}).status_code == 201
-    bot.handle(tg, {"update_id": 4, "message": {"from": {"id": 7500, "username": "New_Friend", "first_name": "Squat"}, "chat": {"id": 7500}, "text": "/start"}})
-    uid = q("SELECT id FROM users WHERE tg_id=7500")[0][0]
-    assert q("SELECT role FROM workspace_members WHERE workspace_id=1 AND user_id=?", uid) == [("operator",)]
+def test_t6_a_squatter_gets_nothing_until_the_inviter_approves_the_numeric_id(owner, tg):
+    inv = owner.post("/api/v1/members/invites", json={"tg_username": "@new_friend", "role": "operator", "name": "Friend"}).json()
+    frm = plain_start(tg, 7500, "New_Friend", "Squat")
+    offer = [x for x in tg.sent if x[0] == 7500 and "دعوت به فضای کار" in x[1]]
+    assert offer and offer[-1][2]  # asked with buttons, nothing granted yet
+    assert q("SELECT COUNT(*) FROM users WHERE tg_id=7500") == [(0,)]
+    say_yes_to_invite(tg, frm, inv["id"])
     note = [t for chat, t, _ in tg.sent if chat == 111][-1]
-    assert "<code>7500</code>" in note and "حذف" in note
-    # a second account that later takes the same username finds nothing to claim
-    bot.handle(tg, {"update_id": 5, "message": {"from": {"id": 7501, "username": "new_friend"}, "chat": {"id": 7501}, "text": "/start"}})
-    assert q("SELECT COUNT(*) FROM users WHERE tg_id=7501") == [(0,)]
-    # the person can now sign in with Telegram
-    assert login(owner.app, tg, 7500).get("/api/v1/auth/me").status_code == 200
+    assert "<code>7500</code>" in note and "تأیید" in note
+    row = owner.get("/api/v1/members/invites").json()[0]
+    assert row["pending_tg_id"] == 7500 and row["pending_name"] == "Squat"
+    assert q("SELECT COUNT(*) FROM workspace_members WHERE workspace_id=1 AND user_id IN (SELECT id FROM users WHERE tg_id=7500)") == [(0,)]
+    # a second asker cannot replace the first while it is pending
+    frm2 = plain_start(tg, 7501, "new_friend")
+    say_yes_to_invite(tg, frm2, inv["id"])
+    assert owner.get("/api/v1/members/invites").json()[0]["pending_tg_id"] == 7500
+    # rejecting clears it; the invite stays open; approving the right person lets them in once
+    assert owner.post("/api/v1/members/invites/%d/reject" % inv["id"]).status_code == 204
+    say_yes_to_invite(tg, frm2, inv["id"])
+    assert owner.post("/api/v1/members/invites/%d/approve" % inv["id"]).status_code == 204
+    uid = q("SELECT id FROM users WHERE tg_id=7501")[0][0]
+    assert q("SELECT role FROM workspace_members WHERE workspace_id=1 AND user_id=?", uid) == [("operator",)]
+    assert owner.get("/api/v1/members/invites").json() == []
+    assert owner.post("/api/v1/members/invites/%d/approve" % inv["id"]).json()["code"] == "member.invite_not_found"
+    assert login(owner.app, tg, 7501).get("/api/v1/auth/me").status_code == 200
+
+
+def test_t6_a_login_start_never_offers_or_claims_an_invite_and_a_no_does_nothing(owner, tg):
+    inv = owner.post("/api/v1/members/invites", json={"tg_username": "@quiet_one", "role": "viewer"}).json()
+    sent = len(tg.sent)
+    bot.handle(tg, {"update_id": 22, "message": {"from": {"id": 7510, "username": "quiet_one"}, "chat": {"id": 7510}, "text": "/start wl_deadbeef"}})
+    assert all("دعوت به فضای کار" not in t for _, t, _ in tg.sent[sent:])
+    frm = plain_start(tg, 7510, "quiet_one")
+    say_yes_to_invite(tg, frm, inv["id"], yes=False)
+    assert owner.get("/api/v1/members/invites").json()[0]["pending_tg_id"] is None
+    assert q("SELECT COUNT(*) FROM users WHERE tg_id=7510") == [(0,)]
 
 
 def test_t6_an_expired_invite_is_not_claimed_and_a_typed_username_is_not_trusted(owner, tg):
@@ -448,12 +489,14 @@ def test_t6_an_expired_invite_is_not_claimed_and_a_typed_username_is_not_trusted
     db = connect()
     db.execute("UPDATE workspace_invites SET expires_at=? WHERE id=?", (int(time.time()) - 1, inv["id"]))
     db.close()
-    bot.handle(tg, {"update_id": 6, "message": {"from": {"id": 7600, "username": "late_one"}, "chat": {"id": 7600}, "text": "/start"}})
+    plain_start(tg, 7600, "late_one")
     assert q("SELECT COUNT(*) FROM users WHERE tg_id=7600") == [(0,)]
+    assert all("دعوت به فضای کار" not in t for _, t, _ in tg.sent[-1:])
     owner.post("/api/v1/members/invites", json={"tg_username": "real_name", "role": "viewer"})
     # someone without that username who types it into the start text claims nothing
     bot.handle(tg, {"update_id": 7, "message": {"from": {"id": 7601}, "chat": {"id": 7601}, "text": "/start real_name"}})
     assert q("SELECT COUNT(*) FROM users WHERE tg_id=7601") == [(0,)]
+    assert owner.get("/api/v1/members/invites").json()[0]["pending_tg_id"] is None
 
 
 def test_linking_claims_the_invites_of_the_linked_username(owner, tg):
@@ -461,7 +504,10 @@ def test_linking_claims_the_invites_of_the_linked_username(owner, tg):
     c, r = register(owner.app, "inv.reg")
     s, _ = start_link(c, tg, 7700, "reg_tg")
     done = c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"code": CODE})
-    assert done.json()["claimed_workspaces"] == 1
+    assert done.json()["claimed_workspaces"] == 1  # a request, not access: the inviter approves in the panel
+    assert q("SELECT COUNT(*) FROM workspace_members WHERE workspace_id=1 AND user_id=?", r.json()["id"]) == [(0,)]
+    iid = owner.get("/api/v1/members/invites").json()[0]["id"]
+    assert owner.post("/api/v1/members/invites/%d/approve" % iid).status_code == 204
     assert q("SELECT role FROM workspace_members WHERE workspace_id=1 AND user_id=?", r.json()["id"]) == [("viewer",)]
 
 

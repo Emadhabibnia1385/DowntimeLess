@@ -2723,6 +2723,39 @@
             "title": "Name",
             "type": "string"
           },
+          "pending_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending At"
+          },
+          "pending_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Name"
+          },
+          "pending_tg_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Tg Id"
+          },
           "role": {
             "title": "Role",
             "type": "string"
@@ -9902,6 +9935,110 @@
           }
         },
         "summary": "Cancel Invite",
+        "tags": [
+          "members"
+        ]
+      }
+    },
+    "/api/v1/members/invites/{invite_id}/approve": {
+      "post": {
+        "description": "Let in the person who asked to join through this invite (their numeric Telegram id is in the list).",
+        "operationId": "members_approve_invite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invite_id",
+            "required": true,
+            "schema": {
+              "title": "Invite Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Invite",
+        "tags": [
+          "members"
+        ]
+      }
+    },
+    "/api/v1/members/invites/{invite_id}/reject": {
+      "post": {
+        "description": "Turn down the request; the invite stays open for the person it was meant for.",
+        "operationId": "members_reject_invite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invite_id",
+            "required": true,
+            "schema": {
+              "title": "Invite Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Invite",
         "tags": [
           "members"
         ]

@@ -163,9 +163,9 @@ def link_confirm(link_id: int, body: LinkConfirm, request: Request, response: Re
     user = db.execute("SELECT * FROM users WHERE id=?", (done["user_id"],)).fetchone()
     tg = getattr(request.app.state, "tg", None)
     if tg is not None and done["claimed"]:
-        from ...bot import notify_claims
-        notify_claims(tg, db, done["claimed"], user["tg_id"], user["tg_username"] or "", user["name"] or "")
-    return {"merged": done["merged"], "claimed_workspaces": sum(1 for c in done["claimed"] if c["added"]), "user": svc.user_out(db, user, ws)}
+        from ...bot import notify_requests
+        notify_requests(tg, db, done["claimed"], user["tg_id"], user["tg_username"] or "", user["name"] or "")
+    return {"merged": done["merged"], "claimed_workspaces": len(done["claimed"]), "user": svc.user_out(db, user, ws)}
 
 
 @router.post("/link/{link_id}/cancel", status_code=204, operation_id="auth_link_cancel")
