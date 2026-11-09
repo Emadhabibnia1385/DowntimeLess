@@ -118,3 +118,23 @@ describe("phase 2 and 3 issues", () => {
 		expect(group.items[0].to).toBe("panel");
 	});
 });
+
+describe("forward issues", () => {
+	it("groups each relay forward under one Persian title and shows the ports", () => {
+		const groups = groupIssues([
+			issue({ id: "a", code: "relay_forward_broken:3:21001", evidence: { ports: ["tcp/21001"] } }),
+			issue({
+				id: "b",
+				code: "relay_forward_broken:4:all",
+				evidence: { ports: ["tcp/21001", "tcp/21002"] },
+			}),
+			issue({ id: "c", code: "dnat_dead_target", evidence: { ports: ["tcp/21005"] } }),
+		]);
+		const forward = groups.find((g) => g.family === "relay_forward_broken");
+		expect(forward?.title).toBe("فوروارد لوکیشن روی رله خراب");
+		expect(forward?.items.map((i) => i.value)).toEqual(["tcp/21001", "tcp/21001, tcp/21002"]);
+		expect(groups.find((g) => g.family === "dnat_dead_target")?.title).toBe(
+			"قانون DNAT به مقصد مرده",
+		);
+	});
+});

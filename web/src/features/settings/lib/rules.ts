@@ -42,7 +42,10 @@ export type RuleId =
 	| "inbound_without_group"
 	| "reseller_quota"
 	| "panel_version_changed"
-	| "panel_errors";
+	| "panel_errors"
+	| "dnat_dead_target"
+	| "dnat_unknown_target"
+	| "relay_forward_broken";
 
 export type RuleUnit = "percent" | "days" | "minutes" | "count" | "mb";
 export type RuleGroup = "host" | "paths" | "services" | "kernel" | "panel";
@@ -88,6 +91,7 @@ export const RULES: readonly Rule[] = [
 	{ id: "blacklisted", group: "paths", unit: null },
 	{ id: "relay_egress", group: "paths", unit: null },
 	{ id: "relay_filtered", group: "paths", unit: null },
+	{ id: "relay_forward_broken", group: "paths", unit: null },
 	{ id: "quota", group: "paths", unit: null },
 	{ id: "quota_pair", group: "paths", unit: null },
 	{ id: "ssl", group: "paths", warn: "ssl_warn_days", crit: "ssl_crit_days", unit: "days" },
@@ -99,6 +103,8 @@ export const RULES: readonly Rule[] = [
 	{ id: "container_unhealthy", group: "services", unit: null },
 	{ id: "container_revived", group: "services", unit: null },
 	{ id: "dnat_missing", group: "kernel", unit: null },
+	{ id: "dnat_dead_target", group: "kernel", unit: null },
+	{ id: "dnat_unknown_target", group: "kernel", unit: null },
 	{ id: "ip_forward_off", group: "kernel", unit: null },
 	{
 		id: "conntrack_limits_reset",

@@ -1,1 +1,0 @@
-import{t as e}from"./panel-CDrL9z62.js";var t=e;export{t as component};

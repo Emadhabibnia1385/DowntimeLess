@@ -343,6 +343,9 @@ export const fa = {
 			reseller_quota: "حجم نماینده رو به پایان",
 			panel_version_changed: "نسخهٔ پنل PasarGuard عوض شد",
 			panel_errors: "خطای خواندن پنل PasarGuard",
+			dnat_dead_target: "قانون DNAT به مقصد مرده",
+			dnat_unknown_target: "قانون DNAT به آدرس بیرون از فضای کاری",
+			relay_forward_broken: "فوروارد لوکیشن روی رله خراب",
 		},
 		values: {
 			expired: "منقضی شده",
@@ -444,6 +447,18 @@ export const fa = {
 			old_version: "نسخهٔ قبلی",
 			new_version: "نسخهٔ تازه",
 			errors: "خطاها",
+			rules: "قانون‌های DNAT",
+			not_listening: "مقصد گوش نمی‌دهد",
+			refused: "مقصد اتصال را رد کرد",
+			probe_fail_pct: "شکست پروب رله",
+			probe_samples: "تعداد پروب",
+			answering: "مقصدهای پاسخ‌دهنده",
+			probe: "نوع سنجش",
+			failed_from: "رله‌های ناموفق",
+			failed_from_count: "تعداد رله‌های ناموفق",
+			location_relays: "رله‌های این لوکیشن",
+			location_relays_count: "تعداد رله‌های لوکیشن",
+			working_on: "روی این رله‌ها کار می‌کند",
 		},
 	},
 	panel: {
@@ -583,6 +598,8 @@ export const fa = {
 			forward_port_closed: "پورت لوکیشن رله گوش نمی‌دهد",
 			dnat_missing: "جدول DNAT رله از بین رفته",
 			ip_forward_off: "ip_forward رله خاموش است",
+			dnat_dead_target: "قانون DNAT به مقصد مرده می‌فرستد",
+			forward_broken: "فوروارد رله از بیرون کار نمی‌کند",
 		},
 	},
 	issueChanges: {
@@ -1558,6 +1575,18 @@ export const fa = {
 			panel_errors: {
 				title: "خطای خواندن پنل",
 				hint: "فقط اطلاع؛ بخشی از اطلاعات پنل خوانده نشد.",
+			},
+			dnat_dead_target: {
+				title: "قانون DNAT به مقصد مرده",
+				hint: "مقصد قانون روی آن پورت گوش نمی‌دهد یا پروب رله به آن شکست می‌خورد.",
+			},
+			dnat_unknown_target: {
+				title: "قانون DNAT به آدرس ناشناخته",
+				hint: "فقط اطلاع؛ مقصد قانون هیچ سروری از این فضای کاری نیست.",
+			},
+			relay_forward_broken: {
+				title: "خرابی فوروارد روی یک رله",
+				hint: "دست‌کم دو رلهٔ دیگر به پورت فورواردشدهٔ این رله وصل نمی‌شوند.",
 			},
 		},
 	},
