@@ -45,7 +45,10 @@ export type RuleId =
 	| "panel_errors"
 	| "dnat_dead_target"
 	| "dnat_unknown_target"
-	| "relay_forward_broken";
+	| "relay_forward_broken"
+	| "drift_ipset"
+	| "drift_dnat"
+	| "drift_sysctl";
 
 export type RuleUnit = "percent" | "days" | "minutes" | "count" | "mb";
 export type RuleGroup = "host" | "paths" | "services" | "kernel" | "panel";
@@ -105,6 +108,9 @@ export const RULES: readonly Rule[] = [
 	{ id: "dnat_missing", group: "kernel", unit: null },
 	{ id: "dnat_dead_target", group: "kernel", unit: null },
 	{ id: "dnat_unknown_target", group: "kernel", unit: null },
+	{ id: "drift_ipset", group: "kernel", unit: null },
+	{ id: "drift_dnat", group: "kernel", unit: null },
+	{ id: "drift_sysctl", group: "kernel", unit: null },
 	{ id: "ip_forward_off", group: "kernel", unit: null },
 	{
 		id: "conntrack_limits_reset",

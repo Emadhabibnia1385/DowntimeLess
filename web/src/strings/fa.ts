@@ -346,6 +346,9 @@ export const fa = {
 			dnat_dead_target: "قانون DNAT به مقصد مرده",
 			dnat_unknown_target: "قانون DNAT به آدرس بیرون از فضای کاری",
 			relay_forward_broken: "فوروارد لوکیشن روی رله خراب",
+			drift_ipset: "ipset زنده با فایل دسترسی یکی نیست",
+			drift_dnat: "DNAT زنده با فایل بوت یکی نیست",
+			drift_sysctl: "sysctl زنده با فایل یکی نیست",
 		},
 		values: {
 			expired: "منقضی شده",
@@ -354,6 +357,7 @@ export const fa = {
 			relays: (n: string) => `${n} رله`,
 			ago: (d: string) => `${d} پیش`,
 			mb: (n: string) => `${n} مگابایت`,
+			liveVsFile: (live: string, file: string) => `${live} زنده، ${file} در فایل`,
 		},
 		openSsl: "مشاهدهٔ گواهی‌ها",
 		evidenceLabels: {
@@ -459,6 +463,15 @@ export const fa = {
 			location_relays: "رله‌های این لوکیشن",
 			location_relays_count: "تعداد رله‌های لوکیشن",
 			working_on: "روی این رله‌ها کار می‌کند",
+			live: "شمار زنده",
+			file: "شمار در فایل",
+			sets: "مجموعه‌ها (زنده / فایل)",
+			held_s: "مدت ماندگاری",
+			without_file: "جدول‌های بی‌فایل بوت",
+			keys: "کلیدها",
+			values: "مقدار (زنده / فایل)",
+			sources: "فایل‌ها",
+			checked: "کلیدهای سنجیده",
 		},
 	},
 	panel: {
@@ -1587,6 +1600,18 @@ export const fa = {
 			relay_forward_broken: {
 				title: "خرابی فوروارد روی یک رله",
 				hint: "دست‌کم دو رلهٔ دیگر به پورت فورواردشدهٔ این رله وصل نمی‌شوند.",
+			},
+			drift_ipset: {
+				title: "ناهمخوانی ipset با فایل دسترسی",
+				hint: "شمار اعضای ipset زنده ده دقیقه با شمار فایل فرق دارد.",
+			},
+			drift_dnat: {
+				title: "ناهمخوانی DNAT با فایل بوت",
+				hint: "قوانین DNAT زنده ده دقیقه با فایل nft بوت فرق دارد.",
+			},
+			drift_sysctl: {
+				title: "ناهمخوانی sysctl با فایل",
+				hint: "مقدار زندهٔ یک کلید sysctl ده دقیقه با فایل‌ها فرق دارد.",
 			},
 		},
 	},

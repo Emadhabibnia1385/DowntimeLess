@@ -60,6 +60,13 @@ export function valueOf(issue: Issue): string {
 		const by = relays ? ` (${t.issues.values.relays(formatNumber(relays))})` : "";
 		return loss === null ? by.trim() : formatPercent(loss) + by;
 	}
+	if (family === "drift_ipset" || family === "drift_dnat") {
+		const live = num(e.live);
+		const file = num(e.file);
+		if (live !== null && file !== null)
+			return t.issues.values.liveVsFile(formatNumber(live), formatNumber(file));
+	}
+	if (family === "drift_sysctl" && Array.isArray(e.keys)) return list(e.keys);
 	if (Array.isArray(e.units)) return e.units.join(", ");
 	for (const key of ["ports", "containers", "inbounds", "errors"]) {
 		if (Array.isArray(e[key])) return list(e[key]);

@@ -138,3 +138,14 @@ describe("forward issues", () => {
 		);
 	});
 });
+
+describe("drift issues", () => {
+	it("shows live against file counts and the sysctl keys", () => {
+		expect(valueOf(issue({ code: "drift_ipset", evidence: { live: 4120, file: 4186 } }))).toBe(
+			"۴٬۱۲۰ زنده، ۴٬۱۸۶ در فایل",
+		);
+		expect(
+			valueOf(issue({ code: "drift_sysctl", evidence: { keys: ["net.ipv4.ip_forward"] } })),
+		).toBe("net.ipv4.ip_forward");
+	});
+});
