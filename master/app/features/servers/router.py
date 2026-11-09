@@ -133,6 +133,10 @@ def _fix_allowed(db: sqlite3.Connection, server: sqlite3.Row, body: JobCreate, a
         raise DLError("job.permission")
     if body.kind == "tunnel_restart" and body.args["unit"] not in svc.tunnel_units_of(server):
         raise DLError("job.args_invalid")
+    db.execute(  # ws: server_row - checked by the caller; a fix that never reported back stops blocking
+        "UPDATE jobs SET status='error', error='no result from the agent', done_at=? WHERE server_id=? AND kind=? "
+        "AND status IN ('queued','sent') AND created_at<?",
+        (int(time.time()), server["id"], body.kind, int(time.time()) - svc.FIX_STALE_S))
     if db.execute("SELECT 1 FROM jobs WHERE server_id=? AND kind=? AND args=? AND status IN ('queued','sent')",  # ws: server_row - checked by the caller
                   (server["id"], body.kind, json.dumps(body.args))).fetchone():
         raise DLError("job.pending")
@@ -154,9 +158,12 @@ def create_job(server_id: int, body: JobCreate, actor: Actor = Depends(require("
     if body.kind not in svc.SAFE_KINDS:
         if actor.via == "key" and not actor.full:
             raise DLError("job.permission")  # a read key never changes a server; a full key may
-    cur = db.execute(
-        "INSERT INTO jobs (server_id, kind, args, created_by, created_at) VALUES (?,?,?,?,?)",  # ws: server_row - checked above
-        (server_id, body.kind, json.dumps(body.args), actor.user_id, int(time.time())),
-    )
+    try:
+        cur = db.execute(
+            "INSERT INTO jobs (server_id, kind, args, created_by, created_at) VALUES (?,?,?,?,?)",  # ws: server_row - checked above
+            (server_id, body.kind, json.dumps(body.args), actor.user_id, int(time.time())),
+        )
+    except sqlite3.IntegrityError:  # the same fix queued at the same moment (index jobs_fix_pending)
+        raise DLError("job.pending")
     changelog.job_created(db, server, cur.lastrowid, body.kind, actor.user_id)
     return _job_out(db.execute("SELECT * FROM jobs WHERE id=?", (cur.lastrowid,)).fetchone())  # ws: server_row - the job just inserted for it

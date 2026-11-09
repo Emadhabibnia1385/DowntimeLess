@@ -766,21 +766,21 @@ export const fa = {
 		},
 		bodies: {
 			nft_reload:
-				"اول همهٔ فایل‌های DNAT با nft -c -f سنجیده می‌شوند و اگر یکی خطا داشت هیچ چیزی عوض نمی‌شود. جدول زنده پشتیبان‌گیری و سرویس DNAT ری‌استارت می‌شود؛ اتصال‌های موجود می‌مانند.",
+				"اول همهٔ فایل‌های DNAT با nft -c -f سنجیده می‌شوند و اگر یکی خطا داشت هیچ چیزی عوض نمی‌شود. کل ruleset زنده پشتیبان‌گیری و هر سرویس DNAT ری‌استارت می‌شود؛ اتصال‌های موجود می‌مانند.",
 			sysctl_apply:
 				"مقدار زندهٔ همهٔ کلیدهای فایل‌ها پشتیبان‌گیری می‌شود و بعد همهٔ فایل‌های sysctl دوباره اعمال می‌شوند.",
 			ipset_sync:
-				"اگر فایل خالی باشد یا از مجموعهٔ زنده کمتر عضو داشته باشد، کاری انجام نمی‌شود. مجموعهٔ زنده پشتیبان‌گیری و سرویس nyxon-access ری‌استارت می‌شود.",
+				"اگر فایل خالی باشد یا عضوی از مجموعهٔ زنده را نداشته باشد، کاری انجام نمی‌شود. مجموعهٔ زنده پشتیبان‌گیری و سرویس nyxon-access ری‌استارت می‌شود.",
 			tunnel_restart:
 				"کاربران این تانل چند ثانیه قطع می‌شوند. برای Backhaul فقط یک سر را ری‌استارت نکنید؛ اگر برنگشت، لاگ همان سرویس را بخوانید.",
 		},
 		commands: {
 			nft_reload:
-				"nft -c -f /etc/nftables-NAME.nft    # every DNAT boot file, all must pass\nnft list table ip TABLE > /var/backups/downtimeless/…\nsystemctl restart NAME.service",
+				"for F in /etc/nftables-*dnat*.nft (with a loaded unit): nft -c -f $F    # all must pass\nnft list ruleset > /var/backups/downtimeless/…-ruleset.nft\nsystemctl restart -- <file name>.service    # e.g. relay-dnat.service",
 			sysctl_apply:
 				"# live values saved to /var/backups/downtimeless/…-sysctl.conf\nsysctl --system",
 			ipset_sync:
-				"ipset save nyxon_trusted > /var/backups/downtimeless/…\nsystemctl restart nyxon-access.service",
+				"ipset save nyxon_trusted > /var/backups/downtimeless/…\nsystemctl restart -- nyxon-access.service",
 			tunnel_restart: (unit: string) => `systemctl restart -- ${unit}`,
 		},
 	},

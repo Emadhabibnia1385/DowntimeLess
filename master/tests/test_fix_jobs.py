@@ -74,3 +74,35 @@ def test_api_keys_never_queue_a_fix_even_full_ones(owner, client):
     db = connect()
     assert db.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 0
     db.close()
+
+
+def test_a_fix_with_no_result_for_half_an_hour_stops_blocking_and_the_index_holds_the_line(owner):
+    import sqlite3 as sq
+    sid, _ = make_server(owner, "arno", "relay")
+    assert post(owner, sid, "nft_reload").status_code == 201
+    db = connect()
+    with pytest.raises(sq.IntegrityError):
+        db.execute("INSERT INTO jobs (server_id, kind, args, created_at) VALUES (?, 'nft_reload', '{}', 1)", (sid,))
+    db.execute("UPDATE jobs SET status='sent', created_at=created_at-3600 WHERE server_id=?", (sid,))
+    db.close()
+    assert post(owner, sid, "nft_reload").status_code == 201
+    db = connect()
+    assert [tuple(r) for r in db.execute("SELECT status, error FROM jobs WHERE server_id=? ORDER BY id", (sid,))] == [
+        ("error", "no result from the agent"), ("queued", None)]
+    db.close()
+
+
+@pytest.mark.parametrize("unit", ["nyxon-access.service", "relay-dnat.service", "backpack-de1.service", "gre-x", "-Hroot@h", "--root=/"])
+def test_service_restart_cannot_stand_in_for_a_fix(owner, unit):
+    sid, _ = make_server(owner, "arno", "relay")
+    r = post(owner, sid, "service_restart", {"unit": unit})
+    assert r.status_code == 422 and r.json()["code"] == "job.args_invalid"
+
+
+def test_the_agent_gets_the_server_level(owner):
+    sid, key = make_server(owner, "arno", "relay")
+    assert report(owner, key).json()["permission"] == "full"
+    db = connect()
+    db.execute("UPDATE servers SET permission='read' WHERE id=?", (sid,))
+    db.close()
+    assert report(owner, key).json()["permission"] == "read"

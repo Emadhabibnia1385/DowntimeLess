@@ -16,6 +16,7 @@ import re
 import shutil
 import socket
 import ssl
+import stat
 import subprocess
 import sys
 import tempfile
@@ -1050,7 +1051,7 @@ def collect_units(memo):
                                                       "--no-legend", "--plain"])) if UNIT_PATTERN.match(n)]
     loaded = parse_list_units(check_out(["systemctl", "list-units", "--all", "--no-legend", "--plain"]))
     names = list(dict.fromkeys(enabled + [n for n, _, sub in loaded if UNIT_PATTERN.match(n) or sub == "auto-restart"]))
-    names = [n for n in names if UNIT_RE.match(n)][:LIST_MAX]
+    names = [n for n in names if UNIT_RE.fullmatch(n)][:LIST_MAX]
     if not names:
         return []
     out = []
@@ -1516,7 +1517,7 @@ def collect_tunnels(memo):
         return None
     states = {}
     if found and has("systemctl"):
-        names = [u for t in found for u in unit_candidates(t["type"], t["name"]) if UNIT_RE.match(u)]
+        names = [u for t in found for u in unit_candidates(t["type"], t["name"]) if UNIT_RE.fullmatch(u)]
         blocks = soft(lambda: parse_systemctl_show(check_out(["systemctl", "show", "-p", "Id,LoadState,ActiveState", "--"]
                                                             + list(dict.fromkeys(names))[:LIST_MAX]))) or []
         states = {b.get("Id"): b.get("ActiveState") for b in blocks if b.get("LoadState") == "loaded"}
@@ -1619,7 +1620,7 @@ def collect_tunnel_logs(memo):
         return None
     units = [line.split()[0] for line in check_out(["systemctl", "list-units", "--type=service", "--state=active",
                                                     "--no-legend", "--plain", "backpack-*"]).splitlines() if line.split()]
-    units = [u for u in units if UNIT_RE.match(u)][:20]
+    units = [u for u in units if UNIT_RE.fullmatch(u)][:20]
     out, until = [], time.monotonic() + 30
     for u in units:
         if time.monotonic() > until:
@@ -2220,7 +2221,7 @@ def job_self_update(args, state):
 # ---- diagnostics and service actions: each returns {"output": text} for the panel to show ----
 
 OUTPUT_MAX = 6000
-UNIT_RE = re.compile(r"^[A-Za-z0-9@._:-]{1,100}$")
+UNIT_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9@._:-]{0,99}")
 
 
 def run_cmd(argv, timeout=25):
@@ -2248,7 +2249,7 @@ def unit_arg(args, required=False):
         if required:
             raise ValueError("args.unit is required")
         return None
-    if not isinstance(unit, str) or not UNIT_RE.match(unit):
+    if not isinstance(unit, str) or not UNIT_RE.fullmatch(unit):
         raise ValueError("invalid unit name")
     return unit
 
@@ -2277,7 +2278,7 @@ def job_journal(args, state):
     argv = ["journalctl", "--no-pager", "-o", "short-iso", "-n", str(n)]
     unit = unit_arg(args)
     if unit:
-        argv += ["-u", unit]
+        argv += ["-u", unit, "--"]
     text, _ = run_cmd(argv)
     return output_of(text[-OUTPUT_MAX:])
 
@@ -2318,8 +2319,10 @@ def job_dns_check(args, state):
 
 def job_service_restart(args, state):
     unit = unit_arg(args, required=True)
-    text, code = run_cmd(["systemctl", "restart", unit], timeout=60)
-    active, _ = run_cmd(["systemctl", "is-active", unit])
+    if FIX_ONLY_RE.fullmatch(unit):
+        raise ValueError("%s restarts only through its fix job (pre-check and backup)" % unit)
+    text, code = run_cmd(["systemctl", "restart", "--", unit], timeout=60)
+    active, _ = run_cmd(["systemctl", "is-active", "--", unit])
     if code != 0:
         raise RuntimeError(text[:200] or "restart failed")
     return {"output": "%s: %s" % (unit, active), "active": active == "active"}
@@ -2336,7 +2339,11 @@ def job_vacuum_logs(args, state):
 BACKUP_DIR = "/var/backups/downtimeless"
 ACCESS_UNIT = "nyxon-access.service"
 DNAT_FILE_GLOB = "/etc/nftables-*dnat*.nft"
-TUNNEL_UNIT_RE = re.compile(r"^(backpack-|backhaul|gre-|wattun@|rathole|frps@|frpc@|gost)[A-Za-z0-9@._-]{0,80}\.service$")
+TUNNEL_UNIT_RE = re.compile(r"(backpack-|backhaul|gre-|wattun@|rathole|frps@|frpc@|gost)[A-Za-z0-9@._-]{0,80}\.service")
+# these restart only through their fix job, which checks first and backs up: never through service_restart
+FIX_ONLY_RE = re.compile(r"(nyxon-access|.*dnat.*|(backpack-|backhaul|gre-|wattun@|rathole|frps@|frpc@|gost).*)(\.service)?")
+BACKUP_KEEP = 50
+FIX_DEADLINE_S = 180
 
 
 def no_args(args):
@@ -2344,13 +2351,31 @@ def no_args(args):
         raise ValueError("this job takes no arguments")
 
 
+def backup_dir():
+    """BACKUP_DIR as a real directory of this user, mode 0700; a symlink or a foreign owner is refused."""
+    try:
+        os.mkdir(BACKUP_DIR, 0o700)
+    except FileExistsError:
+        pass
+    st = os.lstat(BACKUP_DIR)
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.geteuid():
+        raise RuntimeError("%s is not a directory owned by the agent's user: no backup, no change" % BACKUP_DIR)
+    if st.st_mode & 0o077:
+        os.chmod(BACKUP_DIR, 0o700)
+    return BACKUP_DIR
+
+
 def write_backup(name, text):
-    """Saves the live state before a fix, 0600 under BACKUP_DIR; returns the path."""
-    os.makedirs(BACKUP_DIR, mode=0o700, exist_ok=True)
-    path = os.path.join(BACKUP_DIR, "%s-%s" % (time.strftime("%Y%m%d%H%M%S"), name))
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    """Saves the live state before a fix, 0600 under BACKUP_DIR (oldest pruned); returns the path."""
+    base = backup_dir()
+    path = os.path.join(base, "%s-%s" % (time.strftime("%Y%m%d%H%M%S"), name))
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
     with os.fdopen(fd, "w") as f:
         f.write(text)
+    old = sorted(n for n in os.listdir(base) if re.match(r"\d{14}-", n))[:-BACKUP_KEEP]
+    for n in old:
+        with contextlib.suppress(OSError):
+            os.unlink(os.path.join(base, n))
     return path
 
 
@@ -2383,21 +2408,32 @@ def job_nft_reload(args, state):
         text, code = run_cmd(["nft", "-c", "-f", path])
         if code != 0:
             raise RuntimeError(("pre-check failed, nothing reloaded: nft -c -f %s: %s" % (path, text))[:300])
-    lines, backups = [], []
-    for path, table, unit in items:
-        live, code = run_cmd(["nft", "list", "table", "ip", table])
-        if code == 0:
-            backups.append(write_backup(table + ".nft", live + "\n"))
-        lines.append("%s (%s): %s" % (unit, path, restart_unit(unit)))
-    return {"output": "\n".join(lines), "backups": backups,
-            "rollback": "nft delete table ip TABLE ; nft -f BACKUP (the backup is the live table before the reload)"}
+    live, code = run_cmd(["nft", "list", "ruleset"])
+    if code != 0 or not live.strip():
+        raise RuntimeError("nft list ruleset failed: no backup, nothing reloaded")
+    backup = write_backup("ruleset.nft", live + "\n")
+    lines, until = [], time.monotonic() + FIX_DEADLINE_S
+    for path, _, unit in items:
+        if time.monotonic() > until:
+            raise RuntimeError(("deadline reached; done so far: %s" % "; ".join(lines))[:300])
+        try:
+            lines.append("%s (%s): %s" % (unit, path, restart_unit(unit)))
+        except RuntimeError as e:
+            raise RuntimeError(("%s; done before it: %s" % (e, "; ".join(lines) or "none"))[:300])
+    return {"output": "\n".join(lines), "backups": [backup],
+            "rollback": "nft delete table ip TABLE ; then load that table's block from BACKUP (the whole ruleset before)"}
+
+
+# every directory `sysctl --system` reads, so the backup holds every key it may change
+SYSCTL_SYSTEM_FILES = ("/usr/lib/sysctl.d/*.conf", "/lib/sysctl.d/*.conf", "/usr/local/lib/sysctl.d/*.conf",
+                       "/run/sysctl.d/*.conf") + SYSCTL_FILES
 
 
 def job_sysctl_apply(args, state):
     """sysctl --system after saving the live value of every key the files set."""
     no_args(args)
     wanted = {}
-    for pattern in SYSCTL_FILES:
+    for pattern in SYSCTL_SYSTEM_FILES:
         for path in sorted(glob.glob(pattern)):
             wanted.update(parse_sysctl_file(read(path)[:1 << 20]))
     if not wanted:
@@ -2425,13 +2461,18 @@ def job_ipset_sync(args, state):
     if not entries:
         raise RuntimeError("pre-check failed: %s has no %s entries; a restart would drop every trusted source" % (path, key))
     live = parse_ipset_headers(run_cmd(["ipset", "list", "-t", name])[0]).get(name)
-    if live is not None and len(entries) < live:
-        raise RuntimeError("pre-check failed: the file has fewer entries (%d) than the live set (%d); "
-                           "removing trusted sources is done by hand" % (len(entries), live))
+    saved, code = run_cmd(["ipset", "save", name])
+    if live is None or code != 0:
+        raise RuntimeError("pre-check failed: the live set %s could not be read; nothing changed" % name)
+    norm = lambda n: n[:-3] if n.endswith("/32") else n  # noqa: E731
+    members = {norm(f[2]) for f in (line.split() for line in saved.splitlines()) if len(f) >= 3 and f[0] == "add"}
+    lost = sorted(members - {norm(e) for e in entries})
+    if lost:
+        raise RuntimeError("pre-check failed: %d live member(s) are not in the file (first: %s); removing trusted "
+                           "sources is done by hand" % (len(lost), lost[0]))
     if not unit_loaded(ACCESS_UNIT):
         raise RuntimeError("%s is not installed on this server" % ACCESS_UNIT)
-    saved, code = run_cmd(["ipset", "save", name])
-    backups = [write_backup("ipset-%s" % name, saved + "\n")] if code == 0 else []
+    backups = [write_backup("ipset-%s" % name, saved + "\n")]
     active = restart_unit(ACCESS_UNIT)
     after = parse_ipset_headers(run_cmd(["ipset", "list", "-t", name])[0]).get(name)
     return {"output": "%s: %s; %s live %s -> %s, %d in %s" % (ACCESS_UNIT, active, name, live, after, len(entries), path),
@@ -2444,15 +2485,15 @@ def tunnel_units():
 
 
 def job_tunnel_restart(args, state):
-    """Restarts one tunnel unit this server runs (a tunnel config's unit, or an enabled gre- unit)."""
+    """Restarts one tunnel unit this server runs (a tunnel config's unit, or an enabled tunnel-family unit)."""
     unit = args.get("unit") if isinstance(args, dict) else None
-    if set(args) - {"unit"} or not isinstance(unit, str) or not TUNNEL_UNIT_RE.match(unit):
+    if set(args) - {"unit"} or not isinstance(unit, str) or not TUNNEL_UNIT_RE.fullmatch(unit):
         raise ValueError("args.unit must be one tunnel unit of this server")
     if not unit_loaded(unit):
         raise RuntimeError("%s is not loaded on this server" % unit)
     if unit not in tunnel_units():
         enabled, _ = run_cmd(["systemctl", "is-enabled", "--", unit])
-        if not (unit.startswith("gre-") and enabled.strip() == "enabled"):
+        if enabled.strip() != "enabled":
             raise RuntimeError("%s is not a tunnel unit of this server" % unit)
     active = restart_unit(unit)
     return {"output": "%s: %s" % (unit, active), "active": active == "active",
@@ -2517,8 +2558,10 @@ def run_cycle(state):
     state["probe_targets"] = probe_targets(resp.get("probe_targets"))
     state["acct_peers"] = resp.get("acct_peers") or []
     state["peers"] = acct_peers(resp.get("peers"))
-    if not state["restart"]:
-        for job in resp.get("jobs") or []:
+    for job in resp.get("jobs") or []:
+        if state["restart"]:  # the master marked it sent: say so instead of dropping it
+            state["jobs_done"].append({"id": job.get("id"), "status": "rejected", "result": {}, "error": "agent restarting"})
+        else:
             state["jobs_done"].append(run_job(job, state))
         del state["jobs_done"][:-100]
     return min(max(int(resp.get("interval_s") or 30), 5), 600)

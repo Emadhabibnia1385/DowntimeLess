@@ -1,0 +1,1 @@
+import{t as e}from"./panel-LU6gU71S.js";var t=e;export{t as component};

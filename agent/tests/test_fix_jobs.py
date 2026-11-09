@@ -50,14 +50,14 @@ LOADED = {("systemctl", "show"): ("loaded\n", 0), ("systemctl", "is-active"): ("
 def test_nft_reload_checks_every_file_then_backs_up_and_restarts_its_unit(box):
     files, install, tmp = box
     files["/etc/nftables-relay-dnat.nft"] = "table ip relay_dnat {}\n"
-    host = install({**LOADED, **{("nft", "list"): ("table ip relay_dnat { live }", 0)}})
+    host = install({**LOADED, **{("nft", "list", "ruleset"): ("table ip relay_dnat { live }", 0)}})
     res = run("nft_reload")
     assert res["status"] == "ok", res
     assert host.ran("nft", "-c", "-f") == [["nft", "-c", "-f", "/etc/nftables-relay-dnat.nft"]]
     assert host.ran("systemctl", "restart") == [["systemctl", "restart", "--", "relay-dnat.service"]]
     [bak] = res["result"]["backups"]
     assert open(bak).read().startswith("table ip relay_dnat { live }") and oct(os.stat(bak).st_mode)[-3:] == "600"
-    assert "relay-dnat.service" in res["result"]["output"] and "nft -f BACKUP" in res["result"]["rollback"]
+    assert "relay-dnat.service" in res["result"]["output"] and "BACKUP" in res["result"]["rollback"]
 
 
 def test_nft_reload_stops_before_any_change_when_the_syntax_check_fails(box):
@@ -68,6 +68,25 @@ def test_nft_reload_stops_before_any_change_when_the_syntax_check_fails(box):
     res = run("nft_reload")
     assert res["status"] == "error" and "nothing reloaded" in res["error"]
     assert host.ran("systemctl", "restart") == [] and host.ran("nft", "list") == []
+
+
+def test_nft_reload_changes_nothing_without_a_backup(box):
+    files, install, _ = box
+    files["/etc/nftables-relay-dnat.nft"] = "table ip relay_dnat {}\n"
+    host = install({**LOADED, **{("nft", "list", "ruleset"): ("", 1)}})
+    res = run("nft_reload")
+    assert res["status"] == "error" and "no backup" in res["error"] and host.ran("systemctl", "restart") == []
+
+
+def test_a_symlinked_backup_directory_is_refused(box, tmp_path):
+    files, install, _ = box
+    files["/etc/nftables-relay-dnat.nft"] = "x"
+    (tmp_path / "elsewhere").mkdir()
+    os.symlink(tmp_path / "elsewhere", tmp_path / "bak")
+    host = install({**LOADED, **{("nft", "list", "ruleset"): ("table ip relay_dnat {}", 0)}})
+    res = run("nft_reload")
+    assert res["status"] == "error" and "not a directory" in res["error"] and host.ran("systemctl", "restart") == []
+    assert os.listdir(tmp_path / "elsewhere") == []
 
 
 @pytest.mark.parametrize("kind", ["nft_reload", "sysctl_apply", "ipset_sync"])
@@ -97,8 +116,9 @@ def test_sysctl_apply_saves_the_live_values_and_reports_what_changed(box):
 ACCESS = 'TRUSTED_SOURCES="198.51.100.1 198.51.100.2 203.0.113.0/24"\n'
 
 
-def ipset_host(install, live_before, live_after=None):
+def ipset_host(install, live_before, live_after=None, members=("198.51.100.1",)):
     count = [live_before]
+    saved = "create nyxon_trusted hash:net\n" + "".join("add nyxon_trusted %s\n" % m for m in members)
 
     def headers(argv):
         return "Name: nyxon_trusted\nNumber of entries: %d\n" % count[0], 0
@@ -106,7 +126,7 @@ def ipset_host(install, live_before, live_after=None):
     def restart(argv):
         count[0] = live_after if live_after is not None else count[0]
         return "", 0
-    return install({**LOADED, **{("ipset", "list"): headers, ("ipset", "save"): ("create nyxon_trusted hash:net", 0),
+    return install({**LOADED, **{("ipset", "list"): headers, ("ipset", "save"): (saved, 0),
                                    ("systemctl", "restart"): restart}})
 
 
@@ -120,11 +140,14 @@ def test_ipset_sync_restarts_the_service_and_checks_the_count(box):
     assert "1 -> 3" in res["result"]["output"] and res["result"]["backups"]
 
 
-@pytest.mark.parametrize("conf, live", [('TRUSTED_SOURCES=""\n', 0), (ACCESS, 9)])
-def test_ipset_sync_refuses_an_empty_or_shrinking_list(box, conf, live):
+@pytest.mark.parametrize("conf, live, members", [
+    ('TRUSTED_SOURCES=""\n', 0, ()),
+    (ACCESS, 3, ("198.51.100.1", "198.51.100.9/32", "203.0.113.0/24")),  # same count, one member swapped
+])
+def test_ipset_sync_refuses_an_empty_list_or_one_that_drops_a_member(box, conf, live, members):
     files, install, _ = box
     files["/etc/nyxon/access.conf"] = conf
-    host = ipset_host(install, live)
+    host = ipset_host(install, live, members=members)
     res = run("ipset_sync")
     assert res["status"] == "error" and "pre-check failed" in res["error"] and host.ran("systemctl", "restart") == []
 
@@ -140,7 +163,7 @@ def test_tunnel_restart_takes_only_a_tunnel_unit_name(box, unit):
 
 def test_tunnel_restart_refuses_extra_arguments_and_units_this_server_does_not_run(box, monkeypatch):
     _, install, _ = box
-    host = install({**LOADED, **{("systemctl", "is-enabled"): ("enabled", 0)}})
+    host = install({**LOADED, **{("systemctl", "is-enabled"): lambda argv: ("enabled" if argv[-1] != "backpack-nl9.service" else "disabled", 0)}})
     monkeypatch.setattr(agent, "tunnel_units", lambda: {"backpack-de1.service"})
     assert run("tunnel_restart", {"unit": "backpack-de1.service", "cmd": "x"})["status"] == "error"
     assert run("tunnel_restart", {"unit": "backpack-nl9.service"})["status"] == "error"
@@ -157,3 +180,21 @@ def test_fixes_are_refused_without_a_permission_level(kind, box):
     host = install(LOADED)
     res = agent.run_job({"id": "f", "kind": kind, "args": {}}, {"permission": "none"})
     assert res["status"] == "rejected" and host.calls == []
+
+
+def test_ipset_sync_refuses_when_the_live_set_cannot_be_read(box):
+    files, install, _ = box
+    files["/etc/nyxon/access.conf"] = ACCESS
+    host = install({**LOADED, **{("ipset", "list"): ("ipset v7: The set with the given name does not exist", 1),
+                                 ("ipset", "save"): ("", 1)}})
+    res = run("ipset_sync")
+    assert res["status"] == "error" and "could not be read" in res["error"] and host.ran("systemctl", "restart") == []
+
+
+def test_skipped_jobs_while_restarting_are_reported_not_dropped(monkeypatch):
+    st = agent.new_state({"master": "http://127.0.0.1:9", "agent_key": "k"})
+    st["restart"] = True
+    monkeypatch.setattr(agent, "build_report", lambda s: {"jobs_done": []})
+    monkeypatch.setattr(agent, "http_json", lambda *a: {"jobs": [{"id": 7, "kind": "nft_reload", "args": {}}]})
+    agent.run_cycle(st)
+    assert st["jobs_done"] == [{"id": 7, "status": "rejected", "result": {}, "error": "agent restarting"}]

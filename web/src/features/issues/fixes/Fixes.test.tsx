@@ -115,7 +115,7 @@ describe("one-click fixes", () => {
 		const posted = open("admin");
 		await userEvent.click(await screen.findByRole("button", { name: /^رفع «.*» روی sepehr$/ }));
 		const dialog = await screen.findByRole("alertdialog");
-		expect(within(dialog).getByText(/systemctl restart nyxon-access.service/)).toBeTruthy();
+		expect(within(dialog).getByText(/systemctl restart -- nyxon-access.service/)).toBeTruthy();
 		expect(posted).toEqual([]);
 		await userEvent.click(within(dialog).getByRole("button", { name: "تأیید و فرستادن به سرور" }));
 		await waitFor(() =>

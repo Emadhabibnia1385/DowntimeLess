@@ -296,7 +296,16 @@ def test_service_restart_runs_systemctl_and_reports_the_state(monkeypatch):
     monkeypatch.setattr(agent.subprocess, "run", fake)
     res = agent.run_job(job("service_restart", {"unit": "nginx.service"}), state("full"))
     assert res["status"] == "ok" and res["result"] == {"output": "nginx.service: active", "active": True}
-    assert calls[0] == ["systemctl", "restart", "nginx.service"]
+    assert calls[0] == ["systemctl", "restart", "--", "nginx.service"]
+
+
+@pytest.mark.parametrize("unit", ["nyxon-access.service", "nyxon-access", "relay-dnat.service", "mobin-dnat", "backpack-de1.service",
+                                  "gre-de1", "-Hroot@host", "--root=/x"])
+def test_service_restart_leaves_fix_units_to_their_fix_job_and_refuses_options(unit, monkeypatch):
+    rec = Recorder()
+    monkeypatch.setattr(agent.subprocess, "run", rec)
+    res = agent.run_job(job("service_restart", {"unit": unit}), state("full"))
+    assert res["status"] == "error" and rec.calls == []
 
 
 @pytest.mark.parametrize("permission", ["none", "", None])

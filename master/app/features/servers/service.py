@@ -122,11 +122,14 @@ def install_command(token: str) -> str:
     return "curl -fsSL %s/agent/install.sh | sudo bash -s -- --master %s --token %s" % (url, url, token)
 
 
-_UNIT = re.compile(r"^[A-Za-z0-9@._:-]{1,100}$")
+_UNIT = re.compile(r"[A-Za-z0-9][A-Za-z0-9@._:-]{0,99}")
+# restarted only through their fix job (pre-check and backup), never through service_restart
+FIX_ONLY_UNIT = re.compile(r"(nyxon-access|.*dnat.*|(backpack-|backhaul|gre-|wattun@|rathole|frps@|frpc@|gost).*)(\.service)?")
+FIX_STALE_S = 1800  # a fix with no result after this long no longer blocks the next one
 _HOST = re.compile(r"^[A-Za-z0-9:][A-Za-z0-9.:_-]{0,252}$")
 
 
-TUNNEL_UNIT = re.compile(r"^(backpack-|backhaul|gre-|wattun@|rathole|frps@|frpc@|gost)[A-Za-z0-9@._-]{0,80}\.service$")
+TUNNEL_UNIT = re.compile(r"(backpack-|backhaul|gre-|wattun@|rathole|frps@|frpc@|gost)[A-Za-z0-9@._-]{0,80}\.service")
 
 
 def tunnel_units_of(row: sqlite3.Row) -> set:
@@ -139,7 +142,7 @@ def tunnel_units_of(row: sqlite3.Row) -> set:
     tunnels = checks.get("tunnels") if isinstance(checks.get("tunnels"), dict) else {}
     names = [c.get("unit") for c in tunnels.get("configs") or [] if isinstance(c, dict)]
     names += [u.get("name") for u in checks.get("units") or [] if isinstance(u, dict) and u.get("enabled") is True]
-    return {n for n in names if isinstance(n, str) and TUNNEL_UNIT.match(n)}
+    return {n for n in names if isinstance(n, str) and TUNNEL_UNIT.fullmatch(n)}
 
 
 def job_args_valid(kind: str, args: Dict[str, Any]) -> bool:
@@ -147,14 +150,15 @@ def job_args_valid(kind: str, args: Dict[str, Any]) -> bool:
     if kind in ("nft_reload", "sysctl_apply", "ipset_sync"):
         return args == {}
     if kind == "tunnel_restart":
-        return set(args) == {"unit"} and isinstance(args["unit"], str) and TUNNEL_UNIT.match(args["unit"]) is not None
+        return set(args) == {"unit"} and isinstance(args["unit"], str) and TUNNEL_UNIT.fullmatch(args["unit"]) is not None
     if kind in CERT_KINDS:
         return re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$", str(args.get("name", ""))) is not None
     if kind == "service_restart":
-        return isinstance(args.get("unit"), str) and _UNIT.match(args["unit"]) is not None
+        unit = args.get("unit")
+        return isinstance(unit, str) and _UNIT.fullmatch(unit) is not None and FIX_ONLY_UNIT.fullmatch(unit) is None
     if kind == "journal":
         unit, lines = args.get("unit"), args.get("lines", 100)
-        return (unit in (None, "") or (isinstance(unit, str) and _UNIT.match(unit) is not None)) and isinstance(lines, int) and 10 <= lines <= 300
+        return (unit in (None, "") or (isinstance(unit, str) and _UNIT.fullmatch(unit) is not None)) and isinstance(lines, int) and 10 <= lines <= 300
     if kind in ("traceroute", "dns_check"):
         return isinstance(args.get("target"), str) and _HOST.match(args["target"]) is not None
     if kind == "http_check":

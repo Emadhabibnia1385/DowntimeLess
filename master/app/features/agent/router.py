@@ -107,5 +107,5 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
     if jobs:
         db.execute("UPDATE jobs SET status='sent' WHERE server_id=? AND status='queued'", (sid,))  # ws: agent_server - its own jobs
     probe_targets = probes_svc.targets_for_relay(db, ws, now, sid) if server["role"] == "relay" else []
-    return {"interval_s": get_settings().interval_s, "permission": "full", "ping_targets": targets, "probe_targets": probe_targets, "jobs": jobs,
+    return {"interval_s": get_settings().interval_s, "permission": server["permission"], "ping_targets": targets, "probe_targets": probe_targets, "jobs": jobs,
             "acct_peers": links_svc.peers_for(db, server), "peers": links_svc.workspace_peers(db, server)}
