@@ -2,7 +2,7 @@
 import sqlite3
 from typing import Any, Dict, Iterable, List, Optional
 
-from . import host, memory as m, panel
+from . import drift, host, memory as m, panel
 
 PANEL_LIMIT = 10  # panel hosts shown per workspace
 
@@ -26,7 +26,8 @@ def server_issues(db: sqlite3.Connection, ws: int, s, th: Dict[str, float], now:
         return []
     state, ignored = m.load(db, ws, s["id"]), m.ignored(db, ws, s["id"])
     rows = m.baseline(db, ws, s["id"]) if m.checks_of(rep) is not None else []
-    return host.issues(s, th, rep, state, rows, ignored, now) + panel.issues(db, ws, s, th, rep, state, ignored, ctx, now)
+    return (host.issues(s, th, rep, state, rows, ignored, now) + drift.issues(s, th, rep, state, now)
+            + panel.issues(db, ws, s, th, rep, state, ignored, ctx, now))
 
 
 def _pct(count: Optional[int], limit: Optional[int]) -> Optional[float]:

@@ -142,6 +142,21 @@ UDP forwards are not judged because UDP listeners are collapsed in the report).
 Health: both critical codes are hard gates on a relay (`dnat_dead_target`, `forward_broken`) and take 70% of the
 `forward_integrity` weight. Switches: `on_dnat_dead_target`, `on_dnat_unknown_target`, `on_relay_forward_broken`.
 
+## Config drift (agent 0.3.3, `checks/drift.py`)
+
+`checks.drift` compares live state with the files that rebuild it at boot (see `docs/design/agent-checks.md`). A
+finding must hold `DRIFT_HOLD_S` (600 s, two collector runs) with the same numbers; any change of the numbers starts
+the clock again, and equal numbers clear it.
+
+| Code | Severity | When |
+|---|---|---|
+| `drift_ipset` | warning when a live set has fewer entries than its file, info when more | e.g. `nyxon_trusted` 8 live, 21 in `/etc/nyxon/access.conf` (the service read the file only at start); evidence `live`, `file`, one line per set |
+| `drift_dnat` | warning | a `*dnat*` table whose live forwards differ from `/etc/nftables-<table>.nft` (count or hash), or live forwards without any boot file; evidence the counts and the differing ports |
+| `drift_sysctl` | warning | a sysctl key whose live value differs from the last file that sets it (incident 74: conntrack limits skipped at boot); keys absent from `/proc/sys` (module not loaded) are only listed by the agent |
+
+Health: 40% of `forward_integrity` on a relay (`units` elsewhere) for ipset and DNAT drift, 40% of `kernel` for sysctl
+drift; never a gate. Switches: `on_drift_ipset`, `on_drift_dnat`, `on_drift_sysctl`.
+
 ## Health scores (proposal)
 
 **Relay.** Hard gates (any one means failing): agent offline; a configured forward port not listening or

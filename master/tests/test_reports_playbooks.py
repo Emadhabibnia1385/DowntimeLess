@@ -72,7 +72,7 @@ from app.features.reports import guides_fa  # noqa: E402
 
 PERSIAN = re.compile(r"[؀-ۿ]")
 ISSUE_SOURCES = ("overview/service.py", "overview/detectors.py", "overview/forwards.py", "ssl/service.py", "checks/host.py",
-                 "checks/panel.py")
+                 "checks/panel.py", "checks/drift.py")
 
 
 def test_the_code_scan_sees_every_issue_constructor():

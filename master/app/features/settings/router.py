@@ -31,6 +31,7 @@ RULES = (
     "container_revived", "dnat_missing", "ip_forward_off", "conntrack_limits_reset", "conntrack_drops", "oom_kill", "inode_high",
     "journal_big", "time_unsynced", "reboot_pending_pkgs", "node_down", "node_silent", "node_usage_drop", "inbound_without_group",
     "reseller_quota", "panel_version_changed", "panel_errors", "dnat_dead_target", "dnat_unknown_target", "relay_forward_broken",
+    "drift_ipset", "drift_dnat", "drift_sysctl",
 )
 DEFAULTS.update({"on_" + r: 1 for r in RULES})
 

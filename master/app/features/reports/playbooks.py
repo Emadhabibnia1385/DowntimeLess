@@ -25,7 +25,7 @@ def _issue_sources() -> str:
     """The text of the files that raise issues, so a detector counts as live only when its code is really there."""
     text = ""
     for rel in ("overview/service.py", "overview/detectors.py", "overview/forwards.py", "ssl/service.py", "checks/host.py",
-                "checks/panel.py"):
+                "checks/panel.py", "checks/drift.py"):
         try:
             text += (_FEATURES / rel).read_text(encoding="utf-8")
         except OSError:
@@ -621,6 +621,49 @@ _ENTRIES: List[Dict[str, Any]] = [
        ["Do not judge one relay by one vantage point: two in-country relays must agree",
         "Never leave a location with a single relay"],
        ["tunnels.md section 6", "incidents.md 75", "scripts/relay/data_matrix.sh"]),
+
+    # ---- config drift (agent 0.3.3 `checks.drift`: counts and hashes only) ----
+    _p("drift_ipset", "access", "Live ipset differs from the access list file",
+       "مجموعهٔ ipset زنده با فهرست دسترسی در فایل یکی نیست؛ سرویس آن فایل را فقط هنگام شروع می‌خواند و پس از ویرایش ری‌استارت نشده است.", AUTO,
+       ["The access list file was edited but the service that builds the set reads it only at start (nyxon-access: 8 trusted sources live, 21 in the file; a tunnel peer was dropped)",
+        "A live ipset add was made by hand; the service overwrites it at its next start (tunnels section 15)",
+        "A runtime learned entry vanished after a reboot (incident 67)"],
+       ["ipset list -t nyxon_trusted (Number of entries)", "ipset list nyxon_trusted | grep -c ^[0-9]",
+        "grep -c . /etc/nyxon/access.conf ; systemctl status nyxon-access --no-pager"],
+       ["Back up the file: cp -a /etc/nyxon/access.conf /etc/nyxon/access.conf.bak-$(date +%Y%m%d%H%M)",
+        "Restart the service so it re-reads the file, with the owner's yes: systemctl restart nyxon-access",
+        "Then the live count must equal the file: ipset list nyxon_trusted | grep -c ^[0-9]"],
+       ["Do not fix a missing peer with a live ipset add: the next start of the service removes it",
+        "Every exit that dials the relay must be in the persistent list, not only in the live set"],
+       ["tunnels.md section 15", "incidents.md 67"]),
+
+    _p("drift_dnat", "tunnel", "Live DNAT rules differ from the boot file",
+       "قوانین DNAT زنده با فایل بوت یکی نیست؛ تغییری که فقط زنده داده شده با اولین ریبوت یا ری‌استارت واحد DNAT برمی‌گردد.", AUTO,
+       ["A rule was changed live (nft add or a temporary forward during an outage) and the file was not updated (incident 76)",
+        "The file was edited and the unit was not reloaded, so the live table still has the old map",
+        "Live rules with no file at all: lost at the next reboot"],
+       ["nft list ruleset | grep 'dnat to' (every forward: port and destination)",
+        "grep 'dnat to' /etc/nftables-relay-dnat.nft (what the boot unit will load)",
+        "systemctl cat relay-dnat (which file the unit loads)"],
+       ["Make the file say what users need, validate it: nft -c -f /etc/nftables-relay-dnat.nft",
+        "Reload with the owner's yes: systemctl restart relay-dnat (existing flows keep their conntrack mapping)"],
+       ["Do not flush the whole ruleset to resync: other tables (firewall, accounting) live there too",
+        "Do not reload a file you have not validated with nft -c -f"],
+       ["tunnels.md section 6", "incidents.md 76", "scripts/relay/dnat.sh"]),
+
+    _p("drift_sysctl", "kernel", "Live sysctl values differ from the sysctl files",
+       "مقدار زندهٔ sysctl با فایل‌ها یکی نیست؛ فایل sysctl اثبات مقدار زنده نیست (مثلاً conntrack پس از sysctl بارگذاری شده).", AUTO,
+       ["nf_conntrack loaded after sysctl ran at boot, so the conntrack limits in the file were skipped (incident 74)",
+        "A rebuild or reboot fell back to cubic because tcp_bbr was not loaded early (capacity section 13)",
+        "Someone changed a value live with sysctl -w and never wrote it to a file"],
+       ["sysctl net.netfilter.nf_conntrack_max net.netfilter.nf_conntrack_tcp_timeout_established",
+        "sysctl net.ipv4.tcp_congestion_control net.core.default_qdisc",
+        "grep -r . /etc/sysctl.d/ | grep -v '#'", "lsmod | grep -E 'nf_conntrack|tcp_bbr'"],
+       ["Re-apply every file, with the owner's yes: sysctl --system",
+        "Load the modules early so the next boot gets it right: echo nf_conntrack > /etc/modules-load.d/conntrack.conf",
+        "scripts/node/host_tune.sh audits BBR, conntrack and RPS read-only by default"],
+       ["Do not take a sysctl file as proof of the live value: always compare"],
+       ["incidents.md 74", "capacity.md section 13", "scripts/node/host_tune.sh"]),
 
     # ---- detectors planned (panel extras, probes) ----
     _p("quota_exhausted", "quota", "Quota exhausted, host dark",

@@ -346,6 +346,8 @@ def observe(db: sqlite3.Connection, server: sqlite3.Row, rep: Dict[str, Any], no
         if isinstance(ct, dict):
             _counter_events(state, "ct", {"insert_failed": num(ct.get("insert_failed")), "drop": num(ct.get("drop"))}, now)
         _kernel(state, checks.get("kernel"), now)
+        from . import drift  # drift reads this module's helpers
+        drift.observe(state, checks, now)
     panel = panel_of(rep)
     if panel is not None:
         _panel(db, ws, sid, state, panel, now)

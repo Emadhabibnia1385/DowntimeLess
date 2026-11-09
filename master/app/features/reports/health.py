@@ -47,6 +47,9 @@ CHECK_PENALTIES = {
     "node_usage_drop": ({"other": "panel_nodes"}, 0.15),
     "dnat_dead_target": ({"relay": "forward_integrity", "exit": "units", "other": "units"}, 0.7),
     "relay_forward_broken": ({"relay": "forward_integrity"}, 0.7),
+    "drift_ipset": ({"relay": "forward_integrity", "exit": "units", "other": "units"}, 0.4),
+    "drift_dnat": ({"relay": "forward_integrity", "exit": "units", "other": "units"}, 0.4),
+    "drift_sysctl": ({"relay": "kernel", "exit": "kernel", "other": "kernel"}, 0.4),
 }
 # critical issues that are hard gates on a relay: a forward port closed, the DNAT table gone, forwarding off
 GATES = {"listener_missing": "forward_port_closed", "dnat_missing": "dnat_missing", "ip_forward_off": "ip_forward_off",
