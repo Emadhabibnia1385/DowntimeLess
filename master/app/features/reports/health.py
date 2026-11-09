@@ -8,6 +8,7 @@ from ..issues import acks
 from ..overview import service as overview
 from ..servers.service import latest_of, role_of, status_of
 from ..settings.router import thresholds
+from ..checks import quality
 from . import quota as quota_svc
 from .common import name_of
 
@@ -50,6 +51,8 @@ CHECK_PENALTIES = {
     "drift_ipset": ({"relay": "forward_integrity", "exit": "units", "other": "units"}, 0.4),
     "drift_dnat": ({"relay": "forward_integrity", "exit": "units", "other": "units"}, 0.4),
     "drift_sysctl": ({"relay": "kernel", "exit": "kernel", "other": "kernel"}, 0.4),
+    "path_quality_low": ({"relay": "peer_paths", "exit": "relay_reachability"}, 0.5),
+    "tunnel_unhealthy": ({"relay": "forward_integrity", "exit": "units", "other": "units"}, 0.5),
 }
 # critical issues that are hard gates on a relay: a forward port closed, the DNAT table gone, forwarding off
 GATES = {"listener_missing": "forward_port_closed", "dnat_missing": "dnat_missing", "ip_forward_off": "ip_forward_off",
@@ -63,6 +66,19 @@ DESCRIPTION = (
     "probes to proven ports; a path measured only by ICMP counts for at most 30% of its weight and never gates."
 )
 ICMP_ONLY_SHARE = 0.3
+QUALITY_ITEM = "per_peer_user_quality"
+
+
+def _quality_measured(servers: List[Any]) -> set:
+    """Servers with real-user quality data: an exit that sends `checks.paths`, and every server named as its peer."""
+    by_ip = {s["public_ip"]: s["id"] for s in servers if s["public_ip"]}
+    out = set()
+    for s in servers:
+        checks = m.checks_of(m.report_of(s))
+        if checks is not None and isinstance(checks.get("paths"), list):
+            out.add(s["id"])
+            out |= {by_ip[p] for p in quality.by_peer(checks) if p in by_ip}
+    return out
 
 
 def band(score: Optional[int], gates: List[Dict[str, Any]]) -> str:
@@ -187,7 +203,9 @@ def compute(db: sqlite3.Connection, ws: int, found: Optional[List[Dict[str, Any]
     quotas = quota_svc.forecast(db, ws, now)
     quota_by = {q["server_id"]: q for q in quotas or []}
     items: List[Dict[str, Any]] = []
-    for s in db.execute("SELECT * FROM servers WHERE workspace_id=? ORDER BY role, name", (ws,)):
+    servers = db.execute("SELECT * FROM servers WHERE workspace_id=? ORDER BY role, name", (ws,)).fetchall()
+    measured = _quality_measured(servers)
+    for s in servers:
         variant = variant_of(s["role"])
         st, w = status_of(s), WEIGHTS[variant]
         gates: List[Dict[str, Any]] = []
@@ -230,7 +248,7 @@ def compute(db: sqlite3.Connection, ws: int, found: Optional[List[Dict[str, Any]
             score = max(0, 100 - sum(p["points"] for p in pens))
         mine = per_server.get(s["id"], [])
         score, gates, pens = acks.screen_health(st, score, gates, pens, acks.health_quiet(mine))
-        not_measured = list(NOT_MEASURED[variant])
+        not_measured = [x for x in NOT_MEASURED[variant] if not (x == QUALITY_ITEM and s["id"] in measured)]
         if st != "pending" and not checks_svc.has_data(m.report_of(s)):
             not_measured.append(NO_CHECKS)
         if variant == "relay" and s["id"] not in quota_by:

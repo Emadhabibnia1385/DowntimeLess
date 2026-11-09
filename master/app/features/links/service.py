@@ -7,8 +7,11 @@ MAX_PEERS = 64
 
 def peers_for(db: sqlite3.Connection, server: sqlite3.Row) -> List[str]:
     """The addresses a server should count traffic to and from: every other server of its workspace with a known IPv4."""
-    if not server["acct_on"]:
-        return []
+    return workspace_peers(db, server) if server["acct_on"] else []
+
+
+def workspace_peers(db: sqlite3.Connection, server: sqlite3.Row) -> List[str]:
+    """Every other server of the server's workspace with a known IPv4 (at most MAX_PEERS)."""
     rows = db.execute(
         "SELECT public_ip FROM servers WHERE workspace_id=? AND id<>? AND public_ip IS NOT NULL AND public_ip NOT LIKE '%:%' ORDER BY id",
         (server["workspace_id"], server["id"]),

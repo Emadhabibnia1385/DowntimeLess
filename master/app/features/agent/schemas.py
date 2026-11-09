@@ -62,4 +62,5 @@ class ReportResult(BaseModel):
     acct_peers: List[str] = []
     ping_targets: List[PingTarget]
     probe_targets: List[ProbeTarget] = []  # agent 0.3.2+; older agents ignore it
+    peers: List[str] = []  # agent 0.3.3+: the workspace's other servers, named in path quality rows
     jobs: List[JobToRun]

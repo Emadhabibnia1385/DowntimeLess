@@ -21,6 +21,8 @@ DEFAULTS: Dict[str, float] = {
     # a node's last hour under this share of its own median while the other nodes keep this share
     "node_down_min": 5, "node_unavailable": 5, "node_drop_pct": 30, "node_others_pct": 70,
     "reseller_warn": 85, "reseller_crit": 95, "reseller_hours": 24,
+    # real-user path quality per relay and exit (agent 0.3.3 ss -Htin), and tunnel health
+    "quality_min_conns": 10, "quality_mb_min": 0.1, "quality_retrans_max": 40, "tunnel_flat_min": 15, "tunnel_log_fails": 5,
 }
 
 # One on/off switch per kind of alert (1 = on); an alert that is off is neither listed as an issue nor sent to Telegram.
@@ -31,7 +33,7 @@ RULES = (
     "container_revived", "dnat_missing", "ip_forward_off", "conntrack_limits_reset", "conntrack_drops", "oom_kill", "inode_high",
     "journal_big", "time_unsynced", "reboot_pending_pkgs", "node_down", "node_silent", "node_usage_drop", "inbound_without_group",
     "reseller_quota", "panel_version_changed", "panel_errors", "dnat_dead_target", "dnat_unknown_target", "relay_forward_broken",
-    "drift_ipset", "drift_dnat", "drift_sysctl",
+    "drift_ipset", "drift_dnat", "drift_sysctl", "path_quality_low", "tunnel_unhealthy",
 )
 DEFAULTS.update({"on_" + r: 1 for r in RULES})
 

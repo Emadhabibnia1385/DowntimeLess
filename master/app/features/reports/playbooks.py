@@ -25,7 +25,7 @@ def _issue_sources() -> str:
     """The text of the files that raise issues, so a detector counts as live only when its code is really there."""
     text = ""
     for rel in ("overview/service.py", "overview/detectors.py", "overview/forwards.py", "ssl/service.py", "checks/host.py",
-                "checks/panel.py", "checks/drift.py"):
+                "checks/panel.py", "checks/drift.py", "checks/quality.py"):
         try:
             text += (_FEATURES / rel).read_text(encoding="utf-8")
         except OSError:
@@ -664,6 +664,35 @@ _ENTRIES: List[Dict[str, Any]] = [
         "scripts/node/host_tune.sh audits BBR, conntrack and RPS read-only by default"],
        ["Do not take a sysctl file as proof of the live value: always compare"],
        ["incidents.md 74", "capacity.md section 13", "scripts/node/host_tune.sh"]),
+
+    # ---- real-user quality and tunnel health (agent 0.3.3) ----
+    _p("path_quality_low", "path", "Real users get almost no data through one relay",
+       "کاربرانی که از یک رله به این نود می‌آیند وصل‌اند ولی تقریباً داده نمی‌گیرند (کمتر از ۰٫۱ مگابایت در هر اتصال یا ارسال مجدد بالا)، حتی اگر تست‌های مصنوعی سالم باشند.", AUTO,
+       ["A relay's direct DNAT to this exit is throttled while its tunnel to the same exit is fine (incident 53: 0.02 MB per connection)",
+        "A throttled relay-exit pair: ping and bulk tests pass, users disconnect (tunnels section 19)",
+        "Right after a DNS change: stale connections still arriving on the old relay (compare after 10+ minutes)"],
+       ["ssh EXIT 'PORTS=\"21001 21002\" bash -s' < scripts/node/realuse.sh (connections, MB per connection and RTT per relay)",
+        "ss -Htin state established '( sport = :PORT )' | grep -c bytes_acked",
+        "scripts/relay/data_matrix.sh from another in-country server through that relay"],
+       ["Re-point the relay's DNAT for that port to the exit's tunnel IP when a tunnel to the same exit carries data (incident 53), with the owner's yes",
+        "Otherwise take that relay out of the location's DNS while every name keeps two working relays, and re-check the next day"],
+       ["Do not trust ping or a synthetic test alone: judge by real user bytes",
+        "Never leave a location with a single relay"],
+       ["scripts/node/realuse.sh", "incidents.md 53", "tunnels.md section 19"]),
+
+    _p("tunnel_unhealthy", "tunnel", "Tunnel active on paper but its path is dead",
+       "واحد تانل active است ولی لاگ آن خطای handshake دارد یا رابط تانل فقط می‌فرستد و چیزی نمی‌گیرد؛ وضعیت واحد اثبات سلامت نیست.", AUTO,
+       ["The relay's source-IP allowlist dropped the exit's echoes after a reboot: the learned entry was gone (incident 67, did not answer in 6 attempts)",
+        "Relay-to-exit ICMP filtered for a forward xDi link while the unit stays active (tunnels section 15)",
+        "Two dialed links from one exit: one of them logs echoes that carry a different tunnel's tag (tunnels section 15)"],
+       ["journalctl -u UNIT --since -30min --no-pager | grep -c 'handshake did not complete'",
+        "scripts/node/bpstatus.sh (peer loss and handshake failures per BackPack link)",
+        "ping -f -s 1200 -c 300 PEER from one end to the tunnel peer (0% loss is the test)",
+        "ip -s link show IFACE (rx and tx bytes of the tunnel interface)"],
+       ["Allowlist: add the exit to the persistent trusted list and restart the service that loads it: systemctl restart nyxon-access",
+        "Dead links: disable them on both ends; restart a link only one end at a time and wait for it to re-establish"],
+       ["Do not judge a tunnel by systemctl is-active", "Do not fix a dropped peer with a live ipset add: the service overwrites it"],
+       ["tunnels.md section 15", "incidents.md 67", "scripts/node/bpstatus.sh"]),
 
     # ---- detectors planned (panel extras, probes) ----
     _p("quota_exhausted", "quota", "Quota exhausted, host dark",

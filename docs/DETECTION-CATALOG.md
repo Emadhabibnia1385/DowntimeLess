@@ -157,6 +157,23 @@ the clock again, and equal numbers clear it.
 Health: 40% of `forward_integrity` on a relay (`units` elsewhere) for ipset and DNAT drift, 40% of `kernel` for sysctl
 drift; never a gate. Switches: `on_drift_ipset`, `on_drift_dnat`, `on_drift_sysctl`.
 
+## Real-user path quality and tunnel health (agent 0.3.3, `checks/quality.py`)
+
+`checks.paths` is `scripts/node/realuse.sh` as data: per listening port and peer, connections, MB acked per connection,
+RTT and retransmit share; the master sums each peer over its ports. Users' own addresses arrive only as `other` and
+are never judged. Byte counters of tunnel interfaces come from `checks.tunnels` and BackPack log counts from
+`checks.tunnel_logs`.
+
+| Code | Severity | When |
+|---|---|---|
+| `path_quality_low:<peer>` | warning | on the server that sees the connections (an exit), a peer (a relay of the workspace, or a tunnel/loopback address) with at least `quality_min_conns` (10) connections under `quality_mb_min` (0.1) MB each or above `quality_retrans_max` (40) % retransmits for 10 minutes; clears after 5 minutes of good samples |
+| `tunnel_unhealthy:<tunnel>` | warning, critical when both signals | a BackPack unit logged `tunnel_log_fails` (5) `did not answer in` / `handshake did not complete` lines in 10 minutes, or any `carry a different tunnel` line; or a tunnel interface that carried traffic stopped receiving for `tunnel_flat_min` (15) minutes while it still sends |
+
+Health: `path_quality_low` takes 50% of the exit's `relay_reachability` weight, `tunnel_unhealthy` 50% of
+`forward_integrity` on a relay (`units` elsewhere). `per_peer_user_quality` leaves a server's `not_measured` list once
+it sends `checks.paths`, or another server names it as a peer there. Switches: `on_path_quality_low`,
+`on_tunnel_unhealthy`.
+
 ## Health scores (proposal)
 
 **Relay.** Hard gates (any one means failing): agent offline; a configured forward port not listening or

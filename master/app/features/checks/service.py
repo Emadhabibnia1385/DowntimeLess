@@ -2,7 +2,7 @@
 import sqlite3
 from typing import Any, Dict, Iterable, List, Optional
 
-from . import drift, host, memory as m, panel
+from . import drift, host, memory as m, panel, quality
 
 PANEL_LIMIT = 10  # panel hosts shown per workspace
 
@@ -10,10 +10,13 @@ PANEL_LIMIT = 10  # panel hosts shown per workspace
 def context(servers: Iterable[sqlite3.Row]) -> Dict[str, Any]:
     """What a rule may look up on another server of the same workspace: a node's host by its public IP."""
     by_ip: Dict[str, Dict[str, Any]] = {}
+    rows: Dict[str, Any] = {}
     for s in servers:
+        if s["public_ip"]:
+            rows.setdefault(s["public_ip"], s)
         if s["public_ip"] and s["last_report"]:
             by_ip.setdefault(s["public_ip"], m.report_of(s))
-    return {"by_ip": by_ip}
+    return {"by_ip": by_ip, "servers_by_ip": rows}
 
 
 def has_data(rep: Dict[str, Any]) -> bool:
@@ -27,7 +30,7 @@ def server_issues(db: sqlite3.Connection, ws: int, s, th: Dict[str, float], now:
     state, ignored = m.load(db, ws, s["id"]), m.ignored(db, ws, s["id"])
     rows = m.baseline(db, ws, s["id"]) if m.checks_of(rep) is not None else []
     return (host.issues(s, th, rep, state, rows, ignored, now) + drift.issues(s, th, rep, state, now)
-            + panel.issues(db, ws, s, th, rep, state, ignored, ctx, now))
+            + quality.issues(s, th, rep, state, ctx, now) + panel.issues(db, ws, s, th, rep, state, ignored, ctx, now))
 
 
 def _pct(count: Optional[int], limit: Optional[int]) -> Optional[float]:
