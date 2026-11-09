@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import time
 from typing import Any, Dict, List
@@ -20,6 +21,16 @@ LIMITS = {
     "full": {"issues": 60, "recurring": 12, "certs": 15, "pairs": 10, "attention": 40, "changes": 15, "servers": 5},
 }
 SEV = ("critical", "warning", "info")
+NOTES_MAX = 10
+
+
+def _note_text(detail: str) -> str:
+    try:
+        d = json.loads(detail or "{}")
+    except ValueError:
+        d = {}
+    return str(d.get("text") or "")[:500] if isinstance(d, dict) else ""
+
 # lower runs first; codes not listed go last
 PRIORITY = {
     "offline": 0, "quota_exhausted": 1, "quota": 1, "quota_pair": 2, "blacklisted": 1, "relay_filtered": 1, "relay_egress": 1, "conntrack": 2,
@@ -158,9 +169,14 @@ def build(db: sqlite3.Connection, ws: int, detail: str = "brief", now: int = 0) 
     outdated = [r["name"] if not r["alias"] else r["alias"] for r in rows if r["agent_outdated"]]
     quota = quota_svc.forecast(db, ws, now)
     changes = db.execute(
-        "SELECT ts, server_id, kind, title FROM events WHERE workspace_id=? AND ts>=? AND kind NOT IN ('issue_opened','issue_closed') "
+        "SELECT id, ts, server_id, kind, title FROM events WHERE workspace_id=? AND ts>=? AND kind NOT IN ('issue_opened','issue_closed','note') "
         "ORDER BY ts DESC, id DESC LIMIT ?",
         (ws, now - DAY, lim["changes"] + 1)).fetchall()
+    # operator notes always make it in: the next incident is read against the change before it
+    notes = db.execute("SELECT id, ts, server_id, kind, detail AS title FROM events WHERE workspace_id=? AND ts>=? AND kind='note' "
+                       "ORDER BY ts DESC, id DESC LIMIT ?", (ws, now - DAY, NOTES_MAX)).fetchall()
+    changes = sorted([dict(r) for r in changes[: lim["changes"]]] + [dict(r, title=_note_text(r["title"])) for r in notes],
+                     key=lambda r: (-r["ts"], -r["id"]))
     names = {r["id"]: name_of(r) for r in raw_servers}
     counted = db.execute(
         "SELECT COUNT(*) c FROM events WHERE workspace_id=? AND ts>=? AND kind IN ('issue_opened','issue_closed')", (ws, now - DAY)
@@ -182,7 +198,7 @@ def build(db: sqlite3.Connection, ws: int, detail: str = "brief", now: int = 0) 
         "quota": quota,
         "certs_at_risk": certs[: lim["certs"]],
         "agents_outdated": {"latest": current_agent_version(), "servers": outdated},
-        "changes_24h": [{"ts": r["ts"], "server": names.get(r["server_id"]), "kind": r["kind"], "title": r["title"]} for r in changes[: lim["changes"]]],
+        "changes_24h": [{"ts": r["ts"], "server": names.get(r["server_id"]), "kind": r["kind"], "title": r["title"]} for r in changes],
         "issue_events_24h": counted,
         "check_first": check,
         "acknowledged": acks.brief(every)[: lim["issues"]],

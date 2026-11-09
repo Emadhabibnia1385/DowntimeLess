@@ -8,12 +8,15 @@ from fastapi.responses import PlainTextResponse
 
 from ...db import get_db
 from ...deps import Actor, current_workspace, require
+from ...errors import DLError
+from . import events as changelog
 from . import briefing as briefing_svc
 from . import health as health_svc
 from . import guides_fa, periodic, playbooks, render, schemas
 from .common import DAY, check_detail, check_format, check_lang, window
 
 router = APIRouter(prefix="/reports", tags=["reports"])
+changes_router = APIRouter(prefix="/changes", tags=["reports"])
 MAX_EVENTS = 500
 
 
@@ -134,3 +137,23 @@ def relays(since: Optional[int] = None, until: Optional[int] = None, format: str
               ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
     """Relay-by-exit matrix of loss, RTT and a path verdict, plus bytes per pair (default 7 days for bytes)."""
     return _periodic(format, since, until, 7 * DAY, lambda s, u: periodic.relays_report(db, ws, s, u), render.relays_md)
+
+
+@changes_router.post("", response_model=schemas.EventOut, status_code=201, operation_id="reports_add_change")
+def add_change(body: schemas.NoteIn, actor: Actor = Depends(require("admin")), ws: int = Depends(current_workspace),
+               db: sqlite3.Connection = Depends(get_db)):
+    """Record an operator's change note in the change log (at most 500 characters, optionally about one server)."""
+    text = " ".join(body.text.split())
+    if not text:
+        raise DLError("note.invalid")
+    name = None
+    if body.server_id is not None:
+        row = db.execute("SELECT name, alias FROM servers WHERE id=? AND workspace_id=?", (body.server_id, ws)).fetchone()
+        if not row:
+            raise DLError("server.not_found")
+        name = row["alias"] or row["name"]
+    eid = changelog.note(db, ws, text, body.server_id, actor.user_id, actor.via)
+    r = db.execute("SELECT * FROM events WHERE id=? AND workspace_id=?", (eid, ws)).fetchone()
+    return {"id": r["id"], "ts": r["ts"], "server_id": r["server_id"], "server": name, "kind": r["kind"], "title": r["title"],
+            "detail": json.loads(r["detail"])}
+

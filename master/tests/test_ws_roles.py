@@ -48,6 +48,7 @@ MATRIX = [
     ("GET", "/api/v1/ssl", None, "viewer"),
     ("GET", "/api/v1/reports/briefing", None, "viewer"),
     ("GET", "/api/v1/reports/changes", None, "viewer"),
+    ("POST", "/api/v1/changes", {"text": "Arno DNAT changed"}, "admin"),
     ("POST", "/api/v1/issues/ack", {"key": "server:0:cpu", "mode": "24h"}, "operator"),
     ("DELETE", "/api/v1/issues/ack?key=server:{sid}:cpu", None, "operator"),
     ("GET", "/api/v1/servers/{sid}/host-health", None, "viewer"),

@@ -7,7 +7,9 @@ KINDS = (
     "job_created", "job_done", "agent_updated", "server_added", "server_removed", "server_renamed",
     "acct_toggled", "issue_opened", "issue_closed", "rebooted", "ip_changed", "resized", "settings_changed",
     "member_added", "member_role_changed", "member_removed", "issue_acked", "issue_unacked", "check_ack",
+    "note",
 )
+NOTE_MAX = 500
 KEEP_S = 180 * 86400
 MAX_TITLE = 200
 
@@ -19,6 +21,16 @@ def record(db: sqlite3.Connection, ws: int, kind: str, title: str, server_id: Op
         "INSERT INTO events (workspace_id, ts, server_id, kind, title, detail) VALUES (?,?,?,?,?,?)",
         (ws, ts if ts is not None else int(time.time()), server_id, kind, title[:MAX_TITLE], json.dumps(detail or {}, ensure_ascii=False)),
     )
+
+
+def note(db: sqlite3.Connection, ws: int, text: str, server_id: Optional[int], user_id: Optional[int], via: str) -> int:
+    """An operator's own change note ("Arno DNAT changed"); the full text is in detail, the title is its start."""
+    cur = db.execute(
+        "INSERT INTO events (workspace_id, ts, server_id, kind, title, detail) VALUES (?,?,?,?,?,?)",
+        (ws, int(time.time()), server_id, "note", text[:MAX_TITLE],
+         json.dumps({"text": text[:NOTE_MAX], "user_id": user_id, "via": via}, ensure_ascii=False)),
+    )
+    return cur.lastrowid
 
 
 def prune(db: sqlite3.Connection, now: int) -> None:

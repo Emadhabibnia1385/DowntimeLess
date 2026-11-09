@@ -20,7 +20,7 @@ from .features.links.router import router as links_router
 from .features.members.router import router as members_router
 from .features.issues.router import router as issues_router
 from .features.overview.router import router as overview_router
-from .features.reports.router import router as reports_router
+from .features.reports.router import changes_router, router as reports_router
 from .features.servers.router import router as servers_router
 from .features.settings.router import router as settings_router
 from .features.ssl.router import router as ssl_router
@@ -81,7 +81,7 @@ def create_app() -> FastAPI:
     s = get_settings()
     app = FastAPI(title="DowntimeLess", version="0.1.0", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json")
     app.add_exception_handler(DLError, dl_error_handler)
-    for r in (auth_router, servers_router, categories_router, overview_router, issues_router, settings_router, keys_router, ssl_router, links_router, traffic_router, telegram_router, reports_router, members_router, checks_router):
+    for r in (auth_router, servers_router, categories_router, overview_router, issues_router, settings_router, keys_router, ssl_router, links_router, traffic_router, telegram_router, reports_router, changes_router, members_router, checks_router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(agent_router, prefix="/api")
 

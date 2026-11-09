@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ---- briefing ----
@@ -327,6 +327,11 @@ class EventOut(BaseModel):
     kind: str
     title: str
     detail: Dict[str, Any]
+
+
+class NoteIn(BaseModel):
+    text: str = Field(min_length=1, max_length=500)
+    server_id: Optional[int] = None
 
 
 class ChangesOut(BaseModel):
