@@ -125,6 +125,19 @@ def list_jobs(server_id: int, _: Actor = Depends(require("viewer")), ws: int = D
     return [_job_out(r) for r in db.execute("SELECT * FROM jobs WHERE server_id=? ORDER BY id DESC LIMIT 50", (server_id,))]  # ws: server_row - checked above
 
 
+def _fix_allowed(db: sqlite3.Connection, server: sqlite3.Row, body: JobCreate, actor: Actor) -> None:
+    """A fix runs only for a signed-in admin, on a server whose level allows changes, once at a time, on its own units."""
+    if actor.via == "key":
+        raise DLError("job.human_only")
+    if server["permission"] not in ("safe", "full"):
+        raise DLError("job.permission")
+    if body.kind == "tunnel_restart" and body.args["unit"] not in svc.tunnel_units_of(server):
+        raise DLError("job.args_invalid")
+    if db.execute("SELECT 1 FROM jobs WHERE server_id=? AND kind=? AND args=? AND status IN ('queued','sent')",  # ws: server_row - checked by the caller
+                  (server["id"], body.kind, json.dumps(body.args))).fetchone():
+        raise DLError("job.pending")
+
+
 @router.post("/{server_id}/jobs", response_model=JobOut, status_code=201, operation_id="servers_create_job")
 def create_job(server_id: int, body: JobCreate, actor: Actor = Depends(require("operator")), ws: int = Depends(current_workspace),
                db: sqlite3.Connection = Depends(get_db)):
@@ -136,6 +149,8 @@ def create_job(server_id: int, body: JobCreate, actor: Actor = Depends(require("
         raise DLError("auth.forbidden")
     if not svc.job_args_valid(body.kind, body.args):
         raise DLError("job.args_invalid")
+    if body.kind in svc.FIX_KINDS:
+        _fix_allowed(db, server, body, actor)
     if body.kind not in svc.SAFE_KINDS:
         if actor.via == "key" and not actor.full:
             raise DLError("job.permission")  # a read key never changes a server; a full key may

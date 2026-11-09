@@ -9,7 +9,9 @@ from ...settings import get_settings
 RANGES = {"1h": (3600, 30), "6h": (21600, 60), "24h": (86400, 300), "7d": (7 * 86400, 1800), "30d": (30 * 86400, 7200)}
 # read-only kinds any admin may queue; the rest also need the server permission level
 SAFE_KINDS = {"ping", "tcp_check", "speedtest_down", "speedtest_up"}
-MUTATING_KINDS = {"apt_upgrade_safe", "reboot", "self_update", "cert_renew", "cert_delete"}
+# one-click fixes from an alert: fixed commands on the agent, a signed-in admin, never an API key
+FIX_KINDS = {"nft_reload", "sysctl_apply", "ipset_sync", "tunnel_restart"}
+MUTATING_KINDS = {"apt_upgrade_safe", "reboot", "self_update", "cert_renew", "cert_delete"} | FIX_KINDS
 # diagnostics return text for the panel to show; actions change a service or free space; neither is for a read key
 DIAG_KINDS = {"processes", "ports", "disk_usage", "journal", "traceroute", "http_check", "dns_check"}
 ACTION_KINDS = {"service_restart", "vacuum_logs"}
@@ -124,8 +126,28 @@ _UNIT = re.compile(r"^[A-Za-z0-9@._:-]{1,100}$")
 _HOST = re.compile(r"^[A-Za-z0-9:][A-Za-z0-9.:_-]{0,252}$")
 
 
+TUNNEL_UNIT = re.compile(r"^(backpack-|backhaul|gre-|wattun@|rathole|frps@|frpc@|gost)[A-Za-z0-9@._-]{0,80}\.service$")
+
+
+def tunnel_units_of(row: sqlite3.Row) -> set:
+    """The tunnel units the server reported: its tunnel configs' units and its enabled tunnel units (DNAT units excluded)."""
+    try:
+        rep = json.loads(row["last_report"]) if row["last_report"] else {}
+    except ValueError:
+        return set()
+    checks = rep.get("checks") if isinstance(rep, dict) and isinstance(rep.get("checks"), dict) else {}
+    tunnels = checks.get("tunnels") if isinstance(checks.get("tunnels"), dict) else {}
+    names = [c.get("unit") for c in tunnels.get("configs") or [] if isinstance(c, dict)]
+    names += [u.get("name") for u in checks.get("units") or [] if isinstance(u, dict) and u.get("enabled") is True]
+    return {n for n in names if isinstance(n, str) and TUNNEL_UNIT.match(n)}
+
+
 def job_args_valid(kind: str, args: Dict[str, Any]) -> bool:
     """The arguments each kind of job may carry; the agent checks them again before it runs anything."""
+    if kind in ("nft_reload", "sysctl_apply", "ipset_sync"):
+        return args == {}
+    if kind == "tunnel_restart":
+        return set(args) == {"unit"} and isinstance(args["unit"], str) and TUNNEL_UNIT.match(args["unit"]) is not None
     if kind in CERT_KINDS:
         return re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$", str(args.get("name", ""))) is not None
     if kind == "service_restart":
