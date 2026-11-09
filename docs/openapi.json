@@ -6147,6 +6147,14 @@
             "title": "Jobs",
             "type": "array"
           },
+          "peers": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Peers",
+            "type": "array"
+          },
           "permission": {
             "title": "Permission",
             "type": "string"

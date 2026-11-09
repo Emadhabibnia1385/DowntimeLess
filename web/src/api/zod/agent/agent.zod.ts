@@ -67,6 +67,7 @@ export const AgentReportBody = zod.object({
 });
 
 export const agentReportResponseAcctPeersDefault = [];
+export const agentReportResponsePeersDefault = [];
 export const agentReportResponseProbeTargetsItemTlsDefault = false;
 export const agentReportResponseProbeTargetsDefault = [];
 
@@ -80,6 +81,7 @@ export const AgentReportResponse = zod.object({
 			kind: zod.string(),
 		}),
 	),
+	peers: zod.array(zod.string()).default(agentReportResponsePeersDefault),
 	permission: zod.string(),
 	ping_targets: zod.array(
 		zod.object({

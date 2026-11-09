@@ -10,6 +10,7 @@ function valueText(key: string, value: unknown): string {
 		if (key.endsWith("_pct")) return formatPercent(value);
 		if (key.endsWith("_ms")) return formatMs(value);
 		if (key.endsWith("_s_ago") || key.endsWith("_s")) return formatDuration(value);
+		if (key.endsWith("_per_conn")) return formatDecimal(value, 3);
 		return formatDecimal(value, 1);
 	}
 	if (Array.isArray(value)) return value.join(", ");

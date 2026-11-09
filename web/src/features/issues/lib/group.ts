@@ -1,5 +1,5 @@
 import type { Issue } from "@/api/generated/model";
-import { formatDuration, formatNumber, formatPercent, t } from "@/strings";
+import { formatDecimal, formatDuration, formatNumber, formatPercent, t } from "@/strings";
 
 export type Severity = "critical" | "warning" | "info";
 export type GroupItem = {
@@ -67,6 +67,11 @@ export function valueOf(issue: Issue): string {
 			return t.issues.values.liveVsFile(formatNumber(live), formatNumber(file));
 	}
 	if (family === "drift_sysctl" && Array.isArray(e.keys)) return list(e.keys);
+	if (family === "path_quality_low") {
+		const mb = num(e.mb_per_conn);
+		const peer = typeof e.relay === "string" ? e.relay : typeof e.peer === "string" ? e.peer : "";
+		if (mb !== null) return t.issues.values.perConn(formatDecimal(mb, 2), peer);
+	}
 	if (Array.isArray(e.units)) return e.units.join(", ");
 	for (const key of ["ports", "containers", "inbounds", "errors"]) {
 		if (Array.isArray(e[key])) return list(e[key]);

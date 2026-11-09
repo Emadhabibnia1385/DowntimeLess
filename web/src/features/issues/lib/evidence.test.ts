@@ -62,3 +62,9 @@ describe("evidenceRows for the Phase 1 detectors", () => {
 		expect(rows[2].value).toBe("۷۵٪");
 	});
 });
+
+describe("per-connection values", () => {
+	it("keep three decimals so 0.01 MB is not shown as zero", () => {
+		expect(evidenceRows({ mb_per_conn: 0.012 })[0].value).toBe("۰٫۰۱۲");
+	});
+});

@@ -349,6 +349,8 @@ export const fa = {
 			drift_ipset: "ipset زنده با فایل دسترسی یکی نیست",
 			drift_dnat: "DNAT زنده با فایل بوت یکی نیست",
 			drift_sysctl: "sysctl زنده با فایل یکی نیست",
+			path_quality_low: "کیفیت پایین کاربران واقعی از یک رله",
+			tunnel_unhealthy: "تانل فعال ولی مسیر مرده",
 		},
 		values: {
 			expired: "منقضی شده",
@@ -358,6 +360,7 @@ export const fa = {
 			ago: (d: string) => `${d} پیش`,
 			mb: (n: string) => `${n} مگابایت`,
 			liveVsFile: (live: string, file: string) => `${live} زنده، ${file} در فایل`,
+			perConn: (mb: string, peer: string) => `${mb} مگابایت در هر اتصال از ${peer}`,
 		},
 		openSsl: "مشاهدهٔ گواهی‌ها",
 		evidenceLabels: {
@@ -472,6 +475,16 @@ export const fa = {
 			values: "مقدار (زنده / فایل)",
 			sources: "فایل‌ها",
 			checked: "کلیدهای سنجیده",
+			peer: "مبدأ اتصال‌ها",
+			relay: "رله",
+			conns: "اتصال‌ها",
+			mb_per_conn: "مگابایت در هر اتصال",
+			tunnel: "تانل",
+			unit: "سرویس",
+			iface: "رابط",
+			handshake_fails_10m: "خطای handshake در ۱۰ دقیقه",
+			wrong_tag_10m: "پیام برچسب تانل دیگر در ۱۰ دقیقه",
+			rx_flat_s: "مدت بدون دریافت",
 		},
 	},
 	panel: {
@@ -1612,6 +1625,14 @@ export const fa = {
 			drift_sysctl: {
 				title: "ناهمخوانی sysctl با فایل",
 				hint: "مقدار زندهٔ یک کلید sysctl ده دقیقه با فایل‌ها فرق دارد.",
+			},
+			path_quality_low: {
+				title: "کیفیت کاربران واقعی هر رله",
+				hint: "دست‌کم ۱۰ اتصال از یک رله، ده دقیقه کمتر از ۰٫۱ مگابایت در هر اتصال یا بیش از ۴۰٪ ارسال مجدد.",
+			},
+			tunnel_unhealthy: {
+				title: "تانل فعال ولی مرده",
+				hint: "خطاهای handshake در لاگ BackPack، یا رابط تانلی که فقط می‌فرستد.",
 			},
 		},
 	},

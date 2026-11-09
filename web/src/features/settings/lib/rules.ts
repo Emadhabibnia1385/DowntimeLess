@@ -48,7 +48,9 @@ export type RuleId =
 	| "relay_forward_broken"
 	| "drift_ipset"
 	| "drift_dnat"
-	| "drift_sysctl";
+	| "drift_sysctl"
+	| "path_quality_low"
+	| "tunnel_unhealthy";
 
 export type RuleUnit = "percent" | "days" | "minutes" | "count" | "mb";
 export type RuleGroup = "host" | "paths" | "services" | "kernel" | "panel";
@@ -95,12 +97,14 @@ export const RULES: readonly Rule[] = [
 	{ id: "relay_egress", group: "paths", unit: null },
 	{ id: "relay_filtered", group: "paths", unit: null },
 	{ id: "relay_forward_broken", group: "paths", unit: null },
+	{ id: "path_quality_low", group: "paths", unit: null },
 	{ id: "quota", group: "paths", unit: null },
 	{ id: "quota_pair", group: "paths", unit: null },
 	{ id: "ssl", group: "paths", warn: "ssl_warn_days", crit: "ssl_crit_days", unit: "days" },
 	{ id: "listener_missing", group: "services", unit: null },
 	{ id: "unit_stopped", group: "services", unit: null },
 	{ id: "unit_crashloop", group: "services", unit: null },
+	{ id: "tunnel_unhealthy", group: "services", unit: null },
 	{ id: "container_down", group: "services", unit: null },
 	{ id: "container_restarting", group: "services", unit: null },
 	{ id: "container_unhealthy", group: "services", unit: null },

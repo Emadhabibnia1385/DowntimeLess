@@ -12,6 +12,7 @@ export interface ReportResult {
 	acct_peers?: string[];
 	interval_s: number;
 	jobs: JobToRun[];
+	peers?: string[];
 	permission: string;
 	ping_targets: PingTarget[];
 	probe_targets?: ProbeTarget[];

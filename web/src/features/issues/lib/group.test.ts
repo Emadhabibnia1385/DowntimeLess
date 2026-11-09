@@ -149,3 +149,16 @@ describe("drift issues", () => {
 		).toBe("net.ipv4.ip_forward");
 	});
 });
+
+describe("real-user quality issues", () => {
+	it("shows MB per connection and the relay", () => {
+		expect(
+			valueOf(
+				issue({
+					code: "path_quality_low:203.0.113.1",
+					evidence: { mb_per_conn: 0.01, relay: "iran-1" },
+				}),
+			),
+		).toBe("۰٫۰۱ مگابایت در هر اتصال از iran-1");
+	});
+});
