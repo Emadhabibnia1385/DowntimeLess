@@ -1,0 +1,1 @@
+import{t as e}from"./panel-CBJGEGXM.js";var t=e;export{t as component};

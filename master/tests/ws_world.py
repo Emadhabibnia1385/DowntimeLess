@@ -19,7 +19,7 @@ B_IPS = {"bee-relay": "203.0.113.1", "bee-exit": "203.0.113.2", "bee-twin": "198
 A_MARKS = ("alfa-relay", "alfa-exit", "A-cat", "a-domain.example.com", "A-key", "-1001111111111", "A-incident", "A-chan",
            "alfa-node", "alfa-reseller", "alfa-inbound")
 B_MARKS = ("bee-relay", "bee-exit", "bee-twin", "203.0.113.", "B-cat", "b-domain.example.com", "B-key", "-1002222222222",
-           "B-incident", "B-chan", "bee-node", "bee-reseller", "bee-inbound", "bee-box")
+           "B-incident", "B-chan", "bee-node", "bee-reseller", "bee-inbound", "bee-box", "bee_invitee")
 # tables of the host checks and panel truth: every row carries workspace_id
 CHECK_TABLES = ("listener_baseline", "check_state", "check_ignores", "node_usage")
 
@@ -92,6 +92,7 @@ def _fill(client, ws, prefix, ips, chat):
     chan = client.post("/api/v1/telegram/channels", json={"name": prefix + "-chan", "chat_id": chat}).json()["id"]
     assert client.put("/api/v1/telegram/routes", json={"cpu": "channel:%d" % chan}).status_code == 200
     job = client.post("/api/v1/servers/%d/jobs" % ids[exit_], json={"kind": "ping"}).json()["id"]
+    inv = client.post("/api/v1/members/invites", json={"tg_username": "@%s_invitee" % ("alfa" if prefix == "A" else "bee"), "role": "viewer"}).json()["id"]
     # the relay is also the panel host: host checks, a learned baseline, panel truth and an ignore of each kind
     tag = "alfa" if prefix == "A" else "bee"
     pan = panel_data(nodes=[{"id": 1, "name": tag + "-node", "address": "192.0.2.1", "port": 1, "status": "error", "message": ""}],
@@ -129,7 +130,7 @@ def _fill(client, ws, prefix, ips, chat):
                (ws, "server:%d:disk" % ids[exit_], prefix + "-incident", now))
     db.close()
     return {"servers": ids, "agent_keys": keys, "category": cat, "key": key["id"], "key_token": key["token"], "channel": chan,
-            "job": job, "domain": dom}
+            "job": job, "domain": dom, "invite": inv}
 
 
 def build(owner, tg):
@@ -160,11 +161,11 @@ def dump(ws):
     try:
         out = {}
         for table in ("servers", "categories", "domains", "settings", "api_keys", "telegram_channels", "rule_routes",
-                      "incidents", "events", "alert_state", "flapping", "issue_acks"):
+                      "incidents", "events", "alert_state", "flapping", "issue_acks", "workspace_invites", "probe_ports"):
             out[table] = sorted(tuple(r) for r in db.execute("SELECT * FROM %s WHERE workspace_id=?" % table, (ws,)))
         for table in CHECK_TABLES:
             out[table] = sorted(tuple(r) for r in db.execute("SELECT * FROM %s WHERE workspace_id=?" % table, (ws,)))
-        for table in ("jobs", "metrics", "pings", "link_traffic", "link_prev"):
+        for table in ("jobs", "metrics", "pings", "probes", "link_traffic", "link_prev"):
             out[table] = sorted(tuple(r) for r in db.execute(
                 "SELECT t.* FROM %s t JOIN servers s ON s.id=t.server_id WHERE s.workspace_id=?" % table, (ws,)))
         out["members"] = sorted(tuple(r) for r in db.execute("SELECT * FROM workspace_members WHERE workspace_id=?", (ws,)))

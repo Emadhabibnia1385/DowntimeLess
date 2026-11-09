@@ -8,5 +8,6 @@
 export interface MemberCreate {
 	name?: string | null;
 	role: string;
-	tg_id: number;
+	tg_id?: number | null;
+	who?: string | null;
 }

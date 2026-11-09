@@ -12,6 +12,18 @@ PANEL_WORKSPACE = 1  # the installer's workspace; its owner is the panel owner
 MAX_MEMBERS = 50
 MAX_SERVERS = 200
 MAX_DOMAINS = 300
+SELF_SERVERS, SELF_DOMAINS = 20, 30  # caps of a workspace made by self-registration
+ROLE_RANK = {"viewer": 1, "operator": 2, "admin": 3, "owner": 4}
+
+
+def server_cap(db: sqlite3.Connection, ws: int) -> int:
+    row = db.execute("SELECT server_cap FROM workspaces WHERE id=?", (ws,)).fetchone()
+    return row["server_cap"] if row and row["server_cap"] is not None else MAX_SERVERS
+
+
+def domain_cap(db: sqlite3.Connection, ws: int) -> int:
+    row = db.execute("SELECT domain_cap FROM workspaces WHERE id=?", (ws,)).fetchone()
+    return row["domain_cap"] if row and row["domain_cap"] is not None else MAX_DOMAINS
 
 
 def panel_owner_id(db: sqlite3.Connection) -> Optional[int]:
@@ -62,17 +74,21 @@ def default_workspace(db: sqlite3.Connection, user_id: int) -> Optional[int]:
     return row["workspace_id"] if row else None
 
 
-def ensure_personal(db: sqlite3.Connection, user: sqlite3.Row) -> int:
-    """The person's own workspace, created empty (and only once) the first time they sign in."""
-    row = db.execute("SELECT id FROM workspaces WHERE owner_user_id=? ORDER BY id LIMIT 1", (user["id"],)).fetchone()
-    if row:
-        return row["id"]
+def ensure_personal(db: sqlite3.Connection, user: sqlite3.Row, caps: Optional[tuple] = None) -> int:
+    """The person's own workspace, created empty (and only once) the first time they sign in. `caps` (servers, domains)
+    is set for a self-registered account; one statement both checks and inserts, so two sign-ins never make two."""
     now = int(time.time())
-    name = (user["name"] or "").strip() or ("@" + user["tg_username"] if user["tg_username"] else PERSONAL_FALLBACK)
-    try:
-        ws = db.execute("INSERT INTO workspaces (name, owner_user_id, created_at) VALUES (?,?,?)", (name[:64], user["id"], now)).lastrowid
-    except sqlite3.IntegrityError:  # a second sign-in at the same moment made it first
-        return db.execute("SELECT id FROM workspaces WHERE owner_user_id=?", (user["id"],)).fetchone()["id"]
+    name = (user["name"] or "").strip() or ("@" + user["tg_username"] if user["tg_username"] else "")
+    name = name or (user["username"] if "username" in user.keys() and user["username"] else PERSONAL_FALLBACK)
+    servers, domains = caps or (None, None)
+    made = db.execute(
+        "INSERT INTO workspaces (name, owner_user_id, created_at, server_cap, domain_cap) SELECT ?,?,?,?,? "
+        "WHERE NOT EXISTS (SELECT 1 FROM workspaces WHERE owner_user_id=?)",
+        (name[:64], user["id"], now, servers, domains, user["id"]),
+    )
+    if not made.rowcount:
+        return db.execute("SELECT id FROM workspaces WHERE owner_user_id=? ORDER BY id LIMIT 1", (user["id"],)).fetchone()["id"]
+    ws = made.lastrowid
     db.execute(
         "INSERT INTO workspace_members (workspace_id, user_id, role, added_by, created_at) VALUES (?,?,'owner',?,?)",
         (ws, user["id"], user["id"], now),

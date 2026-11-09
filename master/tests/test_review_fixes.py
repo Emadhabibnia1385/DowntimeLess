@@ -53,10 +53,12 @@ def test_landing_is_remembered_at_every_sign_in_and_falls_back_to_the_own_worksp
 
 # ---- HIGH 2: registration stays closed --------------------------------------------------------------------
 
-def test_only_the_panel_owner_lets_new_people_in(owner, tg):
+def test_with_registration_closed_only_the_panel_owner_lets_new_people_in(owner, tg):
+    assert owner.put("/api/v1/auth/registration", json={"open": False}).json() == {"open": False}
     invite(owner, Y_TG, "viewer")
     y = login(owner.app, tg, Y_TG)
     switch(y, _personal(y))
+    assert y.post("/api/v1/members/invites", json={"tg_username": "@new_person", "role": "viewer"}).json()["code"] == "members.panel_owner_only"
     r = y.post("/api/v1/members", json={"tg_id": 900001, "role": "viewer"})
     assert r.status_code == 403 and r.json()["code"] == "members.panel_owner_only"
     assert _q("SELECT COUNT(*) FROM users WHERE tg_id=900001")[0][0] == 0
@@ -79,12 +81,14 @@ def test_a_workspace_has_at_most_50_members(owner):
     assert owner.post("/api/v1/members", json={"tg_id": 801000, "role": "viewer"}).json()["code"] == "members.limit"
 
 
-def test_a_person_owns_one_workspace_at_most(owner):
+def test_signing_in_never_makes_a_second_own_workspace(owner):
+    # migration 019 dropped the unique index (a merge may leave two owned workspaces); the insert itself checks
+    from app.workspaces import ensure_personal
     db = connect()
-    import sqlite3
-    with pytest.raises(sqlite3.IntegrityError):
-        db.execute("INSERT INTO workspaces (name, owner_user_id, created_at) VALUES ('second', "
-                   "(SELECT owner_user_id FROM workspaces WHERE id=1), 1)")
+    user = db.execute("SELECT * FROM users WHERE id=(SELECT owner_user_id FROM workspaces WHERE id=1)").fetchone()
+    first = ensure_personal(db, user)
+    assert ensure_personal(db, user) == first == 1
+    assert db.execute("SELECT COUNT(*) FROM workspaces WHERE owner_user_id=?", (user["id"],)).fetchone()[0] == 1
     db.close()
 
 
@@ -255,11 +259,9 @@ def test_servers_and_domains_have_a_ceiling_per_workspace(owner, monkeypatch):
     from app.features.ssl import service as ssl_svc
 
     monkeypatch.setattr(workspaces, "MAX_SERVERS", 2)
-    monkeypatch.setattr("app.features.servers.router.MAX_SERVERS", 2)
     make_server(owner, "s1")
     make_server(owner, "s2")
     assert owner.post("/api/v1/servers", json={"name": "s3"}).json()["code"] == "server.limit"
-    monkeypatch.setattr("app.features.ssl.router.MAX_DOMAINS", 1)
     monkeypatch.setattr(workspaces, "MAX_DOMAINS", 1)
     monkeypatch.setattr(ssl_svc, "is_public_host", lambda h: True)
     monkeypatch.setattr(ssl_svc, "probe", lambda h, p: {"not_after": None, "issuer": None, "error": None})

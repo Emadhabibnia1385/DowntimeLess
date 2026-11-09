@@ -6,12 +6,20 @@ import time
 from typing import Dict, Optional, Tuple
 from urllib.parse import parse_qsl
 
+import re
+
+from ... import appsettings
 from ...errors import DLError
 from ...security import check_password, digest, hash_password, new_token, same
-from ...workspaces import default_workspace, ensure_personal, is_member_anywhere, is_panel_owner, workspace_out
+from ...workspaces import (
+    SELF_DOMAINS, SELF_SERVERS, default_workspace, ensure_personal, is_member_anywhere, is_panel_owner, workspace_out,
+)
 
 CHALLENGE_TTL = 300
 SESSION_TTL = 30 * 24 * 3600
+# a letter first, so a username never reads as a numeric Telegram id or an @handle where people are added
+USERNAME_RE = re.compile(r"[a-z][a-z0-9_.]{2,31}")
+PASSWORD_MIN, PASSWORD_MAX = 8, 256
 
 
 def user_out(db: sqlite3.Connection, row: sqlite3.Row, ws: int) -> Dict[str, object]:
@@ -19,7 +27,8 @@ def user_out(db: sqlite3.Connection, row: sqlite3.Row, ws: int) -> Dict[str, obj
     workspace = workspace_out(db, ws, row["id"])
     return {
         "id": row["id"], "name": row["name"], "username": row["username"], "role": workspace["role"],
-        "has_password": bool(row["password_hash"]), "tg_username": row["tg_username"], "workspace": workspace,
+        "has_password": bool(row["password_hash"]), "tg_username": row["tg_username"], "tg_linked": row["tg_id"] is not None,
+        "workspace": workspace,
         "is_panel_owner": is_panel_owner(db, row["id"]),
     }
 
@@ -132,6 +141,42 @@ def claim_owner(db: sqlite3.Connection, token: str, tg_id: int, name: str, tg_us
         raise
 
 
+def check_new_username(name: str) -> str:
+    name = (name or "").strip().lower()
+    if not USERNAME_RE.fullmatch(name):
+        raise DLError("register.username_invalid")
+    return name
+
+
+def register(db: sqlite3.Connection, username: str, password: str, password2: str) -> sqlite3.Row:
+    """A new account with a password and its own workspace (20 servers, 30 domains), while registration is open.
+
+    The account, its workspace and its membership are written in one transaction: a failure leaves nothing behind."""
+    if not appsettings.registration_open(db):
+        raise DLError("register.closed")
+    name = check_new_username(username)
+    if password != password2:
+        raise DLError("register.password_mismatch")
+    if not PASSWORD_MIN <= len(password) <= PASSWORD_MAX or password.strip().lower() == name:
+        raise DLError("register.password_weak")
+    secret = hash_password(password)  # argon2, before the write lock is taken
+    now = int(time.time())
+    db.execute("BEGIN IMMEDIATE")
+    try:
+        try:
+            uid = db.execute("INSERT INTO users (username, password_hash, name, role, created_at) VALUES (?,?,'','none',?)",
+                             (name, secret, now)).lastrowid
+        except sqlite3.IntegrityError:
+            raise DLError("register.username_taken")
+        user = db.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+        ensure_personal(db, user, (SELF_SERVERS, SELF_DOMAINS))
+        db.execute("COMMIT")
+    except BaseException:
+        db.execute("ROLLBACK")
+        raise
+    return user
+
+
 def password_login(db: sqlite3.Connection, username: str, password: str):
     row = db.execute("SELECT * FROM users WHERE username=?", (username.strip().lower(),)).fetchone()
     # same error for unknown user and wrong password
@@ -150,6 +195,8 @@ def set_password(db: sqlite3.Connection, user: sqlite3.Row, username: Optional[s
     name = (username or user["username"] or "").strip().lower()
     if len(name) < 3:
         raise DLError("auth.weak_password")
+    if name != user["username"]:
+        check_new_username(name)
     taken = db.execute("SELECT id FROM users WHERE username=? AND id<>?", (name, user["id"])).fetchone()
     if taken:
         raise DLError("auth.invalid")

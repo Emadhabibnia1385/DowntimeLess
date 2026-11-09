@@ -7,6 +7,141 @@
 import * as zod from "zod";
 
 /**
+ * A one-time bot link (10 minutes) that ties a Telegram account to me; it works only for this browser session.
+ * @summary Link Start
+ */
+export const AuthLinkStartHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const AuthLinkStartResponse = zod.object({
+	deep_link: zod.string(),
+	expires_in: zod.int(),
+	link_id: zod.int(),
+});
+
+/**
+ * Where the link stands; once Telegram said yes, exactly what confirming will do (a merge when the Telegram account
+ * already has an account here).
+ * @summary Link View
+ */
+export const AuthLinkViewParams = zod.object({
+	link_id: zod.int(),
+});
+
+export const AuthLinkViewHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const authLinkViewResponseMergeOneOtherNameDefault = ``;
+export const authLinkViewResponseTelegramOneNameDefault = ``;
+
+export const AuthLinkViewResponse = zod.object({
+	expires_at: zod.int(),
+	link_id: zod.int(),
+	merge: zod
+		.union([
+			zod.object({
+				api_keys: zod.int(),
+				fingerprint: zod.string(),
+				keeps_panel_owner: zod.boolean(),
+				moves_password: zod.boolean(),
+				other: zod.object({
+					has_password: zod.boolean(),
+					name: zod.string().default(authLinkViewResponseMergeOneOtherNameDefault),
+					tg_username: zod.union([zod.string(), zod.null()]).optional(),
+					username: zod.union([zod.string(), zod.null()]).optional(),
+				}),
+				survivor: zod.string(),
+				workspaces: zod.array(
+					zod.object({
+						name: zod.string(),
+						owned: zod.boolean(),
+						result_role: zod.string(),
+						role: zod.string(),
+						survivor_role: zod.union([zod.string(), zod.null()]).optional(),
+						workspace_id: zod.int(),
+					}),
+				),
+			}),
+			zod.null(),
+		])
+		.optional(),
+	status: zod.string(),
+	telegram: zod
+		.union([
+			zod.object({
+				id: zod.int(),
+				name: zod.string().default(authLinkViewResponseTelegramOneNameDefault),
+				username: zod.union([zod.string(), zod.null()]).optional(),
+			}),
+			zod.null(),
+		])
+		.optional(),
+});
+
+/**
+ * @summary Link Cancel
+ */
+export const AuthLinkCancelParams = zod.object({
+	link_id: zod.int(),
+});
+
+export const AuthLinkCancelHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const AuthLinkCancelResponse = zod.void();
+
+/**
+ * The second confirmation. A merge needs merge=true and the fingerprint shown. The session is renewed afterwards.
+ * @summary Link Confirm
+ */
+export const AuthLinkConfirmParams = zod.object({
+	link_id: zod.int(),
+});
+
+export const AuthLinkConfirmHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const authLinkConfirmBodyFingerprintOneMax = 64;
+
+export const authLinkConfirmBodyMergeDefault = false;
+
+export const AuthLinkConfirmBody = zod.object({
+	fingerprint: zod
+		.union([zod.string().max(authLinkConfirmBodyFingerprintOneMax), zod.null()])
+		.optional(),
+	merge: zod.boolean().default(authLinkConfirmBodyMergeDefault),
+});
+
+export const authLinkConfirmResponseUserIsPanelOwnerDefault = false;
+export const authLinkConfirmResponseUserTgLinkedDefault = false;
+
+export const AuthLinkConfirmResponse = zod.object({
+	claimed_workspaces: zod.int(),
+	merged: zod.boolean(),
+	user: zod.object({
+		has_password: zod.boolean(),
+		id: zod.int(),
+		is_panel_owner: zod.boolean().default(authLinkConfirmResponseUserIsPanelOwnerDefault),
+		name: zod.string(),
+		role: zod.string(),
+		tg_linked: zod.boolean().default(authLinkConfirmResponseUserTgLinkedDefault),
+		tg_username: zod.union([zod.string(), zod.null()]),
+		username: zod.union([zod.string(), zod.null()]),
+		workspace: zod.object({
+			id: zod.int(),
+			invited_by: zod.union([zod.string(), zod.null()]).optional(),
+			is_personal: zod.boolean(),
+			name: zod.string(),
+			role: zod.string(),
+		}),
+	}),
+});
+
+/**
  * @summary Login
  */
 export const authLoginBodyPasswordMax = 256;
@@ -19,6 +154,7 @@ export const AuthLoginBody = zod.object({
 });
 
 export const authLoginResponseIsPanelOwnerDefault = false;
+export const authLoginResponseTgLinkedDefault = false;
 
 export const AuthLoginResponse = zod.object({
 	has_password: zod.boolean(),
@@ -26,6 +162,7 @@ export const AuthLoginResponse = zod.object({
 	is_panel_owner: zod.boolean().default(authLoginResponseIsPanelOwnerDefault),
 	name: zod.string(),
 	role: zod.string(),
+	tg_linked: zod.boolean().default(authLoginResponseTgLinkedDefault),
 	tg_username: zod.union([zod.string(), zod.null()]),
 	username: zod.union([zod.string(), zod.null()]),
 	workspace: zod.object({
@@ -50,6 +187,7 @@ export const AuthMeHeader = zod.object({
 });
 
 export const authMeResponseIsPanelOwnerDefault = false;
+export const authMeResponseTgLinkedDefault = false;
 
 export const AuthMeResponse = zod.object({
 	has_password: zod.boolean(),
@@ -57,6 +195,7 @@ export const AuthMeResponse = zod.object({
 	is_panel_owner: zod.boolean().default(authMeResponseIsPanelOwnerDefault),
 	name: zod.string(),
 	role: zod.string(),
+	tg_linked: zod.boolean().default(authMeResponseTgLinkedDefault),
 	tg_username: zod.union([zod.string(), zod.null()]),
 	username: zod.union([zod.string(), zod.null()]),
 	workspace: zod.object({
@@ -96,6 +235,7 @@ export const AuthSetPasswordBody = zod.object({
 });
 
 export const authSetPasswordResponseIsPanelOwnerDefault = false;
+export const authSetPasswordResponseTgLinkedDefault = false;
 
 export const AuthSetPasswordResponse = zod.object({
 	has_password: zod.boolean(),
@@ -103,6 +243,7 @@ export const AuthSetPasswordResponse = zod.object({
 	is_panel_owner: zod.boolean().default(authSetPasswordResponseIsPanelOwnerDefault),
 	name: zod.string(),
 	role: zod.string(),
+	tg_linked: zod.boolean().default(authSetPasswordResponseTgLinkedDefault),
 	tg_username: zod.union([zod.string(), zod.null()]),
 	username: zod.union([zod.string(), zod.null()]),
 	workspace: zod.object({
@@ -115,6 +256,67 @@ export const AuthSetPasswordResponse = zod.object({
 });
 
 /**
+ * A new account (username and password, typed twice) with its own workspace of 20 servers and 30 domains.
+ * @summary Register
+ */
+export const authRegisterBodyPasswordMax = 512;
+
+export const authRegisterBodyPassword2Max = 512;
+
+export const authRegisterBodyUsernameMax = 64;
+
+export const AuthRegisterBody = zod.object({
+	password: zod.string().min(1).max(authRegisterBodyPasswordMax),
+	password2: zod.string().min(1).max(authRegisterBodyPassword2Max),
+	username: zod.string().min(1).max(authRegisterBodyUsernameMax),
+});
+
+export const authRegisterResponseIsPanelOwnerDefault = false;
+export const authRegisterResponseTgLinkedDefault = false;
+
+export const AuthRegisterResponse = zod.object({
+	has_password: zod.boolean(),
+	id: zod.int(),
+	is_panel_owner: zod.boolean().default(authRegisterResponseIsPanelOwnerDefault),
+	name: zod.string(),
+	role: zod.string(),
+	tg_linked: zod.boolean().default(authRegisterResponseTgLinkedDefault),
+	tg_username: zod.union([zod.string(), zod.null()]),
+	username: zod.union([zod.string(), zod.null()]),
+	workspace: zod.object({
+		id: zod.int(),
+		invited_by: zod.union([zod.string(), zod.null()]).optional(),
+		is_personal: zod.boolean(),
+		name: zod.string(),
+		role: zod.string(),
+	}),
+});
+
+/**
+ * Whether the sign-up form is offered on the login page.
+ * @summary Registration
+ */
+export const AuthRegistrationResponse = zod.object({
+	open: zod.boolean(),
+});
+
+/**
+ * Open or close self-registration for the whole panel. Only the panel owner, signed in.
+ * @summary Set Registration
+ */
+export const AuthSetRegistrationHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const AuthSetRegistrationBody = zod.object({
+	open: zod.boolean(),
+});
+
+export const AuthSetRegistrationResponse = zod.object({
+	open: zod.boolean(),
+});
+
+/**
  * @summary Telegram Poll
  */
 export const AuthTelegramPollBody = zod.object({
@@ -123,6 +325,7 @@ export const AuthTelegramPollBody = zod.object({
 });
 
 export const authTelegramPollResponseUserOneIsPanelOwnerDefault = false;
+export const authTelegramPollResponseUserOneTgLinkedDefault = false;
 
 export const AuthTelegramPollResponse = zod.object({
 	status: zod.string(),
@@ -134,6 +337,7 @@ export const AuthTelegramPollResponse = zod.object({
 				is_panel_owner: zod.boolean().default(authTelegramPollResponseUserOneIsPanelOwnerDefault),
 				name: zod.string(),
 				role: zod.string(),
+				tg_linked: zod.boolean().default(authTelegramPollResponseUserOneTgLinkedDefault),
 				tg_username: zod.union([zod.string(), zod.null()]),
 				username: zod.union([zod.string(), zod.null()]),
 				workspace: zod.object({
@@ -167,6 +371,7 @@ export const AuthTelegramWebappBody = zod.object({
 });
 
 export const authTelegramWebappResponseIsPanelOwnerDefault = false;
+export const authTelegramWebappResponseTgLinkedDefault = false;
 
 export const AuthTelegramWebappResponse = zod.object({
 	has_password: zod.boolean(),
@@ -174,6 +379,7 @@ export const AuthTelegramWebappResponse = zod.object({
 	is_panel_owner: zod.boolean().default(authTelegramWebappResponseIsPanelOwnerDefault),
 	name: zod.string(),
 	role: zod.string(),
+	tg_linked: zod.boolean().default(authTelegramWebappResponseTgLinkedDefault),
 	tg_username: zod.union([zod.string(), zod.null()]),
 	username: zod.union([zod.string(), zod.null()]),
 	workspace: zod.object({
@@ -201,6 +407,7 @@ export const AuthSwitchWorkspaceBody = zod.object({
 });
 
 export const authSwitchWorkspaceResponseIsPanelOwnerDefault = false;
+export const authSwitchWorkspaceResponseTgLinkedDefault = false;
 
 export const AuthSwitchWorkspaceResponse = zod.object({
 	has_password: zod.boolean(),
@@ -208,6 +415,7 @@ export const AuthSwitchWorkspaceResponse = zod.object({
 	is_panel_owner: zod.boolean().default(authSwitchWorkspaceResponseIsPanelOwnerDefault),
 	name: zod.string(),
 	role: zod.string(),
+	tg_linked: zod.boolean().default(authSwitchWorkspaceResponseTgLinkedDefault),
 	tg_username: zod.union([zod.string(), zod.null()]),
 	username: zod.union([zod.string(), zod.null()]),
 	workspace: zod.object({

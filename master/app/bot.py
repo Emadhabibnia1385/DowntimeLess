@@ -4,7 +4,9 @@ import time
 from html import escape
 from typing import Any, Dict
 
+from . import invites
 from .db import connect
+from .features.auth import linking
 from .features.auth import service as auth
 from .settings import get_settings
 from .telegram import Telegram
@@ -27,10 +29,48 @@ def handle(tg: Telegram, update: Dict[str, Any]) -> None:
         db.close()
 
 
+def notify_claims(tg: Telegram, db, claimed, tg_id: int, username: str, name: str) -> None:
+    """Tell each inviter who claimed their invite (numeric id and name, so a username squatter is seen), and the person."""
+    who = "@%s (شناسهٔ <code>%d</code>%s)" % (escape(username or ""), tg_id, "، " + escape(name) if name else "")
+    for c in claimed:
+        inviter = db.execute("SELECT tg_id FROM users WHERE id=?", (c["invited_by"],)).fetchone() if c["invited_by"] else None
+        if inviter and inviter["tg_id"]:
+            tg.send(inviter["tg_id"], "📨 %s دعوت شما به فضای کار «%s» را با نقش %s پذیرفت.\nاگر این همان کسی نیست که دعوت کردید، "
+                    "او را از صفحهٔ اعضا حذف کنید." % (who, escape(c["workspace"]), c["role"]))
+        if c["added"]:
+            tg.send(tg_id, "✅ شما به فضای کار «%s» اضافه شدید. از پنل وارد شوید." % escape(c["workspace"]))
+
+
+def _claim_invites(tg: Telegram, db, frm: Dict[str, Any]) -> None:
+    """Someone invited by @username starts the bot: their account (made now if needed) takes the open invites."""
+    username = frm.get("username")
+    if not invites.has_open(db, username):
+        return
+    user = db.execute("SELECT id FROM users WHERE tg_id=?", (frm["id"],)).fetchone()
+    uid = user["id"] if user else db.execute(
+        "INSERT INTO users (tg_id, tg_username, name, role, created_at) VALUES (?,?,?,'none',?)",
+        (frm["id"], username, _name(frm)[:64], int(time.time())),
+    ).lastrowid
+    notify_claims(tg, db, invites.claim(db, uid, frm["id"], username), frm["id"], username, _name(frm))
+
+
 def _message(tg: Telegram, db, msg: Dict[str, Any]) -> None:
     frm, chat, text = msg["from"], msg["chat"]["id"], msg["text"].strip()
     arg = text.split(" ", 1)[1].strip() if text.startswith("/start ") else ""
-    if arg.startswith("claim_"):
+    if text.startswith("/start") and not arg.startswith(("ln_", "claim_")):
+        _claim_invites(tg, db, frm)  # a linking account claims its invites when the panel confirms, as itself
+    if arg.startswith("ln_"):
+        row = linking.bot_seen(db, arg[3:], frm["id"], frm.get("username"), _name(frm))
+        if not row:
+            tg.send(chat, "⛔ این لینک اتصال پیدا نشد، منقضی شده یا قبلاً استفاده شده است.")
+        else:
+            tg.send(
+                chat,
+                "🔗 <b>اتصال تلگرام به حساب پنل</b>\nحساب: <code>%s</code>\n\nاین حساب تلگرام به همین حساب پنل وصل شود؟ "
+                "بعد از «بله» باید در خود پنل هم تأیید کنید." % escape(linking.account_label(db, row["user_id"])),
+                [[{"text": "✅ بله، وصل کن", "callback_data": "ln:ok:%d" % row["id"]}, {"text": "❌ نه", "callback_data": "ln:no:%d" % row["id"]}]],
+            )
+    elif arg.startswith("claim_"):
         ok = auth.claim_owner(db, arg[6:], frm["id"], _name(frm), frm.get("username"))
         tg.send(chat, "✅ شما مالک این پنل شدید. حالا از پنل وب وارد شوید." if ok else "⛔ این لینک نامعتبر است یا قبلاً استفاده شده.")
     elif arg.startswith("wl_"):
@@ -58,7 +98,15 @@ def _message(tg: Telegram, db, msg: Dict[str, Any]) -> None:
 
 def _callback(tg: Telegram, db, cb: Dict[str, Any]) -> None:
     parts = cb.get("data", "").split(":")
-    if len(parts) != 3 or parts[0] != "wl":
+    if len(parts) == 3 and parts[0] == "ln" and parts[2].isdigit():
+        ok = linking.bot_decide(db, int(parts[2]), cb["from"]["id"], parts[1] == "ok")
+        tg.answer(cb["id"], "ثبت شد" if ok else "منقضی شده")
+        if "message" in cb:
+            label = ("✅ در تلگرام تأیید شد؛ حالا در پنل تأیید نهایی را بزنید." if parts[1] == "ok" else "❌ اتصال رد شد.") if ok \
+                else "⌛ این درخواست منقضی شده است."
+            tg.edit(cb["message"]["chat"]["id"], cb["message"]["message_id"], label)
+        return
+    if len(parts) != 3 or parts[0] != "wl" or not parts[2].isdigit():
         return tg.answer(cb["id"])
     ok = auth.decide_challenge(db, int(parts[2]), cb["from"]["id"], parts[1] == "ok")
     tg.answer(cb["id"], "ثبت شد" if ok else "منقضی شده")

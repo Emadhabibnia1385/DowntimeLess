@@ -1,1 +1,0 @@
-import{t as e}from"./servers-BSCVNrLP.js";var t=e;export{t as component};

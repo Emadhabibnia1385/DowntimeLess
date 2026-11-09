@@ -3,23 +3,40 @@ from typing import List
 
 from fastapi import APIRouter, Depends, Request, Response
 
+from ... import appsettings
 from ...db import get_db
 from ...deps import COOKIE, Actor, session_any_workspace, session_only
 from ...errors import DLError
 from ...ratelimit import hit
 from ...security import digest
 from ...settings import get_settings
-from ...workspaces import list_for_user, member_role
+from ...workspaces import is_panel_owner, list_for_user, member_role
+from . import linking
 from . import service as svc
 from .schemas import (
-    LoginRequest, PasswordRequest, PollRequest, PollResult, StartResult, SwitchWorkspace, UserOut, WebAppRequest, WorkspaceOut,
+    LinkConfirm, LinkDone, LinkStart, LinkView, LoginRequest, PasswordRequest, PollRequest, PollResult, RegisterRequest,
+    RegistrationIn, RegistrationOut, StartResult, SwitchWorkspace, UserOut, WebAppRequest, WorkspaceOut,
 )
+
+# sign-ups per address and for the whole panel: the second one holds when addresses rotate or a proxy hides them
+REGISTER_PER_IP, REGISTER_GLOBAL, REGISTER_WINDOW = 5, 30, 3600
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _who(request: Request):
     return (request.client.host if request.client else "?"), request.headers.get("user-agent", "")
+
+
+def same_origin(request: Request) -> None:
+    """A browser names the page that sent a request; a state change from another site's page is refused (CSRF).
+    Clients that send no Origin (scripts, the test client) are not browsers acting for someone else."""
+    origin = request.headers.get("origin")
+    if origin is None:
+        return
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+    if origin.split("://", 1)[-1].rstrip("/") != host:
+        raise DLError("auth.origin")
 
 
 def _cookie(response: Response, token: str) -> None:
@@ -67,12 +84,87 @@ def telegram_webapp(body: WebAppRequest, request: Request, response: Response, d
 
 @router.post("/login", response_model=UserOut, operation_id="auth_login")
 def login(body: LoginRequest, request: Request, response: Response, db: sqlite3.Connection = Depends(get_db)):
+    same_origin(request)
     ip, ua = _who(request)
     hit("login:" + ip, 10, 300)
     user = svc.password_login(db, body.username, body.password)
     token, ws = svc.create_session(db, user["id"], ip, ua)
     _cookie(response, token)
     return svc.user_out(db, user, ws)
+
+
+@router.get("/registration", response_model=RegistrationOut, operation_id="auth_registration")
+def registration(db: sqlite3.Connection = Depends(get_db)):
+    """Whether the sign-up form is offered on the login page."""
+    return {"open": appsettings.registration_open(db)}
+
+
+@router.put("/registration", response_model=RegistrationOut, operation_id="auth_set_registration")
+def set_registration(body: RegistrationIn, request: Request, actor: Actor = Depends(session_any_workspace),
+                     db: sqlite3.Connection = Depends(get_db)):
+    """Open or close self-registration for the whole panel. Only the panel owner, signed in."""
+    same_origin(request)
+    if not is_panel_owner(db, actor.user_id):
+        raise DLError("auth.forbidden")
+    appsettings.put(db, "registration_open", "1" if body.open else "0")
+    return {"open": body.open}
+
+
+@router.post("/register", response_model=UserOut, status_code=201, operation_id="auth_register")
+def register(body: RegisterRequest, request: Request, response: Response, db: sqlite3.Connection = Depends(get_db)):
+    """A new account (username and password, typed twice) with its own workspace of 20 servers and 30 domains."""
+    same_origin(request)
+    ip, ua = _who(request)
+    hit("register:" + ip, REGISTER_PER_IP, REGISTER_WINDOW)
+    hit("register:all", REGISTER_GLOBAL, REGISTER_WINDOW)
+    user = svc.register(db, body.username, body.password, body.password2)
+    token, ws = svc.create_session(db, user["id"], ip, ua)
+    _cookie(response, token)
+    return svc.user_out(db, user, ws)
+
+
+@router.post("/link/start", response_model=LinkStart, operation_id="auth_link_start")
+def link_start(request: Request, actor: Actor = Depends(session_any_workspace), db: sqlite3.Connection = Depends(get_db)):
+    """A one-time bot link (10 minutes) that ties a Telegram account to me; it works only for this browser session."""
+    same_origin(request)
+    hit("link:%d" % actor.user_id, 10, 3600)
+    bot = getattr(request.app.state, "bot_username", "")
+    if not bot:
+        raise DLError("bot.not_configured")
+    return linking.start(db, actor.user_id, actor.session_id, bot)
+
+
+@router.get("/link/{link_id}", response_model=LinkView, operation_id="auth_link_view")
+def link_view(link_id: int, actor: Actor = Depends(session_any_workspace), db: sqlite3.Connection = Depends(get_db)):
+    """Where the link stands; once Telegram said yes, exactly what confirming will do (a merge when the Telegram account
+    already has an account here)."""
+    hit("linkview:%d" % actor.user_id, 240, 600)
+    return linking.view(db, link_id, actor.user_id, actor.session_id)
+
+
+@router.post("/link/{link_id}/confirm", response_model=LinkDone, operation_id="auth_link_confirm")
+def link_confirm(link_id: int, body: LinkConfirm, request: Request, response: Response,
+                 actor: Actor = Depends(session_any_workspace), db: sqlite3.Connection = Depends(get_db)):
+    """The second confirmation. A merge needs merge=true and the fingerprint shown. The session is renewed afterwards."""
+    same_origin(request)
+    hit("link:%d" % actor.user_id, 10, 3600)
+    done = linking.confirm(db, link_id, actor.user_id, actor.session_id, body.merge, body.fingerprint)
+    ip, ua = _who(request)
+    db.execute("DELETE FROM sessions WHERE id=?", (actor.session_id,))  # identity changed: a fresh session, never the old token
+    token, ws = svc.create_session(db, done["user_id"], ip, ua)
+    _cookie(response, token)
+    user = db.execute("SELECT * FROM users WHERE id=?", (done["user_id"],)).fetchone()
+    tg = getattr(request.app.state, "tg", None)
+    if tg is not None and done["claimed"]:
+        from ...bot import notify_claims
+        notify_claims(tg, db, done["claimed"], user["tg_id"], user["tg_username"] or "", user["name"] or "")
+    return {"merged": done["merged"], "claimed_workspaces": sum(1 for c in done["claimed"] if c["added"]), "user": svc.user_out(db, user, ws)}
+
+
+@router.post("/link/{link_id}/cancel", status_code=204, operation_id="auth_link_cancel")
+def link_cancel(link_id: int, request: Request, actor: Actor = Depends(session_any_workspace), db: sqlite3.Connection = Depends(get_db)):
+    same_origin(request)
+    linking.cancel(db, link_id, actor.user_id, actor.session_id)
 
 
 @router.post("/logout", status_code=204, operation_id="auth_logout")

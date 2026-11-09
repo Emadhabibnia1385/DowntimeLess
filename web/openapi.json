@@ -2676,6 +2676,73 @@
         "title": "IncidentsReport",
         "type": "object"
       },
+      "InviteCreate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "tg_username": {
+            "title": "Tg Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tg_username",
+          "role"
+        ],
+        "title": "InviteCreate",
+        "type": "object"
+      },
+      "InviteOut": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "integer"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "tg_username": {
+            "title": "Tg Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tg_username",
+          "role",
+          "name",
+          "created_at",
+          "expires_at"
+        ],
+        "title": "InviteOut",
+        "type": "object"
+      },
       "Issue": {
         "properties": {
           "ack_mode": {
@@ -3664,6 +3731,51 @@
         "title": "Latest",
         "type": "object"
       },
+      "LinkConfirm": {
+        "properties": {
+          "fingerprint": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fingerprint"
+          },
+          "merge": {
+            "default": false,
+            "title": "Merge",
+            "type": "boolean"
+          }
+        },
+        "title": "LinkConfirm",
+        "type": "object"
+      },
+      "LinkDone": {
+        "properties": {
+          "claimed_workspaces": {
+            "title": "Claimed Workspaces",
+            "type": "integer"
+          },
+          "merged": {
+            "title": "Merged",
+            "type": "boolean"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserOut"
+          }
+        },
+        "required": [
+          "merged",
+          "claimed_workspaces",
+          "user"
+        ],
+        "title": "LinkDone",
+        "type": "object"
+      },
       "LinkPairBytes": {
         "properties": {
           "in_bytes": {
@@ -3830,6 +3942,101 @@
         "title": "LinkSeries",
         "type": "object"
       },
+      "LinkStart": {
+        "properties": {
+          "deep_link": {
+            "title": "Deep Link",
+            "type": "string"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "link_id": {
+            "title": "Link Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "link_id",
+          "deep_link",
+          "expires_in"
+        ],
+        "title": "LinkStart",
+        "type": "object"
+      },
+      "LinkTelegram": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "LinkTelegram",
+        "type": "object"
+      },
+      "LinkView": {
+        "properties": {
+          "expires_at": {
+            "title": "Expires At",
+            "type": "integer"
+          },
+          "link_id": {
+            "title": "Link Id",
+            "type": "integer"
+          },
+          "merge": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MergePlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "telegram": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LinkTelegram"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "link_id",
+          "status",
+          "expires_at"
+        ],
+        "title": "LinkView",
+        "type": "object"
+      },
       "LinksOut": {
         "properties": {
           "links": {
@@ -3951,12 +4158,29 @@
             "type": "string"
           },
           "tg_id": {
-            "title": "Tg Id",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tg Id"
+          },
+          "who": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Who"
           }
         },
         "required": [
-          "tg_id",
           "role"
         ],
         "title": "MemberCreate",
@@ -4042,6 +4266,135 @@
           "role"
         ],
         "title": "MemberPatch",
+        "type": "object"
+      },
+      "MergeOther": {
+        "properties": {
+          "has_password": {
+            "title": "Has Password",
+            "type": "boolean"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "tg_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tg Username"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "required": [
+          "has_password"
+        ],
+        "title": "MergeOther",
+        "type": "object"
+      },
+      "MergePlan": {
+        "properties": {
+          "api_keys": {
+            "title": "Api Keys",
+            "type": "integer"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "keeps_panel_owner": {
+            "title": "Keeps Panel Owner",
+            "type": "boolean"
+          },
+          "moves_password": {
+            "title": "Moves Password",
+            "type": "boolean"
+          },
+          "other": {
+            "$ref": "#/components/schemas/MergeOther"
+          },
+          "survivor": {
+            "title": "Survivor",
+            "type": "string"
+          },
+          "workspaces": {
+            "items": {
+              "$ref": "#/components/schemas/MergeWorkspace"
+            },
+            "title": "Workspaces",
+            "type": "array"
+          }
+        },
+        "required": [
+          "survivor",
+          "other",
+          "workspaces",
+          "api_keys",
+          "moves_password",
+          "keeps_panel_owner",
+          "fingerprint"
+        ],
+        "title": "MergePlan",
+        "type": "object"
+      },
+      "MergeWorkspace": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "owned": {
+            "title": "Owned",
+            "type": "boolean"
+          },
+          "result_role": {
+            "title": "Result Role",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "survivor_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Survivor Role"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "name",
+          "role",
+          "result_role",
+          "owned"
+        ],
+        "title": "MergeWorkspace",
         "type": "object"
       },
       "MetricPoint": {
@@ -5339,6 +5692,61 @@
           "flapping"
         ],
         "title": "RecurringBrief",
+        "type": "object"
+      },
+      "RegisterRequest": {
+        "properties": {
+          "password": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "password2": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Password2",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "password2"
+        ],
+        "title": "RegisterRequest",
+        "type": "object"
+      },
+      "RegistrationIn": {
+        "properties": {
+          "open": {
+            "title": "Open",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "open"
+        ],
+        "title": "RegistrationIn",
+        "type": "object"
+      },
+      "RegistrationOut": {
+        "properties": {
+          "open": {
+            "title": "Open",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "open"
+        ],
+        "title": "RegistrationOut",
         "type": "object"
       },
       "RelayPair": {
@@ -7179,6 +7587,11 @@
             "title": "Role",
             "type": "string"
           },
+          "tg_linked": {
+            "default": false,
+            "title": "Tg Linked",
+            "type": "boolean"
+          },
           "tg_username": {
             "anyOf": [
               {
@@ -7480,6 +7893,235 @@
         ]
       }
     },
+    "/api/v1/auth/link/start": {
+      "post": {
+        "description": "A one-time bot link (10 minutes) that ties a Telegram account to me; it works only for this browser session.",
+        "operationId": "auth_link_start",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkStart"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link Start",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/link/{link_id}": {
+      "get": {
+        "description": "Where the link stands; once Telegram said yes, exactly what confirming will do (a merge when the Telegram account\nalready has an account here).",
+        "operationId": "auth_link_view",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "title": "Link Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link View",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/link/{link_id}/cancel": {
+      "post": {
+        "operationId": "auth_link_cancel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "title": "Link Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link Cancel",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/link/{link_id}/confirm": {
+      "post": {
+        "description": "The second confirmation. A merge needs merge=true and the fingerprint shown. The session is renewed afterwards.",
+        "operationId": "auth_link_confirm",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "title": "Link Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkConfirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkDone"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link Confirm",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "operationId": "auth_login",
@@ -7638,6 +8280,128 @@
           }
         },
         "summary": "Set Password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "description": "A new account (username and password, typed twice) with its own workspace of 20 servers and 30 domains.",
+        "operationId": "auth_register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/registration": {
+      "get": {
+        "description": "Whether the sign-up form is offered on the login page.",
+        "operationId": "auth_registration",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Registration",
+        "tags": [
+          "auth"
+        ]
+      },
+      "put": {
+        "description": "Open or close self-registration for the whole panel. Only the panel owner, signed in.",
+        "operationId": "auth_set_registration",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Registration",
         "tags": [
           "auth"
         ]
@@ -8910,7 +9674,7 @@
         ]
       },
       "post": {
-        "description": "Add a person by their numeric Telegram id; they sign in with Telegram and see this workspace next to their own.\n\nOnly the panel owner (owner of workspace 1) adds people: every new member can sign in and gets a workspace, so this\nis the registration door of the panel. The answer is the membership only, never the person's profile.",
+        "description": "Add a person now by numeric Telegram id or by the username of an account of this panel; they see this workspace\nnext to their own. A new Telegram id is a new person: while registration is closed only the panel owner adds one.\nThe answer is the membership only, never the person's profile.",
         "operationId": "members_add",
         "parameters": [
           {
@@ -8963,6 +9727,169 @@
           }
         },
         "summary": "Add Member",
+        "tags": [
+          "members"
+        ]
+      }
+    },
+    "/api/v1/members/invites": {
+      "get": {
+        "description": "Open invites of this workspace by Telegram username.",
+        "operationId": "members_invites",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InviteOut"
+                  },
+                  "title": "Response Members Invites",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Invites",
+        "tags": [
+          "members"
+        ]
+      },
+      "post": {
+        "description": "Invite a Telegram @username for 14 days, as viewer or operator. The person with that username claims it by starting\nthe bot or linking Telegram to their account; the inviter is then told in Telegram who claimed it (numeric id).",
+        "operationId": "members_invite",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Invite",
+        "tags": [
+          "members"
+        ]
+      }
+    },
+    "/api/v1/members/invites/{invite_id}": {
+      "delete": {
+        "operationId": "members_cancel_invite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invite_id",
+            "required": true,
+            "schema": {
+              "title": "Invite Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Invite",
         "tags": [
           "members"
         ]

@@ -12,9 +12,10 @@ import {
 } from "@nyxon/nasim";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { authTelegramWebapp, useAuthLogin } from "@/api/generated/auth/auth";
+import { authTelegramWebapp, useAuthLogin, useAuthRegistration } from "@/api/generated/auth/auth";
 import type { UserOut } from "@/api/generated/model";
 import { errorMessage } from "@/api/transport";
 import { brandLogo } from "@/shared/brand";
@@ -28,6 +29,7 @@ import { safeRedirect } from "../pending";
 import { useStartSession } from "../session";
 import { useOnceDone } from "../useOnceDone";
 import { useTelegramLogin } from "../useTelegramLogin";
+import { RegisterForm } from "./RegisterForm";
 
 const schema = z.object({
 	username: z.string().trim().min(1, { error: t.login.needBoth }),
@@ -78,6 +80,9 @@ export function LoginPage({ redirect }: { redirect: string | undefined }) {
 	const problem = telegram.failure ?? (miniApp.error ? errorMessage(miniApp.error) : null);
 	const link = telegram.deepLink;
 	const { scheme } = useTheme();
+	const registration = useAuthRegistration();
+	const [signingUp, setSigningUp] = useState(false);
+	const canSignUp = registration.data?.open === true;
 
 	return (
 		<div className="flex min-h-dvh flex-col bg-background px-page text-foreground">
@@ -102,72 +107,91 @@ export function LoginPage({ redirect }: { redirect: string | undefined }) {
 						</Notice>
 					) : null}
 
-					<div className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5">
-						{miniApp.isLoading ? (
-							<div className="flex items-center justify-center gap-2 text-sm">
-								<Spinner size="sm" />
-								{t.login.miniApp}
-							</div>
-						) : link ? (
-							<div className="flex flex-col items-center gap-4 text-center">
-								<div className="flex items-center gap-2 font-medium">
+					{signingUp && canSignUp ? (
+						<div className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5">
+							<RegisterForm onDone={done} />
+						</div>
+					) : (
+						<div className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5">
+							{miniApp.isLoading ? (
+								<div className="flex items-center justify-center gap-2 text-sm">
 									<Spinner size="sm" />
-									{t.login.waitingTitle}
+									{t.login.miniApp}
 								</div>
-								<p className="text-sm text-muted">{t.login.waiting}</p>
-								<LinkButton href={link} target="_blank" size="lg" fullWidth>
+							) : link ? (
+								<div className="flex flex-col items-center gap-4 text-center">
+									<div className="flex items-center gap-2 font-medium">
+										<Spinner size="sm" />
+										{t.login.waitingTitle}
+									</div>
+									<p className="text-sm text-muted">{t.login.waiting}</p>
+									<LinkButton href={link} target="_blank" size="lg" fullWidth>
+										<TelegramIcon aria-hidden />
+										{t.login.openInTelegram}
+									</LinkButton>
+									<QRCode value={link} label={t.login.qrLabel} />
+									<p className="text-xs text-muted">{t.login.scan}</p>
+									<div className="w-full min-w-0">
+										<CopyField label={t.login.linkLabel} value={link} />
+									</div>
+									<Button variant="ghost" onPress={telegram.cancel}>
+										{t.login.cancel}
+									</Button>
+								</div>
+							) : (
+								<Button
+									size="lg"
+									fullWidth
+									isPending={telegram.isStarting}
+									onPress={telegram.begin}
+								>
 									<TelegramIcon aria-hidden />
-									{t.login.openInTelegram}
-								</LinkButton>
-								<QRCode value={link} label={t.login.qrLabel} />
-								<p className="text-xs text-muted">{t.login.scan}</p>
-								<div className="w-full min-w-0">
-									<CopyField label={t.login.linkLabel} value={link} />
-								</div>
-								<Button variant="ghost" onPress={telegram.cancel}>
-									{t.login.cancel}
+									{telegram.isStarting ? t.login.opening : t.login.telegram}
 								</Button>
-							</div>
-						) : (
-							<Button size="lg" fullWidth isPending={telegram.isStarting} onPress={telegram.begin}>
-								<TelegramIcon aria-hidden />
-								{telegram.isStarting ? t.login.opening : t.login.telegram}
+							)}
+
+							<Divider />
+
+							<FormRoot
+								form={form}
+								className="flex flex-col gap-3 text-start"
+								onSubmit={(values) =>
+									login.mutate({
+										data: { username: values.username.trim(), password: values.password },
+									})
+								}
+							>
+								<TextField
+									name="username"
+									dir="ltr"
+									label={t.login.username}
+									autoComplete="username"
+									spellCheck={false}
+								/>
+								<TextField
+									name="password"
+									dir="ltr"
+									type="password"
+									label={t.login.password}
+									autoComplete="current-password"
+								/>
+								{login.error ? (
+									<Notice tone="danger" role="alert">
+										{errorMessage(login.error)}
+									</Notice>
+								) : null}
+								<SubmitButton>{t.login.submit}</SubmitButton>
+							</FormRoot>
+						</div>
+					)}
+					{canSignUp ? (
+						<p className="flex flex-wrap items-center justify-center gap-1 text-sm text-muted">
+							{signingUp ? t.login.haveAccount : t.login.noAccount}
+							<Button variant="ghost" size="sm" onPress={() => setSigningUp(!signingUp)}>
+								{signingUp ? t.login.toLogin : t.login.toRegister}
 							</Button>
-						)}
-
-						<Divider />
-
-						<FormRoot
-							form={form}
-							className="flex flex-col gap-3 text-start"
-							onSubmit={(values) =>
-								login.mutate({
-									data: { username: values.username.trim(), password: values.password },
-								})
-							}
-						>
-							<TextField
-								name="username"
-								dir="ltr"
-								label={t.login.username}
-								autoComplete="username"
-								spellCheck={false}
-							/>
-							<TextField
-								name="password"
-								dir="ltr"
-								type="password"
-								label={t.login.password}
-								autoComplete="current-password"
-							/>
-							{login.error ? (
-								<Notice tone="danger" role="alert">
-									{errorMessage(login.error)}
-								</Notice>
-							) : null}
-							<SubmitButton>{t.login.submit}</SubmitButton>
-						</FormRoot>
-					</div>
+						</p>
+					) : null}
 				</div>
 			</div>
 			<Footer />

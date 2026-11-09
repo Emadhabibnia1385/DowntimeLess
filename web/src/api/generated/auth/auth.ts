@@ -22,10 +22,17 @@ import type {
 
 import type {
 	HTTPValidationError,
+	LinkConfirm,
+	LinkDone,
+	LinkStart,
+	LinkView,
 	LoginRequest,
 	PasswordRequest,
 	PollRequest,
 	PollResult,
+	RegisterRequest,
+	RegistrationIn,
+	RegistrationOut,
 	StartResult,
 	SwitchWorkspace,
 	UserOut,
@@ -54,6 +61,386 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 	return result;
 };
 
+export const getAuthLinkStartUrl = () => {
+	return `/api/v1/auth/link/start`;
+};
+
+/**
+ * A one-time bot link (10 minutes) that ties a Telegram account to me; it works only for this browser session.
+ * @summary Link Start
+ */
+export const authLinkStart = async (
+	options?: Parameters<typeof apiFetch>[1],
+): Promise<LinkStart> => {
+	return apiFetch<LinkStart>(getAuthLinkStartUrl(), {
+		...options,
+		method: "POST",
+	});
+};
+
+export const getAuthLinkStartMutationKey = () => ["authLinkStart"] as const;
+
+export const getAuthLinkStartMutationOptions = <
+	TError = ErrorType<HTTPValidationError>,
+	TContext = unknown,
+>(options?: {
+	mutation?: UseMutationOptions<Awaited<ReturnType<typeof authLinkStart>>, TError, void, TContext>;
+	request?: SecondParameter<typeof apiFetch>;
+}): UseMutationOptions<Awaited<ReturnType<typeof authLinkStart>>, TError, void, TContext> => {
+	const mutationKey = getAuthLinkStartMutationKey();
+	const { mutation: mutationOptions, request: requestOptions } = options
+		? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+			? options
+			: { ...options, mutation: { ...options.mutation, mutationKey } }
+		: { mutation: { mutationKey }, request: undefined };
+
+	const mutationFn: MutationFunction<Awaited<ReturnType<typeof authLinkStart>>, void> = () => {
+		return authLinkStart(requestOptions);
+	};
+
+	return { mutationFn, ...mutationOptions };
+};
+
+export type AuthLinkStartMutationResult = NonNullable<Awaited<ReturnType<typeof authLinkStart>>>;
+
+export type AuthLinkStartMutationError = ErrorType<HTTPValidationError>;
+
+/**
+ * @summary Link Start
+ */
+export const useAuthLinkStart = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+	options?: {
+		mutation?: UseMutationOptions<
+			Awaited<ReturnType<typeof authLinkStart>>,
+			TError,
+			void,
+			TContext
+		>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseMutationResult<Awaited<ReturnType<typeof authLinkStart>>, TError, void, TContext> => {
+	return useMutation(getAuthLinkStartMutationOptions(options), queryClient);
+};
+export const getAuthLinkViewUrl = (linkId: number) => {
+	return `/api/v1/auth/link/${linkId}`;
+};
+
+/**
+ * Where the link stands; once Telegram said yes, exactly what confirming will do (a merge when the Telegram account
+ * already has an account here).
+ * @summary Link View
+ */
+export const authLinkView = async (
+	linkId: number,
+	options?: Parameters<typeof apiFetch>[1],
+): Promise<LinkView> => {
+	return apiFetch<LinkView>(getAuthLinkViewUrl(linkId), {
+		...options,
+		method: "GET",
+	});
+};
+
+export const getAuthLinkViewQueryKey = (linkId: number) => {
+	return [`/api/v1/auth/link/${linkId}`] as const;
+};
+
+export const useAuthLinkViewQueryOptions = <
+	TData = Awaited<ReturnType<typeof authLinkView>>,
+	TError = ErrorType<HTTPValidationError>,
+>(
+	linkId: number,
+	options?: {
+		query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof authLinkView>>, TError, TData>>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+) => {
+	const { query: queryOptions, request: requestOptions } = options ?? {};
+
+	const queryKey = queryOptions?.queryKey ?? getAuthLinkViewQueryKey(linkId);
+
+	const queryFn: QueryFunction<Awaited<ReturnType<typeof authLinkView>>> = ({ signal }) =>
+		authLinkView(linkId, { signal, ...requestOptions });
+
+	const customOptions = queryDefaults({
+		queryKey,
+		queryFn,
+		enabled: linkId !== null && linkId !== undefined,
+		...queryOptions,
+	});
+
+	return customOptions as UseQueryOptions<
+		Awaited<ReturnType<typeof authLinkView>>,
+		TError,
+		TData
+	> & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AuthLinkViewQueryResult = NonNullable<Awaited<ReturnType<typeof authLinkView>>>;
+export type AuthLinkViewQueryError = ErrorType<HTTPValidationError>;
+
+export function useAuthLinkView<
+	TData = Awaited<ReturnType<typeof authLinkView>>,
+	TError = ErrorType<HTTPValidationError>,
+>(
+	linkId: number,
+	options: {
+		query: Partial<UseQueryOptions<Awaited<ReturnType<typeof authLinkView>>, TError, TData>> &
+			Pick<
+				DefinedInitialDataOptions<
+					Awaited<ReturnType<typeof authLinkView>>,
+					TError,
+					Awaited<ReturnType<typeof authLinkView>>
+				>,
+				"initialData"
+			>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useAuthLinkView<
+	TData = Awaited<ReturnType<typeof authLinkView>>,
+	TError = ErrorType<HTTPValidationError>,
+>(
+	linkId: number,
+	options?: {
+		query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof authLinkView>>, TError, TData>> &
+			Pick<
+				UndefinedInitialDataOptions<
+					Awaited<ReturnType<typeof authLinkView>>,
+					TError,
+					Awaited<ReturnType<typeof authLinkView>>
+				>,
+				"initialData"
+			>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useAuthLinkView<
+	TData = Awaited<ReturnType<typeof authLinkView>>,
+	TError = ErrorType<HTTPValidationError>,
+>(
+	linkId: number,
+	options?: {
+		query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof authLinkView>>, TError, TData>>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Link View
+ */
+
+export function useAuthLinkView<
+	TData = Awaited<ReturnType<typeof authLinkView>>,
+	TError = ErrorType<HTTPValidationError>,
+>(
+	linkId: number,
+	options?: {
+		query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof authLinkView>>, TError, TData>>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+	const queryOptions = useAuthLinkViewQueryOptions(linkId, options);
+
+	const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+		queryKey: DataTag<QueryKey, TData, TError>;
+	};
+
+	return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getAuthLinkCancelUrl = (linkId: number) => {
+	return `/api/v1/auth/link/${linkId}/cancel`;
+};
+
+/**
+ * @summary Link Cancel
+ */
+export const authLinkCancel = async (
+	linkId: number,
+	options?: Parameters<typeof apiFetch>[1],
+): Promise<void> => {
+	return apiFetch<void>(getAuthLinkCancelUrl(linkId), {
+		...options,
+		method: "POST",
+	});
+};
+
+export const getAuthLinkCancelMutationKey = () => ["authLinkCancel"] as const;
+
+export const getAuthLinkCancelMutationOptions = <
+	TError = ErrorType<HTTPValidationError>,
+	TContext = unknown,
+>(options?: {
+	mutation?: UseMutationOptions<
+		Awaited<ReturnType<typeof authLinkCancel>>,
+		TError,
+		AuthLinkCancelMutationVariables,
+		TContext
+	>;
+	request?: SecondParameter<typeof apiFetch>;
+}): UseMutationOptions<
+	Awaited<ReturnType<typeof authLinkCancel>>,
+	TError,
+	AuthLinkCancelMutationVariables,
+	TContext
+> => {
+	const mutationKey = getAuthLinkCancelMutationKey();
+	const { mutation: mutationOptions, request: requestOptions } = options
+		? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+			? options
+			: { ...options, mutation: { ...options.mutation, mutationKey } }
+		: { mutation: { mutationKey }, request: undefined };
+
+	const mutationFn: MutationFunction<
+		Awaited<ReturnType<typeof authLinkCancel>>,
+		AuthLinkCancelMutationVariables
+	> = (props) => {
+		const { linkId } = props ?? {};
+
+		return authLinkCancel(linkId, requestOptions);
+	};
+
+	return { mutationFn, ...mutationOptions };
+};
+
+export type AuthLinkCancelMutationResult = NonNullable<Awaited<ReturnType<typeof authLinkCancel>>>;
+
+export type AuthLinkCancelMutationError = ErrorType<HTTPValidationError>;
+export type AuthLinkCancelMutationVariables = { linkId: number };
+
+/**
+ * @summary Link Cancel
+ */
+export const useAuthLinkCancel = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+	options?: {
+		mutation?: UseMutationOptions<
+			Awaited<ReturnType<typeof authLinkCancel>>,
+			TError,
+			AuthLinkCancelMutationVariables,
+			TContext
+		>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseMutationResult<
+	Awaited<ReturnType<typeof authLinkCancel>>,
+	TError,
+	AuthLinkCancelMutationVariables,
+	TContext
+> => {
+	return useMutation(getAuthLinkCancelMutationOptions(options), queryClient);
+};
+export const getAuthLinkConfirmUrl = (linkId: number) => {
+	return `/api/v1/auth/link/${linkId}/confirm`;
+};
+
+/**
+ * The second confirmation. A merge needs merge=true and the fingerprint shown. The session is renewed afterwards.
+ * @summary Link Confirm
+ */
+export const authLinkConfirm = async (
+	linkId: number,
+	linkConfirm: LinkConfirm,
+	options?: Parameters<typeof apiFetch>[1],
+): Promise<LinkDone> => {
+	const getHeaders = (
+		h?: NonNullable<RequestInit["headers"]>,
+	): Record<string, string | readonly string[]> => {
+		if (!h) return {};
+		if (h instanceof Headers) return Object.fromEntries(h.entries());
+		if (Symbol.iterator in h) {
+			return Object.fromEntries(
+				Array.from(
+					h as Iterable<Iterable<string>>,
+					(entry) => Array.from(entry) as [string, string],
+				),
+			);
+		}
+		const headers: Record<string, string | readonly string[]> = {};
+		for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+			if (value !== undefined) headers[name] = value;
+		}
+		return headers;
+	};
+	return apiFetch<LinkDone>(getAuthLinkConfirmUrl(linkId), {
+		...options,
+		method: "POST",
+		headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+		body: JSON.stringify(linkConfirm),
+	});
+};
+
+export const getAuthLinkConfirmMutationKey = () => ["authLinkConfirm"] as const;
+
+export const getAuthLinkConfirmMutationOptions = <
+	TError = ErrorType<HTTPValidationError>,
+	TContext = unknown,
+>(options?: {
+	mutation?: UseMutationOptions<
+		Awaited<ReturnType<typeof authLinkConfirm>>,
+		TError,
+		AuthLinkConfirmMutationVariables,
+		TContext
+	>;
+	request?: SecondParameter<typeof apiFetch>;
+}): UseMutationOptions<
+	Awaited<ReturnType<typeof authLinkConfirm>>,
+	TError,
+	AuthLinkConfirmMutationVariables,
+	TContext
+> => {
+	const mutationKey = getAuthLinkConfirmMutationKey();
+	const { mutation: mutationOptions, request: requestOptions } = options
+		? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+			? options
+			: { ...options, mutation: { ...options.mutation, mutationKey } }
+		: { mutation: { mutationKey }, request: undefined };
+
+	const mutationFn: MutationFunction<
+		Awaited<ReturnType<typeof authLinkConfirm>>,
+		AuthLinkConfirmMutationVariables
+	> = (props) => {
+		const { linkId, data } = props ?? {};
+
+		return authLinkConfirm(linkId, data, requestOptions);
+	};
+
+	return { mutationFn, ...mutationOptions };
+};
+
+export type AuthLinkConfirmMutationResult = NonNullable<
+	Awaited<ReturnType<typeof authLinkConfirm>>
+>;
+export type AuthLinkConfirmMutationBody = LinkConfirm;
+export type AuthLinkConfirmMutationError = ErrorType<HTTPValidationError>;
+export type AuthLinkConfirmMutationVariables = { linkId: number; data: LinkConfirm };
+
+/**
+ * @summary Link Confirm
+ */
+export const useAuthLinkConfirm = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+	options?: {
+		mutation?: UseMutationOptions<
+			Awaited<ReturnType<typeof authLinkConfirm>>,
+			TError,
+			AuthLinkConfirmMutationVariables,
+			TContext
+		>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseMutationResult<
+	Awaited<ReturnType<typeof authLinkConfirm>>,
+	TError,
+	AuthLinkConfirmMutationVariables,
+	TContext
+> => {
+	return useMutation(getAuthLinkConfirmMutationOptions(options), queryClient);
+};
 export const getAuthLoginUrl = () => {
 	return `/api/v1/auth/login`;
 };
@@ -425,6 +812,332 @@ export const useAuthSetPassword = <TError = ErrorType<HTTPValidationError>, TCon
 	TContext
 > => {
 	return useMutation(getAuthSetPasswordMutationOptions(options), queryClient);
+};
+export const getAuthRegisterUrl = () => {
+	return `/api/v1/auth/register`;
+};
+
+/**
+ * A new account (username and password, typed twice) with its own workspace of 20 servers and 30 domains.
+ * @summary Register
+ */
+export const authRegister = async (
+	registerRequest: RegisterRequest,
+	options?: Parameters<typeof apiFetch>[1],
+): Promise<UserOut> => {
+	const getHeaders = (
+		h?: NonNullable<RequestInit["headers"]>,
+	): Record<string, string | readonly string[]> => {
+		if (!h) return {};
+		if (h instanceof Headers) return Object.fromEntries(h.entries());
+		if (Symbol.iterator in h) {
+			return Object.fromEntries(
+				Array.from(
+					h as Iterable<Iterable<string>>,
+					(entry) => Array.from(entry) as [string, string],
+				),
+			);
+		}
+		const headers: Record<string, string | readonly string[]> = {};
+		for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+			if (value !== undefined) headers[name] = value;
+		}
+		return headers;
+	};
+	return apiFetch<UserOut>(getAuthRegisterUrl(), {
+		...options,
+		method: "POST",
+		headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+		body: JSON.stringify(registerRequest),
+	});
+};
+
+export const getAuthRegisterMutationKey = () => ["authRegister"] as const;
+
+export const getAuthRegisterMutationOptions = <
+	TError = ErrorType<HTTPValidationError>,
+	TContext = unknown,
+>(options?: {
+	mutation?: UseMutationOptions<
+		Awaited<ReturnType<typeof authRegister>>,
+		TError,
+		AuthRegisterMutationVariables,
+		TContext
+	>;
+	request?: SecondParameter<typeof apiFetch>;
+}): UseMutationOptions<
+	Awaited<ReturnType<typeof authRegister>>,
+	TError,
+	AuthRegisterMutationVariables,
+	TContext
+> => {
+	const mutationKey = getAuthRegisterMutationKey();
+	const { mutation: mutationOptions, request: requestOptions } = options
+		? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+			? options
+			: { ...options, mutation: { ...options.mutation, mutationKey } }
+		: { mutation: { mutationKey }, request: undefined };
+
+	const mutationFn: MutationFunction<
+		Awaited<ReturnType<typeof authRegister>>,
+		AuthRegisterMutationVariables
+	> = (props) => {
+		const { data } = props ?? {};
+
+		return authRegister(data, requestOptions);
+	};
+
+	return { mutationFn, ...mutationOptions };
+};
+
+export type AuthRegisterMutationResult = NonNullable<Awaited<ReturnType<typeof authRegister>>>;
+export type AuthRegisterMutationBody = RegisterRequest;
+export type AuthRegisterMutationError = ErrorType<HTTPValidationError>;
+export type AuthRegisterMutationVariables = { data: RegisterRequest };
+
+/**
+ * @summary Register
+ */
+export const useAuthRegister = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+	options?: {
+		mutation?: UseMutationOptions<
+			Awaited<ReturnType<typeof authRegister>>,
+			TError,
+			AuthRegisterMutationVariables,
+			TContext
+		>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseMutationResult<
+	Awaited<ReturnType<typeof authRegister>>,
+	TError,
+	AuthRegisterMutationVariables,
+	TContext
+> => {
+	return useMutation(getAuthRegisterMutationOptions(options), queryClient);
+};
+export const getAuthRegistrationUrl = () => {
+	return `/api/v1/auth/registration`;
+};
+
+/**
+ * Whether the sign-up form is offered on the login page.
+ * @summary Registration
+ */
+export const authRegistration = async (
+	options?: Parameters<typeof apiFetch>[1],
+): Promise<RegistrationOut> => {
+	return apiFetch<RegistrationOut>(getAuthRegistrationUrl(), {
+		...options,
+		method: "GET",
+	});
+};
+
+export const getAuthRegistrationQueryKey = () => {
+	return [`/api/v1/auth/registration`] as const;
+};
+
+export const useAuthRegistrationQueryOptions = <
+	TData = Awaited<ReturnType<typeof authRegistration>>,
+	TError = ErrorType<unknown>,
+>(options?: {
+	query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof authRegistration>>, TError, TData>>;
+	request?: SecondParameter<typeof apiFetch>;
+}) => {
+	const { query: queryOptions, request: requestOptions } = options ?? {};
+
+	const queryKey = queryOptions?.queryKey ?? getAuthRegistrationQueryKey();
+
+	const queryFn: QueryFunction<Awaited<ReturnType<typeof authRegistration>>> = ({ signal }) =>
+		authRegistration({ signal, ...requestOptions });
+
+	const customOptions = queryDefaults({ queryKey, queryFn, ...queryOptions });
+
+	return customOptions as UseQueryOptions<
+		Awaited<ReturnType<typeof authRegistration>>,
+		TError,
+		TData
+	> & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AuthRegistrationQueryResult = NonNullable<Awaited<ReturnType<typeof authRegistration>>>;
+export type AuthRegistrationQueryError = ErrorType<unknown>;
+
+export function useAuthRegistration<
+	TData = Awaited<ReturnType<typeof authRegistration>>,
+	TError = ErrorType<unknown>,
+>(
+	options: {
+		query: Partial<UseQueryOptions<Awaited<ReturnType<typeof authRegistration>>, TError, TData>> &
+			Pick<
+				DefinedInitialDataOptions<
+					Awaited<ReturnType<typeof authRegistration>>,
+					TError,
+					Awaited<ReturnType<typeof authRegistration>>
+				>,
+				"initialData"
+			>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useAuthRegistration<
+	TData = Awaited<ReturnType<typeof authRegistration>>,
+	TError = ErrorType<unknown>,
+>(
+	options?: {
+		query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof authRegistration>>, TError, TData>> &
+			Pick<
+				UndefinedInitialDataOptions<
+					Awaited<ReturnType<typeof authRegistration>>,
+					TError,
+					Awaited<ReturnType<typeof authRegistration>>
+				>,
+				"initialData"
+			>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useAuthRegistration<
+	TData = Awaited<ReturnType<typeof authRegistration>>,
+	TError = ErrorType<unknown>,
+>(
+	options?: {
+		query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof authRegistration>>, TError, TData>>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Registration
+ */
+
+export function useAuthRegistration<
+	TData = Awaited<ReturnType<typeof authRegistration>>,
+	TError = ErrorType<unknown>,
+>(
+	options?: {
+		query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof authRegistration>>, TError, TData>>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+	const queryOptions = useAuthRegistrationQueryOptions(options);
+
+	const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+		queryKey: DataTag<QueryKey, TData, TError>;
+	};
+
+	return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getAuthSetRegistrationUrl = () => {
+	return `/api/v1/auth/registration`;
+};
+
+/**
+ * Open or close self-registration for the whole panel. Only the panel owner, signed in.
+ * @summary Set Registration
+ */
+export const authSetRegistration = async (
+	registrationIn: RegistrationIn,
+	options?: Parameters<typeof apiFetch>[1],
+): Promise<RegistrationOut> => {
+	const getHeaders = (
+		h?: NonNullable<RequestInit["headers"]>,
+	): Record<string, string | readonly string[]> => {
+		if (!h) return {};
+		if (h instanceof Headers) return Object.fromEntries(h.entries());
+		if (Symbol.iterator in h) {
+			return Object.fromEntries(
+				Array.from(
+					h as Iterable<Iterable<string>>,
+					(entry) => Array.from(entry) as [string, string],
+				),
+			);
+		}
+		const headers: Record<string, string | readonly string[]> = {};
+		for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+			if (value !== undefined) headers[name] = value;
+		}
+		return headers;
+	};
+	return apiFetch<RegistrationOut>(getAuthSetRegistrationUrl(), {
+		...options,
+		method: "PUT",
+		headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+		body: JSON.stringify(registrationIn),
+	});
+};
+
+export const getAuthSetRegistrationMutationKey = () => ["authSetRegistration"] as const;
+
+export const getAuthSetRegistrationMutationOptions = <
+	TError = ErrorType<HTTPValidationError>,
+	TContext = unknown,
+>(options?: {
+	mutation?: UseMutationOptions<
+		Awaited<ReturnType<typeof authSetRegistration>>,
+		TError,
+		AuthSetRegistrationMutationVariables,
+		TContext
+	>;
+	request?: SecondParameter<typeof apiFetch>;
+}): UseMutationOptions<
+	Awaited<ReturnType<typeof authSetRegistration>>,
+	TError,
+	AuthSetRegistrationMutationVariables,
+	TContext
+> => {
+	const mutationKey = getAuthSetRegistrationMutationKey();
+	const { mutation: mutationOptions, request: requestOptions } = options
+		? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+			? options
+			: { ...options, mutation: { ...options.mutation, mutationKey } }
+		: { mutation: { mutationKey }, request: undefined };
+
+	const mutationFn: MutationFunction<
+		Awaited<ReturnType<typeof authSetRegistration>>,
+		AuthSetRegistrationMutationVariables
+	> = (props) => {
+		const { data } = props ?? {};
+
+		return authSetRegistration(data, requestOptions);
+	};
+
+	return { mutationFn, ...mutationOptions };
+};
+
+export type AuthSetRegistrationMutationResult = NonNullable<
+	Awaited<ReturnType<typeof authSetRegistration>>
+>;
+export type AuthSetRegistrationMutationBody = RegistrationIn;
+export type AuthSetRegistrationMutationError = ErrorType<HTTPValidationError>;
+export type AuthSetRegistrationMutationVariables = { data: RegistrationIn };
+
+/**
+ * @summary Set Registration
+ */
+export const useAuthSetRegistration = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+	options?: {
+		mutation?: UseMutationOptions<
+			Awaited<ReturnType<typeof authSetRegistration>>,
+			TError,
+			AuthSetRegistrationMutationVariables,
+			TContext
+		>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseMutationResult<
+	Awaited<ReturnType<typeof authSetRegistration>>,
+	TError,
+	AuthSetRegistrationMutationVariables,
+	TContext
+> => {
+	return useMutation(getAuthSetRegistrationMutationOptions(options), queryClient);
 };
 export const getAuthTelegramPollUrl = () => {
 	return `/api/v1/auth/telegram/poll`;

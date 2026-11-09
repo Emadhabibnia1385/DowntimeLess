@@ -25,11 +25,11 @@ def domain_count(db: sqlite3.Connection, ws: int) -> int:
 
 def adopt_domains(db: sqlite3.Connection, server: sqlite3.Row, names: List[Any]) -> None:
     """Domains an agent found in its web server's config join its workspace's list; ones seen again are kept fresh."""
-    from ...workspaces import MAX_DOMAINS
+    from ...workspaces import domain_cap
 
     now, added = int(time.time()), 0
     ws, server_id = server["workspace_id"], server["id"]
-    room = MAX_DOMAINS - domain_count(db, ws)
+    room = domain_cap(db, ws) - domain_count(db, ws)
     for raw in sorted({str(n).lower().strip() for n in names})[:200]:
         if not HOST_RE.match(raw):
             continue

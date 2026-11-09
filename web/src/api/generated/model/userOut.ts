@@ -12,6 +12,7 @@ export interface UserOut {
 	is_panel_owner?: boolean;
 	name: string;
 	role: string;
+	tg_linked?: boolean;
 	tg_username: string | null;
 	username: string | null;
 	workspace: WorkspaceOut;

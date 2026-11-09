@@ -26,10 +26,9 @@ export const MembersListResponseItem = zod.object({
 export const MembersListResponse = zod.array(MembersListResponseItem);
 
 /**
- * Add a person by their numeric Telegram id; they sign in with Telegram and see this workspace next to their own.
- *
- * Only the panel owner (owner of workspace 1) adds people: every new member can sign in and gets a workspace, so this
- * is the registration door of the panel. The answer is the membership only, never the person's profile.
+ * Add a person now by numeric Telegram id or by the username of an account of this panel; they see this workspace
+ * next to their own. A new Telegram id is a new person: while registration is closed only the panel owner adds one.
+ * The answer is the membership only, never the person's profile.
  * @summary Add Member
  */
 export const MembersAddHeader = zod.object({
@@ -39,7 +38,8 @@ export const MembersAddHeader = zod.object({
 export const MembersAddBody = zod.object({
 	name: zod.union([zod.string(), zod.null()]).optional(),
 	role: zod.string(),
-	tg_id: zod.int(),
+	tg_id: zod.union([zod.int(), zod.null()]).optional(),
+	who: zod.union([zod.string(), zod.null()]).optional(),
 });
 
 export const MembersAddResponse = zod.object({
@@ -52,6 +52,61 @@ export const MembersAddResponse = zod.object({
 	tg_username: zod.union([zod.string(), zod.null()]),
 	user_id: zod.int(),
 });
+
+/**
+ * Open invites of this workspace by Telegram username.
+ * @summary List Invites
+ */
+export const MembersInvitesHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const MembersInvitesResponseItem = zod.object({
+	created_at: zod.int(),
+	expires_at: zod.int(),
+	id: zod.int(),
+	name: zod.string(),
+	role: zod.string(),
+	tg_username: zod.string(),
+});
+export const MembersInvitesResponse = zod.array(MembersInvitesResponseItem);
+
+/**
+ * Invite a Telegram @username for 14 days, as viewer or operator. The person with that username claims it by starting
+ * the bot or linking Telegram to their account; the inviter is then told in Telegram who claimed it (numeric id).
+ * @summary Invite
+ */
+export const MembersInviteHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const MembersInviteBody = zod.object({
+	name: zod.union([zod.string(), zod.null()]).optional(),
+	role: zod.string(),
+	tg_username: zod.string(),
+});
+
+export const MembersInviteResponse = zod.object({
+	created_at: zod.int(),
+	expires_at: zod.int(),
+	id: zod.int(),
+	name: zod.string(),
+	role: zod.string(),
+	tg_username: zod.string(),
+});
+
+/**
+ * @summary Cancel Invite
+ */
+export const MembersCancelInviteParams = zod.object({
+	invite_id: zod.int(),
+});
+
+export const MembersCancelInviteHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const MembersCancelInviteResponse = zod.void();
 
 /**
  * Take a person out of this workspace; their own workspace and other memberships stay as they are.

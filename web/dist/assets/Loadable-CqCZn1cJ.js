@@ -1,1 +1,0 @@
-import{X as e,ea as t,fi as n,mt as r}from"./auth-B5PZd0E3.js";var i=t();function a({query:t,children:a,skeleton:o=(0,i.jsx)(e,{})}){return t.isPending?o:t.isError?(0,i.jsx)(r,{message:n(t.error),onRetry:()=>void t.refetch()}):a(t.data)}export{a as t};

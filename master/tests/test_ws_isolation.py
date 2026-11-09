@@ -9,7 +9,7 @@ from test_workspace_guard import NOT_SCOPED, NOT_SCOPED_EXACT
 from ws_world import A_MARKS, B_MARKS, build, dump, switch
 
 NOT_FOUND = {"server.not_found", "category.not_found", "domain.not_found", "key.not_found", "channel.not_found",
-             "member.not_found", "issue.not_found", "ack.not_found"}
+             "member.not_found", "issue.not_found", "ack.not_found", "member.invite_not_found"}
 
 
 @pytest.fixture
@@ -85,6 +85,9 @@ def requests_into_b(w):
         ("PATCH", "/api/v1/servers/{server_id}/ignores"): ("PATCH", "/api/v1/servers/%d/ignores" % bs, {"kind": "container", "name": "bee-box", "ignored": False}, "nf"),
         ("GET", "/api/v1/panel"): ("GET", "/api/v1/panel", None, "list"),
         ("POST", "/api/v1/members"): ("POST", "/api/v1/members", {"tg_id": 909, "role": "viewer"}, (201, None)),
+        ("GET", "/api/v1/members/invites"): ("GET", "/api/v1/members/invites", None, "list"),
+        ("POST", "/api/v1/members/invites"): ("POST", "/api/v1/members/invites", {"tg_username": "@a_newcomer", "role": "viewer"}, (201, None)),
+        ("DELETE", "/api/v1/members/invites/{invite_id}"): ("DELETE", "/api/v1/members/invites/%d" % b["invite"], None, "nf"),
         ("PATCH", "/api/v1/members/{user_id}"): ("PATCH", "/api/v1/members/%d" % w["carol_id"], {"role": "viewer"}, "nf"),
         ("DELETE", "/api/v1/members/{user_id}"): ("DELETE", "/api/v1/members/%d" % w["carol_id"], None, "nf"),
         # also with an id of A, to prove A's own rows still answer: the ping matrix must name A's exit, not B's twin

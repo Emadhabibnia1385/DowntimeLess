@@ -8,6 +8,7 @@ import { useDocumentTitle } from "@/shared/useDocumentTitle";
 import { t } from "@/strings";
 import { type AccountTab, isAccountTab } from "../tabs";
 import { PasswordForm } from "./PasswordForm";
+import { TelegramLink } from "./TelegramLink";
 
 function Profile({ user }: { user: UserOut }) {
 	const space = user.workspace;
@@ -46,11 +47,12 @@ function Messengers({ user }: { user: UserOut }) {
 						) : null}
 					</div>
 					<StatusChip
-						tone={user.tg_username ? "success" : "neutral"}
-						label={user.tg_username ? t.account.connected : t.account.notConnected}
+						tone={user.tg_linked ? "success" : "neutral"}
+						label={user.tg_linked ? t.account.connected : t.account.notConnected}
 						size="sm"
 					/>
 				</div>
+				<TelegramLink user={user} />
 			</div>
 		</SectionCard>
 	);

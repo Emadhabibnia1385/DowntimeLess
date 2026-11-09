@@ -10,7 +10,7 @@ from ...db import get_db
 from ...deps import ROLE_RANK, Actor, current_workspace, require
 from ...errors import DLError
 from ...security import digest, new_token
-from ...workspaces import MAX_SERVERS, server_row
+from ...workspaces import server_cap, server_row
 from ..reports import events as changelog
 from . import service as svc
 from .schemas import JobCreate, JobOut, MetricsOut, ServerCreate, ServerCreated, ServerOut, ServerPatch
@@ -32,7 +32,7 @@ def list_servers(_: Actor = Depends(require("viewer")), ws: int = Depends(curren
 @router.post("", response_model=ServerCreated, status_code=201, operation_id="servers_create")
 def create_server(body: ServerCreate, _: Actor = Depends(require("admin")), ws: int = Depends(current_workspace),
                   db: sqlite3.Connection = Depends(get_db)):
-    if db.execute("SELECT COUNT(*) FROM servers WHERE workspace_id=?", (ws,)).fetchone()[0] >= MAX_SERVERS:
+    if db.execute("SELECT COUNT(*) FROM servers WHERE workspace_id=?", (ws,)).fetchone()[0] >= server_cap(db, ws):
         raise DLError("server.limit")
     token = new_token(24)
     cols = svc.role_columns(body.role)

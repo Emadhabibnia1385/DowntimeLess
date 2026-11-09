@@ -47,7 +47,7 @@ def resolve(request: Request, authorization: Optional[str], db: sqlite3.Connecti
     wanted = _header_ws(request) if use_header else None
     if authorization and authorization.lower().startswith("bearer "):
         row = db.execute(  # ws: token_lookup - the key's hash names one key, and with it the only workspace it may act in
-            "SELECT k.id, k.scope, k.created_by, k.workspace_id FROM api_keys k JOIN workspaces w ON w.id=k.workspace_id "
+            "SELECT k.id, k.scope, k.created_by, k.workspace_id, k.role_cap FROM api_keys k JOIN workspaces w ON w.id=k.workspace_id "
             "WHERE k.token_hash=?",
             (digest(authorization[7:].strip()),),
         ).fetchone()
@@ -58,6 +58,8 @@ def resolve(request: Request, authorization: Optional[str], db: sqlite3.Connecti
             raise DLError("workspace.not_found")
         # 'full' does what the owner does there and 'read' only looks, but never more than the creator's role now
         role = _cap("owner" if row["scope"] == "full" else "viewer", member_role(db, ws, row["created_by"]))
+        if role is not None and row["role_cap"]:  # a key moved by an account merge keeps the reach it had
+            role = _cap(role, row["role_cap"])
         if role is None:
             raise DLError("auth.required")
         db.execute("UPDATE api_keys SET last_used=? WHERE id=? AND workspace_id=?", (now, row["id"], ws))

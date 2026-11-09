@@ -6,6 +6,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from ... import appsettings, invites
 from ...db import get_db
 from ...deps import Actor, current_workspace, require
 from ...errors import DLError
@@ -29,7 +30,24 @@ class MemberOut(BaseModel):
 
 
 class MemberCreate(BaseModel):
-    tg_id: int
+    # a numeric Telegram id or the username of an account of this panel (a Telegram @username is POST /members/invites)
+    who: Optional[str] = None
+    tg_id: Optional[int] = None  # the older form of a numeric id
+    name: Optional[str] = None
+    role: str
+
+
+class InviteOut(BaseModel):
+    id: int
+    tg_username: str
+    role: str
+    name: str
+    created_at: int
+    expires_at: int
+
+
+class InviteCreate(BaseModel):
+    tg_username: str  # with or without @
     name: Optional[str] = None
     role: str
 
@@ -89,40 +107,89 @@ def list_members(actor: Actor = Depends(_owner), ws: int = Depends(current_works
     return [_out(r, actor.user_id) for r in rows]
 
 
-@router.post("", response_model=MemberOut, status_code=201, operation_id="members_add")
-def add_member(body: MemberCreate, actor: Actor = Depends(_owner), ws: int = Depends(current_workspace),
-               db: sqlite3.Connection = Depends(get_db)):
-    """Add a person by their numeric Telegram id; they sign in with Telegram and see this workspace next to their own.
-
-    Only the panel owner (owner of workspace 1) adds people: every new member can sign in and gets a workspace, so this
-    is the registration door of the panel. The answer is the membership only, never the person's profile."""
-    if not is_panel_owner(db, actor.user_id):
+def _may_add_new_people(db: sqlite3.Connection, actor: Actor) -> None:
+    """New people can sign in and get a workspace: while registration is closed only the panel owner lets them in."""
+    if not appsettings.registration_open(db) and not is_panel_owner(db, actor.user_id):
         raise DLError("members.panel_owner_only")
-    hit("members:%d" % actor.user_id, 30, 3600)
-    role = _role(body.role)
-    if not 0 < body.tg_id < TG_ID_MAX:
-        raise DLError("member.tg_id_invalid")
-    name = (body.name or "").strip()
-    if len(name) > 64:
-        raise DLError("member.name_invalid")
-    now = int(time.time())
+
+
+def _join(db: sqlite3.Connection, ws: int, uid: int, role: str, actor: Actor, name: str, label: str, now: int) -> dict:
     if db.execute("SELECT COUNT(*) FROM workspace_members WHERE workspace_id=?", (ws,)).fetchone()[0] >= MAX_MEMBERS:
         raise DLError("members.limit")
-    user = db.execute("SELECT id FROM users WHERE tg_id=?", (body.tg_id,)).fetchone()
-    if user is None:  # no profile data from an invite: the name stays on this membership only
-        uid = db.execute("INSERT INTO users (tg_id, name, role, created_at) VALUES (?,'','none',?)", (body.tg_id, now)).lastrowid
-    else:
-        uid = user["id"]
-        if db.execute("SELECT 1 FROM workspace_members WHERE workspace_id=? AND user_id=?", (ws, uid)).fetchone():
-            raise DLError("member.exists")
+    if db.execute("SELECT 1 FROM workspace_members WHERE workspace_id=? AND user_id=?", (ws, uid)).fetchone():
+        raise DLError("member.exists")
     db.execute(
         "INSERT INTO workspace_members (workspace_id, user_id, role, added_by, display_name, created_at) VALUES (?,?,?,?,?,?)",
         (ws, uid, role, actor.user_id, name, now),
     )
-    label = name or str(body.tg_id)
     changelog.record(db, ws, "member_added", "%s: %s" % (label, role), None, {"user_id": uid, "role": role})
-    return {"user_id": uid, "name": name, "tg_id": body.tg_id, "tg_username": None, "role": role, "last_login": None,
-            "added_at": now, "is_me": uid == actor.user_id}
+    tg_id = db.execute("SELECT tg_id FROM users WHERE id=?", (uid,)).fetchone()["tg_id"]
+    return {"user_id": uid, "name": name, "tg_id": tg_id if label.isdigit() else None, "tg_username": None, "role": role,
+            "last_login": None, "added_at": now, "is_me": uid == actor.user_id}
+
+
+@router.post("", response_model=MemberOut, status_code=201, operation_id="members_add")
+def add_member(body: MemberCreate, actor: Actor = Depends(_owner), ws: int = Depends(current_workspace),
+               db: sqlite3.Connection = Depends(get_db)):
+    """Add a person now by numeric Telegram id or by the username of an account of this panel; they see this workspace
+    next to their own. A new Telegram id is a new person: while registration is closed only the panel owner adds one.
+    The answer is the membership only, never the person's profile."""
+    hit("members:%d" % actor.user_id, 30, 3600)
+    role = _role(body.role)
+    name = (body.name or "").strip()
+    if len(name) > 64:
+        raise DLError("member.name_invalid")
+    who = (body.who or "").strip()
+    now = int(time.time())
+    if body.tg_id is not None or who.lstrip("-").isdigit():
+        tg_id = body.tg_id if body.tg_id is not None else int(who)
+        if not 0 < tg_id < TG_ID_MAX:
+            raise DLError("member.tg_id_invalid")
+        user = db.execute("SELECT id FROM users WHERE tg_id=?", (tg_id,)).fetchone()
+        if user is None:  # no profile data from an invite: the name stays on this membership only
+            _may_add_new_people(db, actor)
+            uid = db.execute("INSERT INTO users (tg_id, name, role, created_at) VALUES (?,'','none',?)", (tg_id, now)).lastrowid
+        else:
+            uid = user["id"]
+        return _join(db, ws, uid, role, actor, name, str(tg_id), now)
+    account = who.lower()
+    if not (3 <= len(account) <= 64 and account.isprintable() and " " not in account):
+        raise DLError("member.who_invalid")
+    user = db.execute("SELECT id FROM users WHERE username=?", (account,)).fetchone()
+    if user is None:
+        raise DLError("member.account_not_found")
+    return _join(db, ws, user["id"], role, actor, name, account, now)
+
+
+@router.post("/invites", response_model=InviteOut, status_code=201, operation_id="members_invite")
+def invite(body: InviteCreate, actor: Actor = Depends(_owner), ws: int = Depends(current_workspace),
+           db: sqlite3.Connection = Depends(get_db)):
+    """Invite a Telegram @username for 14 days, as viewer or operator. The person with that username claims it by starting
+    the bot or linking Telegram to their account; the inviter is then told in Telegram who claimed it (numeric id)."""
+    hit("members:%d" % actor.user_id, 30, 3600)
+    role = _role(body.role)
+    name = (body.name or "").strip()
+    if len(name) > 64:
+        raise DLError("member.name_invalid")
+    raw = body.tg_username.strip()
+    username = invites.tg_username(raw if raw.startswith("@") else "@" + raw)
+    if not username:
+        raise DLError("member.who_invalid")
+    _may_add_new_people(db, actor)
+    return invites.create(db, ws, username, role, name, actor.user_id)
+
+
+@router.get("/invites", response_model=List[InviteOut], operation_id="members_invites")
+def list_invites(actor: Actor = Depends(_owner), ws: int = Depends(current_workspace), db: sqlite3.Connection = Depends(get_db)):
+    """Open invites of this workspace by Telegram username."""
+    return invites.list_open(db, ws)
+
+
+@router.delete("/invites/{invite_id}", status_code=204, operation_id="members_cancel_invite")
+def cancel_invite(invite_id: int, actor: Actor = Depends(_owner), ws: int = Depends(current_workspace),
+                  db: sqlite3.Connection = Depends(get_db)):
+    hit("members:%d" % actor.user_id, 30, 3600)
+    invites.cancel(db, ws, invite_id)
 
 
 @router.patch("/{user_id}", response_model=MemberOut, operation_id="members_update")

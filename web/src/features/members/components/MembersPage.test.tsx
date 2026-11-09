@@ -15,6 +15,7 @@ const me = (role: string, panelOwner = role === "owner"): UserOut => ({
 	role,
 	has_password: false,
 	tg_username: null,
+	tg_linked: true,
 	workspace: { id: 1, name: "فضای کار اصلی", role, is_personal: role === "owner" },
 });
 
@@ -44,7 +45,7 @@ const MEMBERS = [
 
 type Call = { method: string; url: string; body: unknown };
 
-function boot(role = "owner", panelOwner = role === "owner") {
+function boot(role = "owner", panelOwner = role === "owner", registrationOpen = true) {
 	const calls: Call[] = [];
 	vi.stubGlobal(
 		"fetch",
@@ -54,13 +55,26 @@ function boot(role = "owner", panelOwner = role === "owner") {
 			calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : null });
 			const body = url.endsWith("/auth/me")
 				? me(role, panelOwner)
-				: url.endsWith("/members") && method === "POST"
-					? member({ user_id: 3, name: "رضا", tg_id: 555666 })
-					: url.endsWith("/members")
-						? MEMBERS
-						: url.includes("/members/")
-							? member({ role: "admin" })
-							: [];
+				: url.endsWith("/auth/registration")
+					? { open: registrationOpen }
+					: url.endsWith("/members/invites") && method === "POST"
+						? {
+								id: 9,
+								tg_username: "new_friend",
+								role: "operator",
+								name: "",
+								created_at: 1,
+								expires_at: 2,
+							}
+						: url.endsWith("/members/invites")
+							? []
+							: url.endsWith("/members") && method === "POST"
+								? member({ user_id: 3, name: "رضا", tg_id: 555666 })
+								: url.endsWith("/members")
+									? MEMBERS
+									: url.includes("/members/")
+										? member({ role: "admin" })
+										: [];
 			return new Response(method === "DELETE" ? null : JSON.stringify(body), {
 				status: method === "DELETE" ? 204 : 200,
 				headers: { "Content-Type": "application/json" },
@@ -117,27 +131,43 @@ describe("members and access", () => {
 		);
 	});
 
-	it("adds an admin by numeric Telegram id and refuses anything else", async () => {
+	it("adds by numeric Telegram id, invites by @username and refuses anything else", async () => {
 		const calls = boot();
-		await userEvent.click(await screen.findByRole("button", { name: "افزودن ادمین" }));
-		const dialog = await screen.findByRole("dialog");
-		const id = within(dialog).getByRole("textbox", { name: /شناسهٔ عددی تلگرام/ });
+		await userEvent.click(await screen.findByRole("button", { name: "افزودن عضو" }));
+		let dialog = await screen.findByRole("dialog");
+		const who = within(dialog).getByRole("textbox", { name: /چه کسی/ });
 		for (const role of ["بیننده", "اپراتور", "ادمین"]) {
 			expect(within(dialog).getByRole("radio", { name: new RegExp(role) })).toBeTruthy();
 		}
-		expect(within(dialog).getByText("همه کارها به‌جز اعضا و کلید API")).toBeTruthy();
 		expect(within(dialog).queryByRole("radio", { name: /مالک/ })).toBeNull();
-		await userEvent.type(id, "abc12");
+		await userEvent.type(who, "@ab");
 		await userEvent.click(within(dialog).getByRole("button", { name: "افزودن" }));
-		expect(await within(dialog).findByText(/شناسه فقط رقم است/)).toBeTruthy();
-		expect(calls.some((c) => c.method === "POST" && c.url.endsWith("/members"))).toBe(false);
-		await userEvent.clear(id);
-		await userEvent.type(id, "۵۵۵۶۶۶");
+		expect(await within(dialog).findByText(/این ورودی شناسهٔ عددی/)).toBeTruthy();
+		await userEvent.clear(who);
+		await userEvent.type(who, "@new_friend");
+		expect(within(dialog).getByText(/دعوت ۱۴ روزه ساخته می‌شود/)).toBeTruthy();
+		await userEvent.click(within(dialog).getByRole("button", { name: "افزودن" }));
+		expect(await within(dialog).findByText(/فقط برای بیننده یا اپراتور است/)).toBeTruthy();
+		expect(calls.some((c) => c.method === "POST")).toBe(false);
+		await userEvent.click(within(dialog).getByRole("radio", { name: /اپراتور/ }));
+		await userEvent.click(within(dialog).getByRole("button", { name: "افزودن" }));
+		await waitFor(() =>
+			expect(
+				calls.find((c) => c.method === "POST" && c.url.endsWith("/members/invites"))?.body,
+			).toEqual({
+				tg_username: "new_friend",
+				name: null,
+				role: "operator",
+			}),
+		);
+		await userEvent.click(await screen.findByRole("button", { name: "افزودن عضو" }));
+		dialog = await screen.findByRole("dialog");
+		await userEvent.type(within(dialog).getByRole("textbox", { name: /چه کسی/ }), "۵۵۵۶۶۶");
 		await userEvent.click(within(dialog).getByRole("radio", { name: /اپراتور/ }));
 		await userEvent.click(within(dialog).getByRole("button", { name: "افزودن" }));
 		await waitFor(() =>
 			expect(calls.find((c) => c.method === "POST" && c.url.endsWith("/members"))?.body).toEqual({
-				tg_id: 555666,
+				who: "555666",
 				name: null,
 				role: "operator",
 			}),
@@ -147,17 +177,32 @@ describe("members and access", () => {
 	it("is the owner's page only", async () => {
 		const calls = boot("admin");
 		expect(await screen.findByRole("heading", { level: 1, name: "دسترسی محدود" })).toBeTruthy();
-		expect(screen.queryByRole("button", { name: "افزودن ادمین" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "افزودن عضو" })).toBeNull();
 		expect(calls.some((c) => c.url.endsWith("/members"))).toBe(false);
 		expect(screen.queryByRole("link", { name: "اعضا" })).toBeNull();
 	});
 
-	it("lets only the panel owner add people; another workspace's owner manages roles", async () => {
-		boot("owner", false);
+	it("with registration closed another workspace's owner adds existing accounts only", async () => {
+		boot("owner", false, false);
 		expect(await screen.findByRole("grid", { name: "فهرست اعضا" })).toBeTruthy();
-		expect(screen.queryByRole("button", { name: "افزودن ادمین" })).toBeNull();
-		expect(screen.getByText(/فقط مالک پنل افراد تازه را اضافه می‌کند/)).toBeTruthy();
+		expect(screen.getByRole("button", { name: "افزودن عضو" })).toBeTruthy();
+		expect(await screen.findByText(/افراد تازه را فقط مالک پنل اضافه می‌کند/)).toBeTruthy();
+		expect(screen.queryByText("ثبت‌نام در پنل")).toBeNull();
 		expect(screen.getByRole("button", { name: "حذف سارا" })).toBeTruthy();
+	});
+
+	it("gives the panel owner the registration switch", async () => {
+		const calls = boot("owner", true, true);
+		const toggle = await screen.findByRole("switch", { name: "ثبت‌نام باز است" });
+		await waitFor(() => expect((toggle as HTMLInputElement).checked).toBe(true));
+		await userEvent.click(toggle);
+		await waitFor(() =>
+			expect(
+				calls.find((c) => c.method === "PUT" && c.url.endsWith("/auth/registration"))?.body,
+			).toEqual({
+				open: false,
+			}),
+		);
 	});
 
 	it("puts the members page in the owner's navigation", async () => {
