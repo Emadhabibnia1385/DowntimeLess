@@ -48,7 +48,24 @@ Only Telegram ids that are a member of some workspace can sign in; the first sig
 - Every 30 s: `POST /api/agent/v1/report` with metrics and results of the last jobs.
   The response carries the next `ping_targets` and queued `jobs`.
 - Jobs are a closed whitelist: `ping`, `tcp_check`, `speedtest_down`, `speedtest_up`, `apt_upgrade_safe`, `reboot`, `self_update`,
-  `cert_renew`, `cert_delete` (certbot only, the certificate name is validated by both sides).
+  `cert_renew`, `cert_delete` (certbot only, the certificate name is validated by both sides), the diagnostics, and the
+  one-click fixes below.
+- One-click fixes (agent 0.3.3): `nft_reload`, `sysctl_apply`, `ipset_sync`, `tunnel_restart`. Offered only from the matching
+  alert (`dnat_*`/`drift_dnat`, `drift_sysctl`, `drift_ipset`, `tunnel_unhealthy`) to an admin signed in to the panel, after a
+  confirm dialog that shows the exact commands; API keys (even `full`) are refused (`job.human_only`), a server at level `read`
+  refuses (`job.permission`), and the same fix cannot be queued twice before its result (`job.pending`). The agent runs only
+  fixed commands from the vpnopsnyx playbooks; the only argument is `tunnel_restart`'s unit, which must be one of the tunnel units
+  the server itself reported (checked by the master and again by the agent). Each fix runs a pre-check first and stops before
+  any change when it fails, saves the live state under `/var/backups/downtimeless/` (0600) and returns a rollback note:
+  - `nft_reload`: `nft -c -f` on every `/etc/nftables-*dnat*.nft` whose unit is loaded, then per file the live table saved and
+    `systemctl restart <unit>` (existing flows keep their conntrack mapping).
+  - `sysctl_apply`: the live value of every key the sysctl files set is saved, then `sysctl --system`; the result lists what
+    changed and what still differs.
+  - `ipset_sync`: refused when `TRUSTED_SOURCES` in `/etc/nyxon/access.conf` is empty or has fewer entries than the live
+    `nyxon_trusted` set (shrinking a trusted list stays a manual step); otherwise `ipset save` and
+    `systemctl restart nyxon-access.service`, then the live count against the file.
+  - `tunnel_restart`: `systemctl restart -- <unit>` for a loaded tunnel unit (a tunnel config's unit, or an enabled `gre-` unit).
+  Both the request and the result go to the change log. There is no reboot-risk gate on jobs today, so none applies here.
 - The agent also reports the domains its nginx answers for on TLS (`ssl.domains`); the master adds them to the SSL list as
   `auto` domains, probes them from outside, drops them a week after they vanish, and never re-adds one the owner removed.
   Mutating jobs (`apt_upgrade_safe`, `reboot`) run only if the server's permission level is `safe`/`full`, and are always

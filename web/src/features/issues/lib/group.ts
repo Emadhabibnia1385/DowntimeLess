@@ -1,4 +1,5 @@
 import type { Issue } from "@/api/generated/model";
+import { type Fix, fixOf } from "../fixes/lib";
 import { formatDecimal, formatDuration, formatNumber, formatPercent, t } from "@/strings";
 
 export type Severity = "critical" | "warning" | "info";
@@ -10,6 +11,8 @@ export type GroupItem = {
 	value: string;
 	/** How many times this problem was active in the last 24 hours. */
 	recent: number;
+	/** The one-click fix this alert offers on its server, if any. */
+	fix: Fix | null;
 };
 export type IssueGroup = {
 	family: string;
@@ -151,6 +154,7 @@ export function groupIssues(issues: readonly Issue[]): IssueGroup[] {
 						: "server",
 			value: valueOf(issue),
 			recent: issue.recent_24h ?? 0,
+			fix: fixOf(issue),
 		});
 	}
 	return [...groups.values()].sort(

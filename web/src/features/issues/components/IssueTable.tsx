@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import type { Issue } from "@/api/generated/model";
 import { formatNumber, t } from "@/strings";
 import { AckButton } from "../acks";
+import { FixJobButton } from "../fixes";
 import { FixCommand, GuideButton } from "../guides";
 import { type GroupItem, groupIssues, type IssueGroup } from "../lib/group";
 
@@ -50,6 +51,14 @@ function ServerLine({ item, title }: { item: GroupItem; title: string }) {
 			</span>
 			<span className="flex items-center gap-2">
 				<span className="tabular-nums text-muted">{item.value || t.common.none}</span>
+				{item.fix && item.serverId !== null ? (
+					<FixJobButton
+						serverId={item.serverId}
+						server={item.serverName}
+						title={title}
+						fix={item.fix}
+					/>
+				) : null}
 				<AckButton target={{ key: item.id, title, server: item.serverName }} />
 			</span>
 		</li>

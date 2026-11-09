@@ -1,1 +1,0 @@
-import{Z as e,ht as t,la as n,xi as r}from"./auth-CQVk7PBU.js";var i=n();function a({query:n,children:a,skeleton:o=(0,i.jsx)(e,{})}){return n.isPending?o:n.isError?(0,i.jsx)(t,{message:r(n.error),onRetry:()=>void n.refetch()}):a(n.data)}export{a as t};
