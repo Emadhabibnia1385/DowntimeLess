@@ -149,7 +149,7 @@ def _broken_forwards(servers, rules, win, proven, th, min_samples) -> List[Dict[
         group = sorted({names[i] for p in ports for i in location.get(p, [])})
         working = sorted({names[i] for p in ports for i in good_on.get(p, []) if i != y["id"]})
         ev = dict(probe="tcp", ports=["tcp/%d" % p for p in ports], rules=[_rule(r) for r in what["rules"]],
-                  measured_by=sorted(names[i] for i in bad), measured_by_count=len(bad), location_relays=group,
+                  failed_from=sorted(names[i] for i in bad), failed_from_count=len(bad), location_relays=group,
                   location_relays_count=len(group), working_on=working)
         if what["all"]:
             out.append(make(y, "relay_forward_broken:%d:all" % y["id"], "critical",

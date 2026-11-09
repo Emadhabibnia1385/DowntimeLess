@@ -123,6 +123,25 @@ So the path verdicts come from TCP:
   weight and never gates. The relays report shows `tcp_fail_pct`, `tcp_samples`, `tls_failed` beside the ICMP loss
   and the verdict `icmp_only` for ICMP-only loss.
 
+## Forwards: DNAT destinations and relay-to-relay probes (agent 0.3.3)
+
+Agent 0.3.3 reports each plain DNAT forward of a host (`checks.nft.dnat`: port and IPv4 destination). The master adds
+two kinds of probe target for a relay, after the exit ports (24): its own DNAT destinations (8 per cycle) and the
+forwarded ports of the other relays of the workspace (8 per cycle; ports that answered before first, the rest in turn
+every 5 minutes). A connection to another relay's forwarded port goes through its DNAT and completes only when the whole
+path to the destination works. These results are stored with the other probes but never enter the relay-to-exit path
+verdicts. `app/features/overview/forwards.py` judges them (window 10 minutes, at least 6 attempts per relay, TCP only;
+UDP forwards are not judged because UDP listeners are collapsed in the report).
+
+| Code | Severity | When |
+|---|---|---|
+| `dnat_dead_target` | critical / warning | one issue per host, listing every dead rule. A destination that is a server of the workspace (by public IP), online, that does not listen on the port (public TCP listener; below 32768, and a baseline port only after 2 reports missing): warning, critical when the relay's own probe to it also fails (`loss_crit`). A destination that listens but refuses the relay, or does not answer while other ports of it do: warning. An address outside the workspace or a tunnel peer (private range) whose probe fails: critical when mostly refused, warning when it times out. An offline destination is left to `offline`; an answering probe clears the rule. |
+| `dnat_unknown_target` | info | a rule to a public address that is no server of the workspace (often the old server of a migration that is still up); acknowledge it when it is deliberate |
+| `relay_forward_broken:<relay>:<port>` | critical with 2+ relays, info with one | other relays (each with a full window) all fail (`loss_crit`) to connect to a proven forwarded port of the relay; relays that disagree point at the measuring relay's own path, so nothing is raised. Evidence names the location group (every relay that forwards the same port), the relays where it works and who failed, so "5 of 8 connections of a location fail" maps to one relay. When every measured forward of the relay fails (2+ ports) it is one issue `relay_forward_broken:<relay>:all`. |
+
+Health: both critical codes are hard gates on a relay (`dnat_dead_target`, `forward_broken`) and take 70% of the
+`forward_integrity` weight. Switches: `on_dnat_dead_target`, `on_dnat_unknown_target`, `on_relay_forward_broken`.
+
 ## Health scores (proposal)
 
 **Relay.** Hard gates (any one means failing): agent offline; a configured forward port not listening or

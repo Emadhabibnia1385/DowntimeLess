@@ -1,4 +1,4 @@
-# Agent checks (agent 0.3.0)
+# Agent checks (agent 0.3.0, extended through 0.3.3)
 
 Phase 2 and the agent half of Phase 3 of `docs/DETECTION-CATALOG.md`: read-only data the master rules will use
 later. Nothing here changes a server. The master already stores the whole report, so no master change is needed
@@ -33,7 +33,7 @@ that runs a PasarGuard panel), `panel_error` (short class name, only when the pa
 | `checks.conntrack` `{module_loaded, count, max, tcp_established_timeout, insert_failed, drop, early_drop}` | `/proc/sys/net/netfilter/*`, `/proc/net/stat/nf_conntrack` (hex, summed over CPUs) | every report | file reads, <1 ms | limits reset to defaults after a reboot, table full, drops; module not loaded on a DNAT relay |
 | `checks.containers` `[{name, image, state, status, restarts, health, policy, exit_code, oom_killed, started_at}]` (≤50) | `docker ps -a --format` (id, name, image, state, status) and one `docker inspect --format` asking only restart count, restart policy, health, state, exit code, OOM flag, start time, image; `image` is repo:tag, digest dropped | 60 s | 2 commands, ~100–300 ms | node or panel container down or looping |
 | `checks.container_logs` `[{container, unavailable, keepalive, queuepool, certfail}]` | `docker logs --since 10m` of each running PasarGuard panel/node container (database containers excluded, ≤20, ≤30 s in all), streamed and counted: `Code: Unavailable`, `keep alive timeout`, `QueuePool limit`, `CERTIFICATE_VERIFY_FAILED` | 300 s | 1 + N commands, ~20 ms per MB of log, reading stops at 16 MB | node says Connected while Xray is stopped; keep-alive stops; DB pool exhaustion; node cert mismatch |
-| `checks.nft` `{tables, relay_dnat, dnat_rules, dnat_by_table, ip_forward}` | `nft list tables`; `nft list ruleset` streamed, `dnat to` lines counted per table (reading stops at 16 MB); `/proc/sys/net/ipv4/ip_forward` | 60 s | 2 commands, ~20 ms (20k rules parse in ~10 ms) | DNAT table gone after a reboot, or present but empty |
+| `checks.nft` `{tables, relay_dnat, dnat_rules, dnat_by_table, dnat, dnat_unparsed, ip_forward}` | `nft list tables`; `nft list ruleset` streamed, `dnat to` lines counted per table (reading stops at 16 MB); `dnat` (0.3.3) `[{table, proto, port, to, to_port}]` (≤300) keeps each plain one-port forward (`tcp dport 21001 ... dnat to 198.51.100.10:21001`, port and IPv4 destination only, never comments); port ranges, sets and maps are only counted in `dnat_unparsed`; docker's own `DOCKER` chain is skipped; `/proc/sys/net/ipv4/ip_forward` | 60 s | 2 commands, ~20 ms (20k rules parse in ~10 ms) | DNAT table gone after a reboot, or present but empty; a rule left pointing at a dead or old destination |
 | `checks.tunnels.configs` `[{name, type, mode, transport, ports, peer, iface, unit, active, rx_bytes?, tx_bytes?}]` | `/etc/backhaul/*.toml`, `/etc/backpack/*.toml`, `/etc/rathole/*.toml`, `/etc/frp/*.toml\|ini`, `/etc/wattun/*.yml\|yaml` through a key whitelist; unit state from one `systemctl show`; interface bytes from `/sys/class/net/IFACE/statistics` (same numbers as `ip -s link`, no command) | 60 s | file reads + 1 command, ~15 ms | which ports each tunnel should carry (compare with listeners), tunnel unit down, one-sided BackPack link |
 | `checks.tunnels.links` `[{iface, kind, mtu, state, rx_bytes, tx_bytes}]` | `/sys/class/net/*/type` 768/776/778/823/65534 (IPIP, SIT, GRE, ip6gre, TUN/WireGuard) | 60 s | file reads | per-link bytes, one-sided GRE, MTU sanity |
 | `checks.kernel` `{congestion, qdisc, mtu_probing, ip_forward, reserved_ports, swappiness, oom_kill, boot_id, ntp_synced, inode_pct, journal_mb}` | `/proc/sys/...`, `/proc/vmstat`, `/proc/sys/kernel/random/boot_id`, `timedatectl show -p NTPSynchronized`, `statvfs("/")`, `journalctl --disk-usage` | 300 s | 2 commands, ~50 ms | drift after rebuilds (BBR, fq, mtu probing, reserved ports), OOM kills, reboot/rebuild (`boot_id`), clock sync, inodes, journal size |
@@ -42,13 +42,14 @@ that runs a PasarGuard panel), `panel_error` (short class name, only when the pa
 | `ssl.node_certs` `[{name, source, not_after, days_left, ips, domains}]` | `openssl x509` on `/var/lib/*/certs/ssl_cert.pem`; listed apart from `ssl.certs` so the master offers no certbot action on them | with the ssl scan (1800 s) | 1 command per cert | node cert expiry; cert SAN IP differs from the server's address after a move |
 | `panel` `{container, version, nodes, usage, admins, inbounds_without_group, user_status, errors}` | see below | 60 s (discovery 300 s) | 1 `docker exec`, 0.3–2 s, hard limit 8 s (7 s inside) | panel truth: node status and message, usage collapse per node, reseller quota, inbounds nobody receives, user status surges, panel version |
 
-## TCP/TLS probes (agent 0.3.2)
+## TCP/TLS probes (agent 0.3.2, wider in 0.3.3)
 
 `probes [{target, port, ok, rtt_ms, error, tls}]` in the report: one entry per item of the master's `probe_targets`
-(at most 32 kept, each a valid host and a TCP port). Each is one `socket.create_connection` with a 3 s timeout,
-and when the master marks the port `tls` one TLS handshake (no SNI, no verification) on the same socket, then close:
-no data is sent. 8 run in parallel in a thread beside the ICMP pings, within a 12 s budget; one still running at the
-budget is left out instead of reported as failed. Standard library only (`socket`, `ssl`). The master's side (which
+(at most 48 kept from 0.3.3, 32 before, each a valid host and a TCP port). Each is one `socket.create_connection` with
+a 3 s timeout, and when the master marks the port `tls` one TLS handshake (no SNI, no verification) on the same socket,
+then close: no data is sent. 12 run in parallel (8 before 0.3.3) in a thread beside the ICMP pings, within a 12 s
+budget; one still running at the budget is left out instead of reported as failed. From 0.3.3 the list also holds the
+relay's own DNAT destinations and the forwarded ports of the other relays (the master decides, the agent only connects). Standard library only (`socket`, `ssl`). The master's side (which
 ports, proven ports, verdicts) is in `docs/DETECTION-CATALOG.md`, "TCP probes".
 
 ## The panel reader
