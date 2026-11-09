@@ -7,6 +7,31 @@
 import * as zod from "zod";
 
 /**
+ * Record an operator's change note in the change log (at most 500 characters, optionally about one server).
+ * @summary Add Change
+ */
+export const ReportsAddChangeHeader = zod.object({
+	authorization: zod.union([zod.string(), zod.null()]).optional(),
+});
+
+export const reportsAddChangeBodyTextMax = 500;
+
+export const ReportsAddChangeBody = zod.object({
+	server_id: zod.union([zod.int(), zod.null()]).optional(),
+	text: zod.string().min(1).max(reportsAddChangeBodyTextMax),
+});
+
+export const ReportsAddChangeResponse = zod.object({
+	detail: zod.record(zod.string(), zod.unknown()),
+	id: zod.int(),
+	kind: zod.string(),
+	server: zod.union([zod.string(), zod.null()]),
+	server_id: zod.union([zod.int(), zod.null()]),
+	title: zod.string(),
+	ts: zod.int(),
+});
+
+/**
  * Per server percent of time reporting, from gaps between reports and offline incidents (default 7 days).
  * @summary Availability
  */
@@ -585,6 +610,7 @@ export const ReportsPlaybooksResponse = zod.object({
 		zod.object({
 			code: zod.string(),
 			detector: zod.string(),
+			fix_cmd_fa: zod.union([zod.string(), zod.null()]).optional(),
 			meaning_fa: zod.union([zod.string(), zod.null()]).optional(),
 			summary_fa: zod.string(),
 			theme: zod.string(),

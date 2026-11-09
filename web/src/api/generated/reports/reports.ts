@@ -4,15 +4,18 @@
  * DowntimeLess
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
 	DataTag,
 	DefinedInitialDataOptions,
 	DefinedUseQueryResult,
+	MutationFunction,
 	QueryClient,
 	QueryFunction,
 	QueryKey,
 	UndefinedInitialDataOptions,
+	UseMutationOptions,
+	UseMutationResult,
 	UseQueryOptions,
 	UseQueryResult,
 } from "@tanstack/react-query";
@@ -23,9 +26,11 @@ import type {
 	CapacityReport,
 	ChangesOut,
 	DailyOut,
+	EventOut,
 	HTTPValidationError,
 	HealthOut,
 	IncidentsReport,
+	NoteIn,
 	PlaybookList,
 	PlaybookOut,
 	RelaysReport,
@@ -64,6 +69,112 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 	return result;
 };
 
+export const getReportsAddChangeUrl = () => {
+	return `/api/v1/changes`;
+};
+
+/**
+ * Record an operator's change note in the change log (at most 500 characters, optionally about one server).
+ * @summary Add Change
+ */
+export const reportsAddChange = async (
+	noteIn: NoteIn,
+	options?: Parameters<typeof apiFetch>[1],
+): Promise<EventOut> => {
+	const getHeaders = (
+		h?: NonNullable<RequestInit["headers"]>,
+	): Record<string, string | readonly string[]> => {
+		if (!h) return {};
+		if (h instanceof Headers) return Object.fromEntries(h.entries());
+		if (Symbol.iterator in h) {
+			return Object.fromEntries(
+				Array.from(
+					h as Iterable<Iterable<string>>,
+					(entry) => Array.from(entry) as [string, string],
+				),
+			);
+		}
+		const headers: Record<string, string | readonly string[]> = {};
+		for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+			if (value !== undefined) headers[name] = value;
+		}
+		return headers;
+	};
+	return apiFetch<EventOut>(getReportsAddChangeUrl(), {
+		...options,
+		method: "POST",
+		headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+		body: JSON.stringify(noteIn),
+	});
+};
+
+export const getReportsAddChangeMutationKey = () => ["reportsAddChange"] as const;
+
+export const getReportsAddChangeMutationOptions = <
+	TError = ErrorType<HTTPValidationError>,
+	TContext = unknown,
+>(options?: {
+	mutation?: UseMutationOptions<
+		Awaited<ReturnType<typeof reportsAddChange>>,
+		TError,
+		ReportsAddChangeMutationVariables,
+		TContext
+	>;
+	request?: SecondParameter<typeof apiFetch>;
+}): UseMutationOptions<
+	Awaited<ReturnType<typeof reportsAddChange>>,
+	TError,
+	ReportsAddChangeMutationVariables,
+	TContext
+> => {
+	const mutationKey = getReportsAddChangeMutationKey();
+	const { mutation: mutationOptions, request: requestOptions } = options
+		? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+			? options
+			: { ...options, mutation: { ...options.mutation, mutationKey } }
+		: { mutation: { mutationKey }, request: undefined };
+
+	const mutationFn: MutationFunction<
+		Awaited<ReturnType<typeof reportsAddChange>>,
+		ReportsAddChangeMutationVariables
+	> = (props) => {
+		const { data } = props ?? {};
+
+		return reportsAddChange(data, requestOptions);
+	};
+
+	return { mutationFn, ...mutationOptions };
+};
+
+export type ReportsAddChangeMutationResult = NonNullable<
+	Awaited<ReturnType<typeof reportsAddChange>>
+>;
+export type ReportsAddChangeMutationBody = NoteIn;
+export type ReportsAddChangeMutationError = ErrorType<HTTPValidationError>;
+export type ReportsAddChangeMutationVariables = { data: NoteIn };
+
+/**
+ * @summary Add Change
+ */
+export const useReportsAddChange = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+	options?: {
+		mutation?: UseMutationOptions<
+			Awaited<ReturnType<typeof reportsAddChange>>,
+			TError,
+			ReportsAddChangeMutationVariables,
+			TContext
+		>;
+		request?: SecondParameter<typeof apiFetch>;
+	},
+	queryClient?: QueryClient,
+): UseMutationResult<
+	Awaited<ReturnType<typeof reportsAddChange>>,
+	TError,
+	ReportsAddChangeMutationVariables,
+	TContext
+> => {
+	return useMutation(getReportsAddChangeMutationOptions(options), queryClient);
+};
 export const getReportsAvailabilityUrl = (params?: ReportsAvailabilityParams) => {
 	const normalizedParams = new URLSearchParams();
 

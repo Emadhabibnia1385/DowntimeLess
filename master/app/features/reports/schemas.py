@@ -249,6 +249,7 @@ class PlaybookItem(BaseModel):
     # lang=fa only, and only for the codes that have a guide for people
     title_fa: Optional[str] = None
     meaning_fa: Optional[str] = None
+    fix_cmd_fa: Optional[str] = None  # the first command of the guide's fixes, shown to copy beside the issue
 
 
 class PlaybookList(BaseModel):

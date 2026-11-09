@@ -8,6 +8,7 @@
 export interface PlaybookItem {
 	code: string;
 	detector: string;
+	fix_cmd_fa?: string | null;
 	meaning_fa?: string | null;
 	summary_fa: string;
 	theme: string;

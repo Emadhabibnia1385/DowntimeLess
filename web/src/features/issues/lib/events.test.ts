@@ -63,8 +63,24 @@ describe("describeEvent", () => {
 	});
 
 	it("labels every kind the master can write", () => {
-		expect(EVENT_KINDS).toHaveLength(16);
+		expect(EVENT_KINDS).toHaveLength(17);
 		for (const kind of EVENT_KINDS) expect(kindLabel(kind)).not.toBe(kind);
 		expect(kindLabel("mystery")).toBe("mystery");
+	});
+});
+
+describe("operator notes", () => {
+	it("show their full text", () => {
+		const note = {
+			id: 1,
+			ts: 1,
+			server_id: null,
+			server: null,
+			kind: "note",
+			title: "short",
+			detail: { text: "full text" },
+		};
+		expect(describeEvent(note)).toBe("full text");
+		expect(kindLabel("note")).toBe("یادداشت");
 	});
 });

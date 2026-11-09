@@ -45,7 +45,7 @@ def list_playbooks(format: str = "json", lang: str = "en", _: Actor = Depends(re
         item = {k: p[k] for k in ("code", "theme", "title", "summary_fa", "detector")}
         g = guides_fa.guide(p["code"]) if fa else None
         if g:
-            item.update(title_fa=g["title"], meaning_fa=g["meaning"])
+            item.update(title_fa=g["title"], meaning_fa=g["meaning"], fix_cmd_fa=guides_fa.first_fix(g))
         items.append(item)
     return _answer(format, {"principles": playbooks.PRINCIPLES, "playbooks": items}, render.playbooks_md)
 

@@ -25,7 +25,8 @@ export function kindTone(kind: string): "danger" | "warning" | "success" | "info
 		return "warning";
 	if (kind === "server_removed") return "danger";
 	if (kind === "issue_closed" || kind === "server_added") return "success";
-	if (kind === "job_created" || kind === "job_done" || kind === "agent_updated") return "info";
+	if (kind === "job_created" || kind === "job_done" || kind === "agent_updated" || kind === "note")
+		return "info";
 	return "neutral";
 }
 
@@ -76,6 +77,8 @@ export function describeEvent(event: EventOut): string {
 			return W.settings_changed(
 				Array.isArray(d.keys) ? d.keys.map(String).join("، ") : formatNumber(0),
 			);
+		case "note":
+			return text(d.text) || event.title;
 		case "check_ack":
 			return W.check_ack(
 				(W.checkWhat as Record<string, string>)[text(d.what)] ?? text(d.what),

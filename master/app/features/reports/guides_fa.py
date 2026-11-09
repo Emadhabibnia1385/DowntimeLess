@@ -698,5 +698,10 @@ def guide(code: str) -> Optional[Dict[str, Any]]:
     return _BY_CODE.get(code)
 
 
+def first_fix(g: Dict[str, Any]) -> Optional[str]:
+    """The first command of a guide's fixes: copied by the operator, never run by the panel."""
+    return next((s["cmd"] for s in g["fixes"] if s["cmd"]), None)
+
+
 def index() -> List[Dict[str, Any]]:
     return _GUIDES

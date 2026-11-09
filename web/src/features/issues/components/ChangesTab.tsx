@@ -10,6 +10,7 @@ import {
 } from "@nyxon/nasim";
 import { useMemo } from "react";
 import type { EventOut } from "@/api/generated/model";
+import { NoteForm } from "./NoteForm";
 import { ServerLabel } from "./ServerLabel";
 import { useServers } from "@/features/servers";
 import { Loadable } from "@/shared/Loadable";
@@ -82,6 +83,7 @@ export function ChangesTab({
 	return (
 		<SectionCard title={t.issueChanges.title}>
 			<div className="flex flex-col gap-4">
+				<NoteForm />
 				<div className="grid max-w-xl items-end gap-3 sm:grid-cols-2">
 					<SelectField
 						label={C.periodLabel}

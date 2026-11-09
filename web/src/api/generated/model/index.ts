@@ -124,6 +124,7 @@ export * from "./metricPoint";
 export * from "./metricsOut";
 export * from "./missingPort";
 export * from "./nftSummary";
+export * from "./noteIn";
 export * from "./overview";
 export * from "./overviewHistoryParams";
 export * from "./overviewSnapshot200";

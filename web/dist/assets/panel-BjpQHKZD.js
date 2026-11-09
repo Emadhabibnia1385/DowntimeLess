@@ -1,1 +1,0 @@
-import{t as e}from"./panel-Bi1NDXzh.js";var t=e;export{t as component};

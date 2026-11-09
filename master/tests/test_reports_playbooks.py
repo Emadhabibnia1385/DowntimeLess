@@ -132,3 +132,13 @@ def test_lang_fa_over_the_api(owner):
     md = owner.get("/api/v1/reports/playbooks/conntrack?lang=fa&format=md").text
     assert "```\nsysctl net.netfilter.nf_conntrack_max" in md and "از کجا بفهمیم رفع شد" in md
     assert owner.get("/api/v1/reports/playbooks?lang=de").status_code == 422
+
+
+def test_the_index_names_the_first_fix_command_of_each_guide(owner):
+    lst = {p["code"]: p for p in owner.get("/api/v1/reports/playbooks?lang=fa").json()["playbooks"]}
+    assert lst["dnat_dead_target"]["fix_cmd_fa"].startswith("cp -a /etc/nftables-relay-dnat.nft")
+    assert lst["drift_ipset"]["fix_cmd_fa"].startswith("cp -a /etc/nyxon/access.conf")
+    assert lst["ip_forward_off"]["fix_cmd_fa"] == "sysctl -w net.ipv4.ip_forward=1"
+    assert lst["container_revived"]["fix_cmd_fa"] is None or isinstance(lst["container_revived"]["fix_cmd_fa"], str)
+    assert all(p["fix_cmd_fa"] is None for p in owner.get("/api/v1/reports/playbooks").json()["playbooks"])
+

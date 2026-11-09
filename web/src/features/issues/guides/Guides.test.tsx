@@ -69,7 +69,10 @@ function open(path: string) {
 						? {
 								principles: [],
 								playbooks: [
-									item("disk", "host", "دیسک رو به پر شدن است"),
+									{
+										...item("disk", "host", "دیسک رو به پر شدن است"),
+										fix_cmd_fa: "journalctl --vacuum-size=200M",
+									},
 									item("node_down", "node", "نود در پنل وصل نیست"),
 									item("quota_exhausted", "quota", null),
 								],
@@ -122,5 +125,14 @@ describe("fix guides", () => {
 			screen.getByRole("button", { name: "باز کردن راهنمای «نود در پنل وصل نیست»" }),
 		);
 		expect(await within(await screen.findByRole("dialog")).findByText("df -h /")).toBeTruthy();
+	});
+
+	it("shows the first fix command beside the issue row, to copy only", async () => {
+		open("/issues");
+		const table = await screen.findByRole("grid");
+		expect(await within(table).findByText("journalctl --vacuum-size=200M")).toBeTruthy();
+		expect(within(table).getByText("دستور رفع (فقط برای کپی؛ پنل اجرا نمی‌کند)")).toBeTruthy();
+		expect(within(table).getByRole("button", { name: "کپی" })).toBeTruthy();
+		expect(within(table).queryByRole("button", { name: /اجرا/ })).toBeNull();
 	});
 });

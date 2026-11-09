@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import type { Issue } from "@/api/generated/model";
 import { formatNumber, t } from "@/strings";
 import { AckButton } from "../acks";
-import { GuideButton } from "../guides";
+import { FixCommand, GuideButton } from "../guides";
 import { type GroupItem, groupIssues, type IssueGroup } from "../lib/group";
 
 const TONES = { critical: "danger", warning: "warning", info: "info" } as const;
@@ -95,9 +95,12 @@ export function IssueTable({ issues }: { issues: readonly Issue[] }) {
 					id: "next",
 					header: t.issues.columns.next,
 					cell: (group) => (
-						<span className="block max-w-80 whitespace-normal text-sm text-muted">
-							{group.suggestion}
-						</span>
+						<div className="flex flex-col gap-2">
+							<span className="block max-w-80 whitespace-normal text-sm text-muted">
+								{group.suggestion}
+							</span>
+							<FixCommand code={group.family} />
+						</div>
 					),
 				},
 			]}

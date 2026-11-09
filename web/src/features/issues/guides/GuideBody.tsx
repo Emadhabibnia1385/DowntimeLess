@@ -6,7 +6,7 @@ import { formatNumber, t } from "@/strings";
 const G = t.issueGuides;
 
 // Shown to copy, never run: the panel has no execute path for these.
-function Command({ cmd }: { cmd: string }) {
+export function Command({ cmd }: { cmd: string }) {
 	return (
 		<div className="flex items-start gap-2 rounded-xl border border-border bg-surface-secondary py-2 ps-3 pe-2">
 			<span className="sr-only">{G.command}</span>
