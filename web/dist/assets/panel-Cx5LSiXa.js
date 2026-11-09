@@ -1,0 +1,1 @@
+import{t as e}from"./panel-xBf_VnMv.js";var t=e;export{t as component};

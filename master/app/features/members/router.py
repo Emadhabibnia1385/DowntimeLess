@@ -132,13 +132,15 @@ def _join(db: sqlite3.Connection, ws: int, uid: int, role: str, actor: Actor, na
 def add_member(body: MemberCreate, actor: Actor = Depends(_owner), ws: int = Depends(current_workspace),
                db: sqlite3.Connection = Depends(get_db)):
     """Add a person now by numeric Telegram id or by the username of an account of this panel; they see this workspace
-    next to their own. A new Telegram id is a new person: while registration is closed only the panel owner adds one.
-    The answer is the membership only, never the person's profile."""
+    next to their own. The person is not asked, so only the panel owner does this; every other workspace owner invites
+    by Telegram @username (POST /members/invites). The answer is the membership only, never the person's profile."""
     hit("members:%d" % actor.user_id, 30, 3600)
     role = _role(body.role)
     name = (body.name or "").strip()
     if len(name) > 64:
         raise DLError("member.name_invalid")
+    if not is_panel_owner(db, actor.user_id):  # no consent step here: others invite by Telegram @username instead
+        raise DLError("members.panel_owner_only")
     who = (body.who or "").strip()
     now = int(time.time())
     if body.tg_id is not None or who.lstrip("-").isdigit():

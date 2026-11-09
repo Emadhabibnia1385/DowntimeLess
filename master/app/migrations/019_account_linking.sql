@@ -15,6 +15,9 @@ ALTER TABLE api_keys ADD COLUMN role_cap TEXT CHECK (role_cap IS NULL OR role_ca
 
 -- panel-wide switches (registration_open); only the panel owner changes them
 CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+-- an existing panel does not silently start accepting sign-ups from the internet: closed there, the owner opens it;
+-- a fresh install (no people yet) keeps the default, open
+INSERT INTO app_settings (key, value) SELECT 'registration_open', '0' WHERE EXISTS (SELECT 1 FROM users);
 
 -- linking a Telegram account to the account signed in on one browser session: bot deep link, then two confirmations
 CREATE TABLE link_tokens (
@@ -28,6 +31,9 @@ CREATE TABLE link_tokens (
   tg_id INTEGER,
   tg_username TEXT,
   tg_name TEXT NOT NULL DEFAULT '',
+  -- the one-time code the bot shows after a yes; the panel must send it back (hash only), a few tries
+  code_hash TEXT,
+  code_tries INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL,
   done_at INTEGER

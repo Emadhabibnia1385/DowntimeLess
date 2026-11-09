@@ -59,12 +59,12 @@ def list_channels(_: Actor = Depends(require("admin")), ws: int = Depends(curren
 
 
 @router.post("/channels", response_model=ChannelOut, status_code=201, operation_id="telegram_create_channel")
-def create_channel(body: ChannelIn, request: Request, _: Actor = Depends(require("admin")), ws: int = Depends(current_workspace),
+def create_channel(body: ChannelIn, request: Request, actor: Actor = Depends(require("admin")), ws: int = Depends(current_workspace),
                    db: sqlite3.Connection = Depends(get_db)):
     """A chat the shared bot may post this workspace's alerts to, checked with Telegram before it is saved.
 
-    A group or channel: the bot must be an administrator that may post, and so must one of this workspace's owner or
-    admins. A private chat (a positive id): only one of those people's own id. One chat belongs to one workspace."""
+    A group or channel: the bot must be an administrator that may post, and so must the caller (with the Telegram account
+    linked to their panel account). A private chat (a positive id): only the caller's own id. One chat, one workspace."""
     name, chat_id = body.name.strip(), normalize_chat_id(body.chat_id)
     if not name or len(name) > 64:
         raise DLError("channel.invalid")
@@ -73,9 +73,10 @@ def create_channel(body: ChannelIn, request: Request, _: Actor = Depends(require
     # another workspace's chat: the same answer as a malformed id, so nobody learns which chats are taken
     if db.execute("SELECT 1 FROM telegram_channels WHERE chat_id=?", (chat_id,)).fetchone():  # ws: unique_check - one chat in one workspace
         raise DLError("channel.invalid")
-    managers = {r["tg_id"] for r in db.execute(
-        "SELECT u.tg_id FROM workspace_members m JOIN users u ON u.id=m.user_id "
-        "WHERE m.workspace_id=? AND m.role IN ('owner','admin') AND u.tg_id IS NOT NULL", (ws,))}
+    # only the caller's own Telegram account proves a chat: a member added without being asked must never make their
+    # private chat or their channel a target for someone else's alerts
+    me = db.execute("SELECT tg_id FROM users WHERE id=?", (actor.user_id,)).fetchone()
+    managers = {me["tg_id"]} if me and me["tg_id"] is not None else set()
     if _NUMERIC.match(chat_id) and not chat_id.startswith("-"):
         if int(chat_id) not in managers:
             raise DLError("channel.private_not_member")

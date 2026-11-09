@@ -6,6 +6,7 @@ import {
 	Notice,
 	Spinner,
 	StatusChip,
+	TextField,
 	toast,
 } from "@nyxon/nasim";
 import { useQueryClient } from "@tanstack/react-query";
@@ -32,13 +33,34 @@ const who = (view: LinkView) =>
 		? L.telegramWho(view.telegram.name || String(view.telegram.id), view.telegram.username ?? "")
 		: "";
 
+function CodeField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+	return (
+		<TextField
+			label={L.code}
+			description={L.codeHint}
+			value={value}
+			onChange={(v) => onChange(v.replace(/\D/g, "").slice(0, 6))}
+			inputMode="numeric"
+			autoComplete="one-time-code"
+			dir="ltr"
+			maxLength={6}
+		/>
+	);
+}
+
 function Merge({
 	plan,
 	busy,
+	canSubmit,
+	code,
+	onCode,
 	onConfirm,
 }: {
 	plan: MergePlan;
 	busy: boolean;
+	canSubmit: boolean;
+	code: string;
+	onCode: (v: string) => void;
 	onConfirm: () => void;
 }) {
 	const [sure, setSure] = useState(false);
@@ -50,7 +72,7 @@ function Merge({
 			</Notice>
 			<p className="text-sm leading-7">{M.lead}</p>
 			<ul className="flex list-disc flex-col gap-1.5 ps-5 text-sm leading-7">
-				<li>{plan.survivor === "telegram" ? M.survivorTelegram : M.survivorThis}</li>
+				<li>{M.survivorThis}</li>
 				<li>
 					{M.other}: {other.name || t.members.noName} ·{" "}
 					{other.username ? M.otherUsername(other.username) : M.noUsername}
@@ -84,10 +106,16 @@ function Merge({
 					))}
 				</ul>
 			)}
+			<CodeField value={code} onChange={onCode} />
 			<CheckboxField value={sure} onChange={setSure}>
 				{M.understand}
 			</CheckboxField>
-			<Button variant="danger-soft" isDisabled={!sure} isPending={busy} onPress={onConfirm}>
+			<Button
+				variant="danger-soft"
+				isDisabled={!sure || !canSubmit}
+				isPending={busy}
+				onPress={onConfirm}
+			>
 				{M.submit}
 			</Button>
 		</div>
@@ -117,12 +145,14 @@ function Flow({ started, onEnd }: { started: LinkStart; onEnd: () => void }) {
 			},
 		},
 	});
+	const [code, setCode] = useState("");
 	const data = view.data;
 	const status = data?.status ?? "pending";
+	const hasCode = code.length === 6;
 	const ask = (merge: MergePlan | null | undefined) =>
 		confirm.mutate({
 			linkId: started.link_id,
-			data: merge ? { merge: true, fingerprint: merge.fingerprint } : {},
+			data: merge ? { code, merge: true, fingerprint: merge.fingerprint } : { code },
 		});
 	if (status === "denied" || status === "expired" || status === "done") {
 		return (
@@ -140,11 +170,19 @@ function Flow({ started, onEnd }: { started: LinkStart; onEnd: () => void }) {
 				<div className="flex flex-col gap-3">
 					<h3 className="font-semibold">{L.step2}</h3>
 					{data.merge ? (
-						<Merge plan={data.merge} busy={confirm.isPending} onConfirm={() => ask(data.merge)} />
+						<Merge
+							plan={data.merge}
+							busy={confirm.isPending}
+							canSubmit={hasCode}
+							code={code}
+							onCode={setCode}
+							onConfirm={() => ask(data.merge)}
+						/>
 					) : (
 						<>
 							<p className="text-sm leading-7">{L.plainBody(who(data))}</p>
-							<Button isPending={confirm.isPending} onPress={() => ask(null)}>
+							<CodeField value={code} onChange={setCode} />
+							<Button isDisabled={!hasCode} isPending={confirm.isPending} onPress={() => ask(null)}>
 								{L.confirm}
 							</Button>
 						</>

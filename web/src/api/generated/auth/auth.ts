@@ -339,7 +339,8 @@ export const getAuthLinkConfirmUrl = (linkId: number) => {
 };
 
 /**
- * The second confirmation. A merge needs merge=true and the fingerprint shown. The session is renewed afterwards.
+ * The second confirmation: the code the bot showed after the yes, and for a merge merge=true and the fingerprint
+ * shown. The account signed in is always the one that stays; its session is renewed afterwards.
  * @summary Link Confirm
  */
 export const authLinkConfirm = async (

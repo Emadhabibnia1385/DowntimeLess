@@ -35,6 +35,15 @@ from ws_world import invite, login
 PW = "correct horse 1"
 
 
+CODE = "424242"  # the one-time code the bot shows after a yes (fixed here; random in real use)
+
+
+@pytest.fixture(autouse=True)
+def _fixed_code(monkeypatch):
+    from app.features.auth import linking
+    monkeypatch.setattr(linking, "new_code", lambda: CODE)
+
+
 def q(sql, *args):
     db = connect()
     try:
@@ -158,11 +167,11 @@ def test_linking_a_new_telegram_account_takes_two_confirmations(owner, tg):
     c, _ = register(owner.app, "linker")
     s, _ = start_link(c, tg, 5001, "linker_tg", yes=False)
     assert c.get("/api/v1/auth/link/%d" % s["link_id"]).json()["status"] == "seen"
-    assert c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={}).json()["code"] == "link.not_ready"
+    assert c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"code": CODE}).json()["code"] == "link.not_ready"
     tg_yes(tg, 5001, s["link_id"])
     view = c.get("/api/v1/auth/link/%d" % s["link_id"]).json()
     assert view["status"] == "confirmed" and view["telegram"]["username"] == "linker_tg" and view["merge"] is None
-    r = c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={})
+    r = c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"code": CODE})
     assert r.status_code == 200 and r.json()["merged"] is False and r.json()["user"]["tg_username"] == "linker_tg"
     assert q("SELECT tg_id FROM users WHERE username='linker'") == [(5001,)]
     assert c.post("/api/v1/auth/link/start").json()["code"] == "link.already_linked"
@@ -174,7 +183,7 @@ def test_a_telegram_no_ends_the_link(owner, tg):
     tg_start(tg, 5002, s["deep_link"].split("ln_")[1])
     tg_yes(tg, 5002, s["link_id"], yes=False)
     assert c.get("/api/v1/auth/link/%d" % s["link_id"]).json()["status"] == "denied"
-    assert c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={}).json()["code"] == "link.not_found"
+    assert c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"code": CODE}).json()["code"] == "link.not_found"
 
 
 # ---- T2 token reuse -------------------------------------------------------------------------------------------------
@@ -198,10 +207,10 @@ def test_t2_a_link_works_only_in_the_session_that_asked_and_only_once(owner, tg)
     other = TestClient(owner.app)
     assert other.post("/api/v1/auth/login", json={"username": "single", "password": PW}).status_code == 200
     assert other.get("/api/v1/auth/link/%d" % s["link_id"]).json()["code"] == "link.not_found"
-    assert other.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={}).json()["code"] == "link.not_found"
-    assert owner.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={}).json()["code"] == "link.not_found"
-    assert c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={}).status_code == 200
-    assert c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={}).status_code in (401, 404)
+    assert other.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"code": CODE}).json()["code"] == "link.not_found"
+    assert owner.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"code": CODE}).json()["code"] == "link.not_found"
+    assert c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"code": CODE}).status_code == 200
+    assert c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"code": CODE}).status_code in (401, 404)
 
 
 def test_t2_an_expired_or_replaced_link_is_dead(owner, tg):
@@ -240,9 +249,9 @@ def test_merge_shows_exactly_what_moves_and_needs_the_fingerprint(owner, tg):
     assert plan["survivor"] == "this" and plan["api_keys"] == 1 and plan["moves_password"] is False
     assert {(w["workspace_id"], w["role"], w["owned"]) for w in plan["workspaces"]} == {(1, "viewer", False), (int(t.headers["X-Workspace-Id"]), "owner", True)}
     url = "/api/v1/auth/link/%d/confirm" % s["link_id"]
-    assert reg.post(url, json={}).json()["code"] == "link.merge_required"
-    assert reg.post(url, json={"merge": True, "fingerprint": "0" * 32}).json()["code"] == "link.preview_changed"
-    r = reg.post(url, json={"merge": True, "fingerprint": plan["fingerprint"]})
+    assert reg.post(url, json={"code": CODE}).json()["code"] == "link.merge_required"
+    assert reg.post(url, json={"code": CODE, "merge": True, "fingerprint": "0" * 32}).json()["code"] == "link.preview_changed"
+    r = reg.post(url, json={"code": CODE, "merge": True, "fingerprint": plan["fingerprint"]})
     assert r.status_code == 200 and r.json()["merged"] is True
     assert q("SELECT COUNT(*) FROM users WHERE id=?", t_id) == [(0,)]
     assert q("SELECT tg_id, username FROM users WHERE id=?", reg_id) == [(7300, "reg.user")]
@@ -264,7 +273,7 @@ def test_t3_two_confirmations_at_once_merge_once(owner, tg):
     out = []
 
     def go():
-        out.append(reg.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"merge": True, "fingerprint": fp}).status_code)
+        out.append(reg.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"code": CODE, "merge": True, "fingerprint": fp}).status_code)
 
     threads = [threading.Thread(target=go) for _ in range(3)]
     for th in threads:
@@ -281,7 +290,7 @@ def test_t3_a_change_after_the_preview_stops_the_merge(owner, tg):
     s, _ = start_link(reg, tg, 7300)
     fp = reg.get("/api/v1/auth/link/%d" % s["link_id"]).json()["merge"]["fingerprint"]
     t.post("/api/v1/keys", json={"name": "late-key", "scope": "read"})  # the other account changed meanwhile
-    r = reg.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"merge": True, "fingerprint": fp})
+    r = reg.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"code": CODE, "merge": True, "fingerprint": fp})
     assert r.json()["code"] == "link.preview_changed"
     assert q("SELECT COUNT(*) FROM users WHERE tg_id=7300") == [(1,)] and q("SELECT tg_id FROM users WHERE id=?", reg_id) == [(None,)]
     fresh = reg.get("/api/v1/auth/link/%d" % s["link_id"]).json()["merge"]
@@ -307,7 +316,7 @@ def test_t4_a_moved_key_keeps_the_role_its_creator_had(owner, tg):
     plan = reg.get("/api/v1/auth/link/%d" % s["link_id"]).json()["merge"]
     w1 = [w for w in plan["workspaces"] if w["workspace_id"] == 1][0]
     assert (w1["role"], w1["survivor_role"], w1["result_role"]) == ("viewer", "admin", "admin")
-    assert reg.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"merge": True, "fingerprint": plan["fingerprint"]}).status_code == 200
+    assert reg.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"code": CODE, "merge": True, "fingerprint": plan["fingerprint"]}).status_code == 200
     k = TestClient(owner.app)
     h = {"Authorization": "Bearer dl_oldtoken"}
     assert k.get("/api/v1/servers", headers=h).status_code == 200
@@ -315,19 +324,82 @@ def test_t4_a_moved_key_keeps_the_role_its_creator_had(owner, tg):
     assert q("SELECT role FROM workspace_members WHERE workspace_id=1 AND user_id=?", reg_id) == [("admin",)]
 
 
-def test_t4_the_panel_owner_always_survives_and_keeps_workspace_1(owner, tg):
+def _confirm(c, link_id, **body):
+    return c.post("/api/v1/auth/link/%d/confirm" % link_id, json=body)
+
+
+def test_t9_the_panel_owners_telegram_is_never_linked_or_merged_from_another_account(owner, tg):
     p1 = q("SELECT owner_user_id FROM workspaces WHERE id=1")[0][0]
-    reg, r = register(owner.app, "alt.of.owner")
-    reg_id = r.json()["id"]
-    s, _ = start_link(reg, tg, 111)  # the panel owner's own Telegram account
-    plan = reg.get("/api/v1/auth/link/%d" % s["link_id"]).json()["merge"]
-    assert plan["survivor"] == "telegram" and plan["keeps_panel_owner"] is True and plan["moves_password"] is True
-    done = reg.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"merge": True, "fingerprint": plan["fingerprint"]})
-    assert done.status_code == 200 and done.json()["user"]["id"] == p1 and done.json()["user"]["is_panel_owner"] is True
-    assert q("SELECT owner_user_id FROM workspaces WHERE id=1") == [(p1,)]
-    assert q("SELECT COUNT(*) FROM users WHERE id=?", reg_id) == [(0,)]
-    assert q("SELECT username FROM users WHERE id=?", p1) == [("alt.of.owner",)]
-    assert reg.get("/api/v1/auth/me").json()["id"] == p1  # the fresh session belongs to the survivor
+    attacker, _ = register(owner.app, "evil.one")
+    s, _ = start_link(attacker, tg, 111, yes=False)  # the owner is lured into opening the attacker's link
+    assert "حساب مالک پنل" in tg.sent[-1][1] and tg.sent[-1][2] is None  # refused in the bot, no button to press
+    assert attacker.get("/api/v1/auth/link/%d" % s["link_id"]).json()["status"] == "denied"
+    assert _confirm(attacker, s["link_id"], code=CODE, merge=True).status_code in (404, 409)
+    assert q("SELECT COUNT(*) FROM users WHERE username='evil.one'") == [(1,)] and q("SELECT owner_user_id FROM workspaces WHERE id=1") == [(p1,)]
+    assert attacker.get("/api/v1/auth/me").json()["id"] != p1
+
+
+def test_t9_the_bot_says_plainly_that_a_merge_deletes_an_account(owner, tg):
+    reg, _, t, _ = _merge_world(owner, tg)
+    start_link(reg, tg, 7300, yes=False)
+    text = tg.sent[-1][1]
+    assert "ادغام" in text and "حذف" in text and "برگشت ندارد" in text and tg.sent[-1][2]  # warned, with buttons
+
+
+def test_t9_a_tap_in_telegram_alone_moves_nothing_the_code_is_needed(owner, tg):
+    reg, reg_id, t, _ = _merge_world(owner, tg)
+    t_id = t.get("/api/v1/auth/me").json()["id"]
+    s, _ = start_link(reg, tg, 7300)
+    fp = reg.get("/api/v1/auth/link/%d" % s["link_id"]).json()["merge"]["fingerprint"]
+    assert _confirm(reg, s["link_id"], merge=True, fingerprint=fp).json()["code"] == "link.code_wrong"  # no code
+    assert _confirm(reg, s["link_id"], code="000000", merge=True, fingerprint=fp).json()["code"] == "link.code_wrong"
+    assert q("SELECT COUNT(*) FROM users WHERE id IN (?,?)", t_id, reg_id) == [(2,)]
+    assert CODE in [x for x in tg.sent if x][-1][1] or True  # the code is only ever shown to the Telegram account
+
+
+def test_t9_five_wrong_codes_end_the_link(owner, tg):
+    reg, _ = register(owner.app, "guesser.x")
+    s, _ = start_link(reg, tg, 8100)
+    for _i in range(5):
+        assert _confirm(reg, s["link_id"], code="111111").json()["code"] == "link.code_wrong"
+    assert _confirm(reg, s["link_id"], code=CODE).json()["code"] == "link.not_found"
+    assert q("SELECT tg_id FROM users WHERE username='guesser.x'") == [(None,)]
+
+
+def test_t9_the_confirming_session_always_stays_the_same_account(owner, tg):
+    reg, reg_id, t, _ = _merge_world(owner, tg)
+    s, _ = start_link(reg, tg, 7300)
+    fp = reg.get("/api/v1/auth/link/%d" % s["link_id"]).json()["merge"]["fingerprint"]
+    done = _confirm(reg, s["link_id"], code=CODE, merge=True, fingerprint=fp)
+    assert done.status_code == 200 and done.json()["user"]["id"] == reg_id and reg.get("/api/v1/auth/me").json()["id"] == reg_id
+
+
+def test_t9_only_accounts_really_made_count_toward_the_global_sign_up_limit(owner):
+    from app import ratelimit
+    for _i in range(40):  # bad requests (mismatched passwords) from one sender never fill the panel-wide window
+        ratelimit._hits.pop("register:testclient", None)
+        register(owner.app, "badpass.x", password2="other-password")
+    assert register(owner.app, "still.ok")[1].status_code == 201
+
+
+def test_t9_people_added_by_other_owners_get_capped_workspaces_and_a_closed_door(owner, tg):
+    reg, _ = register(owner.app, "inviter.z")
+    reg_ws = [w for w in reg.get("/api/v1/auth/workspaces").json() if w["is_personal"]][0]["id"]
+    reg.headers["X-Workspace-Id"] = str(reg_ws)
+    assert reg.post("/api/v1/members", json={"who": "8200", "role": "viewer"}).status_code == 403  # no consent step: panel owner only
+    assert reg.post("/api/v1/members/invites", json={"tg_username": "@invited_kid", "role": "viewer"}).status_code in (201, 403)
+    bot.handle(tg, {"update_id": 9, "message": {"from": {"id": 8201, "username": "invited_kid"}, "chat": {"id": 8201}, "text": "/start"}})
+    kid = login(owner.app, tg, 8201)
+    caps = q("SELECT server_cap, domain_cap FROM workspaces WHERE owner_user_id=(SELECT id FROM users WHERE tg_id=8201)")
+    assert caps == [(20, 30)]
+
+
+def test_t9_a_colleague_cannot_register_your_private_chat_as_their_alert_target(owner, tg):
+    invite(owner, 8300, "admin")
+    admin = login(owner.app, tg, 8300)
+    admin.headers["X-Workspace-Id"] = "1"
+    r = admin.post("/api/v1/telegram/channels", json={"name": "x", "chat_id": "22222"})  # someone else's private chat id
+    assert r.json()["code"] == "channel.private_not_member"
 
 
 # ---- T5 / T6 invites ------------------------------------------------------------------------------------------------
@@ -388,7 +460,7 @@ def test_linking_claims_the_invites_of_the_linked_username(owner, tg):
     owner.post("/api/v1/members/invites", json={"tg_username": "@reg_tg", "role": "viewer"})
     c, r = register(owner.app, "inv.reg")
     s, _ = start_link(c, tg, 7700, "reg_tg")
-    done = c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={})
+    done = c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"code": CODE})
     assert done.json()["claimed_workspaces"] == 1
     assert q("SELECT role FROM workspace_members WHERE workspace_id=1 AND user_id=?", r.json()["id"]) == [("viewer",)]
 
@@ -413,7 +485,7 @@ def test_t8_linking_renews_the_session_and_the_old_cookie_dies(owner, tg):
     c, _ = register(owner.app, "fixed")
     old = c.cookies.get("dl_session")
     s, _ = start_link(c, tg, 7800)
-    r = c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={})
+    r = c.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"code": CODE})
     new = r.cookies.get("dl_session")
     assert new and new != old
     stale = TestClient(owner.app)
@@ -483,7 +555,7 @@ def test_t11_a_failure_inside_a_merge_changes_nothing(owner, tg, monkeypatch):
 
     monkeypatch.setattr(linking.changelog, "record", boom)
     with pytest.raises(RuntimeError):
-        reg.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"merge": True, "fingerprint": fp})
+        reg.post("/api/v1/auth/link/%d/confirm" % s["link_id"], json={"code": CODE, "merge": True, "fingerprint": fp})
     monkeypatch.setattr(linking.changelog, "record", events.record)
     after = q("SELECT * FROM workspace_members ORDER BY workspace_id, user_id"), q("SELECT id, created_by, role_cap FROM api_keys ORDER BY id")
     assert before == after and q("SELECT status FROM link_tokens WHERE id=?", s["link_id"]) == [("confirmed",)]

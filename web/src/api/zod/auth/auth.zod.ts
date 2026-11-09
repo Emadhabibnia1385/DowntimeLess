@@ -94,7 +94,8 @@ export const AuthLinkCancelHeader = zod.object({
 export const AuthLinkCancelResponse = zod.void();
 
 /**
- * The second confirmation. A merge needs merge=true and the fingerprint shown. The session is renewed afterwards.
+ * The second confirmation: the code the bot showed after the yes, and for a merge merge=true and the fingerprint
+ * shown. The account signed in is always the one that stays; its session is renewed afterwards.
  * @summary Link Confirm
  */
 export const AuthLinkConfirmParams = zod.object({
@@ -105,11 +106,14 @@ export const AuthLinkConfirmHeader = zod.object({
 	authorization: zod.union([zod.string(), zod.null()]).optional(),
 });
 
+export const authLinkConfirmBodyCodeOneMax = 12;
+
 export const authLinkConfirmBodyFingerprintOneMax = 64;
 
 export const authLinkConfirmBodyMergeDefault = false;
 
 export const AuthLinkConfirmBody = zod.object({
+	code: zod.union([zod.string().max(authLinkConfirmBodyCodeOneMax), zod.null()]).optional(),
 	fingerprint: zod
 		.union([zod.string().max(authLinkConfirmBodyFingerprintOneMax), zod.null()])
 		.optional(),

@@ -114,6 +114,7 @@ class LinkView(BaseModel):
 
 
 class LinkConfirm(BaseModel):
+    code: Optional[str] = Field(default=None, max_length=12)  # the one-time code the bot showed after the yes
     merge: bool = False
     fingerprint: Optional[str] = Field(default=None, max_length=64)
 

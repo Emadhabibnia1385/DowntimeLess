@@ -27,8 +27,8 @@ export const MembersListResponse = zod.array(MembersListResponseItem);
 
 /**
  * Add a person now by numeric Telegram id or by the username of an account of this panel; they see this workspace
- * next to their own. A new Telegram id is a new person: while registration is closed only the panel owner adds one.
- * The answer is the membership only, never the person's profile.
+ * next to their own. The person is not asked, so only the panel owner does this; every other workspace owner invites
+ * by Telegram @username (POST /members/invites). The answer is the membership only, never the person's profile.
  * @summary Add Member
  */
 export const MembersAddHeader = zod.object({

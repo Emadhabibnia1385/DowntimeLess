@@ -37,7 +37,9 @@ def test_019_keeps_every_row_and_adds_its_tables(tmp_path):
     assert [tuple(r) for r in db.execute("SELECT * FROM workspace_members ORDER BY workspace_id, user_id")] == before
     assert [tuple(r) for r in db.execute("SELECT id, server_cap, domain_cap FROM workspaces ORDER BY id")] == [(1, None, None), (2, None, None)]
     assert db.execute("SELECT role_cap FROM api_keys").fetchone()[0] is None
-    for table in ("app_settings", "link_tokens", "workspace_invites"):
+    # an existing panel does not start accepting sign-ups by itself: the migration closes registration there
+    assert [tuple(r) for r in db.execute("SELECT key, value FROM app_settings")] == [("registration_open", "0")]
+    for table in ("link_tokens", "workspace_invites"):
         assert db.execute("SELECT COUNT(*) FROM %s" % table).fetchone()[0] == 0
     # one person may now own two workspaces (after a merge); an open invite per username and workspace stays unique
     db.execute("INSERT INTO workspaces (name, owner_user_id, created_at) VALUES ('second', 1, 1)")

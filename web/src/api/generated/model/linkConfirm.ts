@@ -6,6 +6,7 @@
  */
 
 export interface LinkConfirm {
+	code?: string | null;
 	fingerprint?: string | null;
 	merge?: boolean;
 }

@@ -7,7 +7,7 @@ from ... import appsettings
 from ...db import get_db
 from ...deps import COOKIE, Actor, session_any_workspace, session_only
 from ...errors import DLError
-from ...ratelimit import hit
+from ...ratelimit import full, hit
 from ...security import digest
 from ...settings import get_settings
 from ...workspaces import is_panel_owner, list_for_user, member_role
@@ -116,8 +116,12 @@ def register(body: RegisterRequest, request: Request, response: Response, db: sq
     same_origin(request)
     ip, ua = _who(request)
     hit("register:" + ip, REGISTER_PER_IP, REGISTER_WINDOW)
-    hit("register:all", REGISTER_GLOBAL, REGISTER_WINDOW)
+    full("register:all", REGISTER_GLOBAL, REGISTER_WINDOW)
     user = svc.register(db, body.username, body.password, body.password2)
+    try:  # only accounts really made count for the whole panel, so bad requests of one sender never close sign-up
+        hit("register:all", REGISTER_GLOBAL, REGISTER_WINDOW)
+    except DLError:
+        pass
     token, ws = svc.create_session(db, user["id"], ip, ua)
     _cookie(response, token)
     return svc.user_out(db, user, ws)
@@ -145,10 +149,13 @@ def link_view(link_id: int, actor: Actor = Depends(session_any_workspace), db: s
 @router.post("/link/{link_id}/confirm", response_model=LinkDone, operation_id="auth_link_confirm")
 def link_confirm(link_id: int, body: LinkConfirm, request: Request, response: Response,
                  actor: Actor = Depends(session_any_workspace), db: sqlite3.Connection = Depends(get_db)):
-    """The second confirmation. A merge needs merge=true and the fingerprint shown. The session is renewed afterwards."""
+    """The second confirmation: the code the bot showed after the yes, and for a merge merge=true and the fingerprint
+    shown. The account signed in is always the one that stays; its session is renewed afterwards."""
     same_origin(request)
     hit("link:%d" % actor.user_id, 10, 3600)
-    done = linking.confirm(db, link_id, actor.user_id, actor.session_id, body.merge, body.fingerprint)
+    done = linking.confirm(db, link_id, actor.user_id, actor.session_id, body.merge, body.fingerprint, body.code)
+    if done["user_id"] != actor.user_id:  # a confirm never hands this browser another account
+        raise DLError("auth.forbidden")
     ip, ua = _who(request)
     db.execute("DELETE FROM sessions WHERE id=?", (actor.session_id,))  # identity changed: a fresh session, never the old token
     token, ws = svc.create_session(db, done["user_id"], ip, ua)

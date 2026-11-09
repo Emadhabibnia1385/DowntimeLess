@@ -113,9 +113,14 @@ describe("linking Telegram from the account page", () => {
 			true,
 		);
 		await userEvent.click(screen.getByRole("checkbox", { name: /یک‌طرفه است/ }));
+		expect(merge.hasAttribute("disabled") || merge.getAttribute("aria-disabled") === "true").toBe(
+			true,
+		); // the bot's code is still missing
+		await userEvent.type(screen.getByLabelText("کد تأیید ربات"), "424242");
 		await userEvent.click(screen.getByRole("button", { name: "ادغام و اتصال" }));
 		await waitFor(() =>
 			expect(calls.find((c) => c.url.endsWith("/auth/link/5/confirm"))?.body).toEqual({
+				code: "424242",
 				merge: true,
 				fingerprint: "f".repeat(32),
 			}),
@@ -126,9 +131,12 @@ describe("linking Telegram from the account page", () => {
 	it("links without a merge after one confirmation", async () => {
 		const calls = boot({ ...merging, merge: null });
 		await userEvent.click(await screen.findByRole("button", { name: "اتصال حساب تلگرام" }));
+		await userEvent.type(await screen.findByLabelText("کد تأیید ربات"), "123456");
 		await userEvent.click(await screen.findByRole("button", { name: "تأیید اتصال" }));
 		await waitFor(() =>
-			expect(calls.find((c) => c.url.endsWith("/auth/link/5/confirm"))?.body).toEqual({}),
+			expect(calls.find((c) => c.url.endsWith("/auth/link/5/confirm"))?.body).toEqual({
+				code: "123456",
+			}),
 		);
 	});
 });

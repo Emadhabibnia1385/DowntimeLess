@@ -1,28 +1,34 @@
 """Linking a Telegram account to the account signed in on one browser session, and merging two accounts.
 
 Flow: the panel asks for a link (bound to this user AND this session, 10 minutes, a random token stored as a hash); the
-person opens the bot's deep link, the bot records which Telegram account sent /start (the token is then spent) and asks
-"link to <account>?" in Telegram (confirmation 1); the panel shows exactly what will happen, including a merge when the
-Telegram account already belongs to another account, and the person confirms there (confirmation 2) with the
-fingerprint of what was shown. The link or merge then happens in one transaction, once.
+person opens the bot's deep link, the bot records which Telegram account sent /start (the token is then spent) and says
+plainly what a yes does, a merge included (confirmation 1). After the yes the bot shows a one-time 6 digit code. The
+panel shows exactly what will happen and the person confirms there (confirmation 2) with that code and the fingerprint
+of what was shown. The link or merge then happens in one transaction, once.
+
+Trust model: a tap in Telegram can be phished (someone sends their own link to a victim), so the tap alone moves
+nothing. The code is shown only to the Telegram account, with a warning never to pass it on, and five wrong codes end
+the link. The session that confirms always stays the same account: the Telegram account of the panel owner is never
+linked or merged from another account (the owner sets a username and password on their own account instead).
 
 Merge is one way: the absorbed account's memberships, owned workspaces, API keys and credentials move to the survivor
-and the absorbed account is deleted. The survivor is the owner of workspace 1 when that person is one of the two (the
-panel owner never changes), else the account signed in. A membership never rises above the better of the two roles,
+and the absorbed account is deleted. The survivor is always the account signed in; the panel owner is never absorbed. A membership never rises above the better of the two roles,
 and a moved API key keeps the role its creator had (api_keys.role_cap), so a merge never widens a key's reach."""
 import hashlib
 import json
+import secrets
 import sqlite3
 import time
 from typing import Any, Dict, List, Optional
 
 from ... import invites
 from ...errors import DLError
-from ...security import digest, new_token
+from ...security import digest, new_token, same
 from ...workspaces import PANEL_WORKSPACE, ROLE_RANK, panel_owner_id
 from ..reports import events as changelog
 
 LINK_TTL = 600
+CODE_TRIES = 5
 OPEN = ("pending", "seen", "confirmed")
 
 
@@ -57,12 +63,40 @@ def bot_seen(db: sqlite3.Connection, token: str, tg_id: int, tg_username: Option
     return db.execute("SELECT * FROM link_tokens WHERE token_hash=?", (digest(token),)).fetchone()
 
 
-def bot_decide(db: sqlite3.Connection, link_id: int, tg_id: int, yes: bool) -> bool:
-    """Confirmation 1, in Telegram, by the same Telegram account that opened the link."""
-    return bool(db.execute(
-        "UPDATE link_tokens SET status=? WHERE id=? AND status='seen' AND tg_id=? AND expires_at>?",
-        ("confirmed" if yes else "denied", link_id, tg_id, int(time.time())),
-    ).rowcount)
+def new_code() -> str:
+    return "%06d" % secrets.randbelow(10 ** 6)
+
+
+def refusal(db: sqlite3.Connection, row: sqlite3.Row) -> Optional[str]:
+    """Why this Telegram account can never be linked to the asking account: 'panel_owner', 'same' or None."""
+    other = db.execute("SELECT id FROM users WHERE tg_id=?", (row["tg_id"],)).fetchone()
+    if other is None:
+        return None
+    if other["id"] == row["user_id"]:
+        return "same"
+    return "panel_owner" if other["id"] == panel_owner_id(db) else None
+
+
+def deny(db: sqlite3.Connection, link_id: int) -> None:
+    db.execute("UPDATE link_tokens SET status='denied' WHERE id=? AND status IN ('pending','seen','confirmed')", (link_id,))
+
+
+def owner_label(db: sqlite3.Connection, tg_id: int) -> Optional[str]:
+    """The account this Telegram id already has here (it would be merged away), or None."""
+    row = db.execute("SELECT id FROM users WHERE tg_id=?", (tg_id,)).fetchone()
+    return account_label(db, row["id"]) if row else None
+
+
+def bot_decide(db: sqlite3.Connection, link_id: int, tg_id: int, yes: bool) -> Optional[str]:
+    """Confirmation 1, in Telegram, by the same Telegram account that opened the link.
+
+    None when the link is gone; '' after a no; after a yes the one-time code, which only that Telegram account sees."""
+    code = new_code() if yes else ""
+    won = db.execute(
+        "UPDATE link_tokens SET status=?, code_hash=?, code_tries=0 WHERE id=? AND status='seen' AND tg_id=? AND expires_at>?",
+        ("confirmed" if yes else "denied", digest(code) if yes else None, link_id, tg_id, int(time.time())),
+    ).rowcount
+    return code if won else None
 
 
 def _row(db: sqlite3.Connection, link_id: int, user_id: int, session_id: int) -> sqlite3.Row:
@@ -94,7 +128,9 @@ def plan(db: sqlite3.Connection, me: int, tg_id: int) -> Optional[Dict[str, Any]
     if other["id"] == me:
         raise DLError("link.same_account")
     p1 = panel_owner_id(db)
-    survivor, absorbed = (other["id"], me) if p1 == other["id"] else (me, other["id"])
+    if other["id"] == p1:
+        raise DLError("link.panel_owner")
+    survivor, absorbed = me, other["id"]
     mine = {r["workspace_id"]: r for r in _memberships(db, survivor)}
     rows = []
     for r in _memberships(db, absorbed):
@@ -109,7 +145,7 @@ def plan(db: sqlite3.Connection, me: int, tg_id: int) -> Optional[Dict[str, Any]
     shape = {"survivor": survivor, "absorbed": absorbed, "ws": [(x["workspace_id"], x["role"], x["survivor_role"], x["owned"]) for x in rows],
              "keys": [k["id"] for k in keys], "pw": moves_password, "user": ab["username"], "tg": ab["tg_id"], "p1": p1}
     return {
-        "survivor": "telegram" if survivor == other["id"] else "this",
+        "survivor": "this",
         "other": {"username": other["username"], "name": other["name"] or "", "has_password": bool(other["password_hash"]),
                   "tg_username": other["tg_username"]},
         "workspaces": rows, "api_keys": len(keys), "moves_password": moves_password,
@@ -141,10 +177,36 @@ def cancel(db: sqlite3.Connection, link_id: int, user_id: int, session_id: int) 
     db.execute("UPDATE link_tokens SET status='denied' WHERE id=? AND status IN ('pending','seen','confirmed')", (link_id,))
 
 
-def confirm(db: sqlite3.Connection, link_id: int, user_id: int, session_id: int, merge: bool, fingerprint: Optional[str]) -> Dict[str, Any]:
-    """Confirmation 2, in the panel: link, or merge then link, in one transaction that only one request can win.
-    Returns {"user_id": survivor, "merged": bool, "claimed": [...]}."""
+def _check_code(db: sqlite3.Connection, link_id: int, user_id: int, session_id: int, code: Optional[str], now: int) -> None:
+    """The code the bot showed must come back before anything moves; a wrong one is counted and five end the link."""
+    db.execute("BEGIN IMMEDIATE")
+    try:
+        row = db.execute("SELECT * FROM link_tokens WHERE id=? AND user_id=? AND session_id=?", (link_id, user_id, session_id)).fetchone()
+        if not row or row["status"] not in OPEN or row["expires_at"] <= now:
+            error = "link.not_found"
+        elif row["status"] != "confirmed":
+            error = "link.not_ready"
+        elif row["code_hash"] and code and same(digest(code.strip()), row["code_hash"]):
+            error = None
+        else:
+            tries = row["code_tries"] + 1
+            db.execute("UPDATE link_tokens SET code_tries=?, status=CASE WHEN ?>=? THEN 'denied' ELSE status END WHERE id=?",
+                       (tries, tries, CODE_TRIES, link_id))
+            error = "link.code_wrong"
+        db.execute("COMMIT")
+    except BaseException:
+        db.execute("ROLLBACK")
+        raise
+    if error:
+        raise DLError(error)
+
+
+def confirm(db: sqlite3.Connection, link_id: int, user_id: int, session_id: int, merge: bool, fingerprint: Optional[str],
+            code: Optional[str] = None) -> Dict[str, Any]:
+    """Confirmation 2, in the panel: the bot's code, then link, or merge then link, in one transaction that only one
+    request can win. The survivor is always `user_id`. Returns {"user_id": survivor, "merged": bool, "claimed": [...]}."""
     now = int(time.time())
+    _check_code(db, link_id, user_id, session_id, code, now)
     db.execute("BEGIN IMMEDIATE")
     try:
         won = db.execute(

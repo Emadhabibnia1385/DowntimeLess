@@ -3733,6 +3733,18 @@
       },
       "LinkConfirm": {
         "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
           "fingerprint": {
             "anyOf": [
               {
@@ -8055,7 +8067,7 @@
     },
     "/api/v1/auth/link/{link_id}/confirm": {
       "post": {
-        "description": "The second confirmation. A merge needs merge=true and the fingerprint shown. The session is renewed afterwards.",
+        "description": "The second confirmation: the code the bot showed after the yes, and for a merge merge=true and the fingerprint\nshown. The account signed in is always the one that stays; its session is renewed afterwards.",
         "operationId": "auth_link_confirm",
         "parameters": [
           {
@@ -9674,7 +9686,7 @@
         ]
       },
       "post": {
-        "description": "Add a person now by numeric Telegram id or by the username of an account of this panel; they see this workspace\nnext to their own. A new Telegram id is a new person: while registration is closed only the panel owner adds one.\nThe answer is the membership only, never the person's profile.",
+        "description": "Add a person now by numeric Telegram id or by the username of an account of this panel; they see this workspace\nnext to their own. The person is not asked, so only the panel owner does this; every other workspace owner invites\nby Telegram @username (POST /members/invites). The answer is the membership only, never the person's profile.",
         "operationId": "members_add",
         "parameters": [
           {
@@ -12188,7 +12200,7 @@
         ]
       },
       "post": {
-        "description": "A chat the shared bot may post this workspace's alerts to, checked with Telegram before it is saved.\n\nA group or channel: the bot must be an administrator that may post, and so must one of this workspace's owner or\nadmins. A private chat (a positive id): only one of those people's own id. One chat belongs to one workspace.",
+        "description": "A chat the shared bot may post this workspace's alerts to, checked with Telegram before it is saved.\n\nA group or channel: the bot must be an administrator that may post, and so must the caller (with the Telegram account\nlinked to their panel account). A private chat (a positive id): only the caller's own id. One chat, one workspace.",
         "operationId": "telegram_create_channel",
         "parameters": [
           {

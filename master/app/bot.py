@@ -54,6 +54,36 @@ def _claim_invites(tg: Telegram, db, frm: Dict[str, Any]) -> None:
     notify_claims(tg, db, invites.claim(db, uid, frm["id"], username), frm["id"], username, _name(frm))
 
 
+LINK_REFUSED = {
+    "same": "ℹ️ این تلگرام از قبل به همین حساب وصل است.",
+    "panel_owner": "⛔ این تلگرام حساب مالک پنل است و به حساب دیگری وصل یا در آن ادغام نمی‌شود. اگر خودتان مالک هستید، با همین "
+                   "تلگرام وارد پنل شوید و در صفحهٔ حساب، نام کاربری و رمز بگذارید. اگر کسی این لینک را برایتان فرستاده، آن را نادیده بگیرید.",
+}
+LINK_OWN = ("⚠️ فقط اگر <b>خودتان همین الان</b> در پنل «اتصال تلگرام» را زده‌اید «بله» بزنید. اگر کسی این لینک را برایتان فرستاده، "
+            "«نه» بزنید.")
+
+
+def _ask_link(tg: Telegram, db, chat: int, frm: Dict[str, Any], row) -> None:
+    """Confirmation 1: say in plain words what a yes does. A phished tap must not look harmless."""
+    why = linking.refusal(db, row)
+    if why:
+        linking.deny(db, row["id"])
+        return tg.send(chat, LINK_REFUSED[why])
+    account = escape(linking.account_label(db, row["user_id"]))
+    mine = linking.owner_label(db, frm["id"])
+    if mine is None:
+        text = ("🔗 <b>اتصال تلگرام به حساب پنل</b>\nحساب: <code>%s</code>\n\nبعد از اتصال، هر کس به حساب <code>%s</code> دسترسی دارد "
+                "می‌تواند با این تلگرام وارد شود و هشدارها و دعوت‌های این تلگرام را بگیرد.\n\n%s\nبعد از «بله» یک کد می‌گیرید که "
+                "باید در خود پنل وارد شود." % (account, account, LINK_OWN))
+    else:
+        text = ("⚠️ <b>ادغام دو حساب</b>\nاین تلگرام الان در پنل حساب «%s» را دارد. با ادامه، حساب «%s» در حساب <code>%s</code> ادغام و "
+                "<b>حذف</b> می‌شود: همهٔ فضاهای کار، سرورها و کلیدهای API آن به <code>%s</code> می‌رسد و هر کس رمز آن حساب را "
+                "داشته باشد صاحب همه‌شان می‌شود. این کار برگشت ندارد.\n\nفقط اگر هر دو حساب مال خود شماست ادامه دهید.\n%s"
+                % (escape(mine), escape(mine), account, account, LINK_OWN))
+    tg.send(chat, text, [[{"text": "✅ بله، خودم خواستم", "callback_data": "ln:ok:%d" % row["id"]},
+                          {"text": "❌ نه", "callback_data": "ln:no:%d" % row["id"]}]])
+
+
 def _message(tg: Telegram, db, msg: Dict[str, Any]) -> None:
     frm, chat, text = msg["from"], msg["chat"]["id"], msg["text"].strip()
     arg = text.split(" ", 1)[1].strip() if text.startswith("/start ") else ""
@@ -64,12 +94,7 @@ def _message(tg: Telegram, db, msg: Dict[str, Any]) -> None:
         if not row:
             tg.send(chat, "⛔ این لینک اتصال پیدا نشد، منقضی شده یا قبلاً استفاده شده است.")
         else:
-            tg.send(
-                chat,
-                "🔗 <b>اتصال تلگرام به حساب پنل</b>\nحساب: <code>%s</code>\n\nاین حساب تلگرام به همین حساب پنل وصل شود؟ "
-                "بعد از «بله» باید در خود پنل هم تأیید کنید." % escape(linking.account_label(db, row["user_id"])),
-                [[{"text": "✅ بله، وصل کن", "callback_data": "ln:ok:%d" % row["id"]}, {"text": "❌ نه", "callback_data": "ln:no:%d" % row["id"]}]],
-            )
+            _ask_link(tg, db, chat, frm, row)
     elif arg.startswith("claim_"):
         ok = auth.claim_owner(db, arg[6:], frm["id"], _name(frm), frm.get("username"))
         tg.send(chat, "✅ شما مالک این پنل شدید. حالا از پنل وب وارد شوید." if ok else "⛔ این لینک نامعتبر است یا قبلاً استفاده شده.")
@@ -99,11 +124,16 @@ def _message(tg: Telegram, db, msg: Dict[str, Any]) -> None:
 def _callback(tg: Telegram, db, cb: Dict[str, Any]) -> None:
     parts = cb.get("data", "").split(":")
     if len(parts) == 3 and parts[0] == "ln" and parts[2].isdigit():
-        ok = linking.bot_decide(db, int(parts[2]), cb["from"]["id"], parts[1] == "ok")
-        tg.answer(cb["id"], "ثبت شد" if ok else "منقضی شده")
+        code = linking.bot_decide(db, int(parts[2]), cb["from"]["id"], parts[1] == "ok")
+        tg.answer(cb["id"], "ثبت شد" if code is not None else "منقضی شده")
         if "message" in cb:
-            label = ("✅ در تلگرام تأیید شد؛ حالا در پنل تأیید نهایی را بزنید." if parts[1] == "ok" else "❌ اتصال رد شد.") if ok \
-                else "⌛ این درخواست منقضی شده است."
+            if code is None:
+                label = "⌛ این درخواست منقضی شده است."
+            elif not code:
+                label = "❌ اتصال رد شد."
+            else:
+                label = ("✅ در تلگرام تأیید شد.\n\nکد تأیید: <code>%s</code>\n\nاین کد را فقط <b>خودتان</b> در همان صفحهٔ پنل که باز کرده‌اید "
+                         "وارد کنید. آن را برای هیچ‌کس نفرستید؛ مدیر یا پشتیبانی هیچ‌وقت این کد را از شما نمی‌خواهد." % code)
             tg.edit(cb["message"]["chat"]["id"], cb["message"]["message_id"], label)
         return
     if len(parts) != 3 or parts[0] != "wl" or not parts[2].isdigit():

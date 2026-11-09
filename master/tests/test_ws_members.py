@@ -73,10 +73,10 @@ def test_an_invited_person_signs_in_to_their_own_workspace_once_and_sees_who_inv
     assert _count("SELECT COUNT(*) FROM workspaces WHERE owner_user_id=(SELECT id FROM users WHERE tg_id=111)") == 1
     # their own workspace starts empty and is theirs to look after; new people only while registration is open
     assert dina.get("/api/v1/servers").json() == [] and dina.get("/api/v1/members").status_code == 200
-    owner.put("/api/v1/auth/registration", json={"open": False})
+    # adding a person directly asks nothing of them, so it stays with the panel owner; others invite by @username
     assert dina.post("/api/v1/members", json={"tg_id": 9123, "role": "viewer"}).json()["code"] == "members.panel_owner_only"
     owner.put("/api/v1/auth/registration", json={"open": True})
-    assert dina.post("/api/v1/members", json={"tg_id": 9123, "role": "viewer"}).status_code == 201
+    assert dina.post("/api/v1/members", json={"tg_id": 9123, "role": "viewer"}).json()["code"] == "members.panel_owner_only"
     # the next sign-in returns to the workspace used last
     switch(dina, 1)
     again = login(owner.app, tg, 7003)

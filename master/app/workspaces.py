@@ -74,9 +74,21 @@ def default_workspace(db: sqlite3.Connection, user_id: int) -> Optional[int]:
     return row["workspace_id"] if row else None
 
 
+def personal_caps(db: sqlite3.Connection, user_id: int) -> Optional[tuple]:
+    """Caps of a new personal workspace: none for the panel owner and for people the panel owner added or invited,
+    the self-service caps for everyone else (sign-up, or let in by another workspace's owner)."""
+    p1 = panel_owner_id(db)
+    if p1 is None or user_id == p1:
+        return None
+    trusted = db.execute(  # ws: caller_row - did the panel owner put this person in any workspace
+        "SELECT 1 FROM workspace_members WHERE user_id=? AND added_by=?", (user_id, p1)).fetchone()
+    return None if trusted else (SELF_SERVERS, SELF_DOMAINS)
+
+
 def ensure_personal(db: sqlite3.Connection, user: sqlite3.Row, caps: Optional[tuple] = None) -> int:
     """The person's own workspace, created empty (and only once) the first time they sign in. `caps` (servers, domains)
-    is set for a self-registered account; one statement both checks and inserts, so two sign-ins never make two."""
+    defaults to personal_caps(); one statement both checks and inserts, so two sign-ins never make two."""
+    caps = caps or personal_caps(db, user["id"])
     now = int(time.time())
     name = (user["name"] or "").strip() or ("@" + user["tg_username"] if user["tg_username"] else "")
     name = name or (user["username"] if "username" in user.keys() and user["username"] else PERSONAL_FALLBACK)

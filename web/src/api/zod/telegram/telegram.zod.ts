@@ -24,8 +24,8 @@ export const TelegramListChannelsResponse = zod.array(TelegramListChannelsRespon
 /**
  * A chat the shared bot may post this workspace's alerts to, checked with Telegram before it is saved.
  *
- * A group or channel: the bot must be an administrator that may post, and so must one of this workspace's owner or
- * admins. A private chat (a positive id): only one of those people's own id. One chat belongs to one workspace.
+ * A group or channel: the bot must be an administrator that may post, and so must the caller (with the Telegram account
+ * linked to their panel account). A private chat (a positive id): only the caller's own id. One chat, one workspace.
  * @summary Create Channel
  */
 export const TelegramCreateChannelHeader = zod.object({
