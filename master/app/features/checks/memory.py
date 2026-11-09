@@ -66,6 +66,22 @@ def panel_of(rep: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return p if isinstance(p, dict) else None
 
 
+IPV4 = re.compile(r"^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$")
+
+
+def dnat_rules(rep: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The plain one-port DNAT forwards of a report (agent 0.3.3 `checks.nft.dnat`), checked field by field."""
+    out: List[Dict[str, Any]] = []
+    for x in dicts(part(rep, "nft").get("dnat")) or []:
+        proto, port, to, to_port = x.get("proto"), num(x.get("port")), x.get("to"), num(x.get("to_port"))
+        if proto not in ("tcp", "udp") or port is None or to_port is None or not (0 < port < 65536 and 0 < to_port < 65536):
+            continue
+        if not isinstance(to, str) or not IPV4.match(to):
+            continue
+        out.append({"table": text(x.get("table"), 64) or "", "proto": proto, "port": port, "to": to, "to_port": to_port})
+    return out[:MAX_BASELINE]
+
+
 def listener_keys(items: Any) -> Optional[Dict[Tuple[str, int], Optional[str]]]:
     """(proto, port) -> process of the report's listeners; None when the agent did not send a list."""
     rows = dicts(items)

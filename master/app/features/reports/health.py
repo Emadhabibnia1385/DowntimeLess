@@ -45,14 +45,18 @@ CHECK_PENALTIES = {
     "node_down": ({"other": "panel_nodes"}, 0.34),
     "node_silent": ({"other": "panel_nodes"}, 0.34),
     "node_usage_drop": ({"other": "panel_nodes"}, 0.15),
+    "dnat_dead_target": ({"relay": "forward_integrity", "exit": "units", "other": "units"}, 0.7),
+    "relay_forward_broken": ({"relay": "forward_integrity"}, 0.7),
 }
 # critical issues that are hard gates on a relay: a forward port closed, the DNAT table gone, forwarding off
-GATES = {"listener_missing": "forward_port_closed", "dnat_missing": "dnat_missing", "ip_forward_off": "ip_forward_off"}
+GATES = {"listener_missing": "forward_port_closed", "dnat_missing": "dnat_missing", "ip_forward_off": "ip_forward_off",
+         "dnat_dead_target": "dnat_dead_target", "relay_forward_broken": "forward_broken"}
 DESCRIPTION = (
     "100 minus penalties; bands: healthy >= 80, degraded 50-79, failing < 50 or any hard gate. Hard gates: agent offline, "
     "conntrack at the critical threshold, relay whose TCP probes fail >= 50% to every exit, exit whose TCP probes fail >= 50% from every relay "
     "(2+ relays), quota exhausted, "
-    "relay with a baseline forward port not listening, its DNAT table gone or ip_forward off (critical issues). Path penalties use TCP "
+    "relay with a baseline forward port not listening, its DNAT table gone, ip_forward off, a DNAT rule to a dead destination or a "
+    "forward other relays agree is broken (critical issues). Path penalties use TCP "
     "probes to proven ports; a path measured only by ICMP counts for at most 30% of its weight and never gates."
 )
 ICMP_ONLY_SHARE = 0.3

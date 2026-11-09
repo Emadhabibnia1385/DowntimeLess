@@ -63,8 +63,9 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
         (now, body.model_dump_json(), rx, tx, body.agent_version, body.hostname, public_ip,
          geo.get("country"), geo.get("city"), geo.get("org"), sid, ws),
     )
+    dumped = body.model_dump()
     try:
-        checks_memory.observe(db, server, body.model_dump(), now)
+        checks_memory.observe(db, server, dumped, now)
     except Exception:  # a bad field in the new blocks must never cost the whole report
         log.exception("check memory of server %d failed", sid)
     extra = body.model_extra or {}
@@ -83,7 +84,7 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
                 "INSERT INTO pings (server_id, ts, target, loss, rtt) VALUES (?,?,?,?,?)", (sid, now, str(p["target"]), p.get("loss_pct"), p.get("rtt_ms"))
             )
     try:
-        probes_svc.record(db, server, extra.get("probes"), now)
+        probes_svc.record(db, server, extra.get("probes"), now, dumped)
     except Exception:  # a malformed probe list must never cost the whole report
         log.exception("probes of server %d failed", sid)
     for j in body.jobs_done:
@@ -105,6 +106,6 @@ def report(body: Report, x_agent_key: str = Header(default=""), db: sqlite3.Conn
         "SELECT * FROM jobs WHERE server_id=? AND status='queued' ORDER BY id", (sid,))]  # ws: agent_server - its own jobs
     if jobs:
         db.execute("UPDATE jobs SET status='sent' WHERE server_id=? AND status='queued'", (sid,))  # ws: agent_server - its own jobs
-    probe_targets = probes_svc.targets_for_relay(db, ws, now) if server["role"] == "relay" else []
+    probe_targets = probes_svc.targets_for_relay(db, ws, now, sid) if server["role"] == "relay" else []
     return {"interval_s": get_settings().interval_s, "permission": "full", "ping_targets": targets, "probe_targets": probe_targets, "jobs": jobs,
             "acct_peers": links_svc.peers_for(db, server)}

@@ -7,7 +7,7 @@ from ..issues import acks
 from ..servers.service import latest_of, status_of
 from ..settings.router import thresholds
 from ..ssl import service as ssl_svc
-from . import detectors, probes
+from . import detectors, forwards, probes
 from .detectors import make as _issue
 
 
@@ -112,6 +112,7 @@ def issues(db: sqlite3.Connection, ws: int) -> List[Dict[str, Any]]:
         by_target.setdefault(w["to_id"], []).append(w)
     classified, replaced = detectors.classify_paths(th, names, by_target)
     out.extend(classified)
+    out.extend(forwards.issues(db, ws, th, servers, now, PING_MIN_SAMPLES))
     if th["on_quota_pair"]:
         out.extend(detectors.quota_pairs(forecasts))
     if th["on_ping"]:

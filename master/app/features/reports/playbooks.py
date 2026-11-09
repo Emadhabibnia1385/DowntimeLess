@@ -24,7 +24,8 @@ _FEATURES = Path(__file__).resolve().parents[1]
 def _issue_sources() -> str:
     """The text of the files that raise issues, so a detector counts as live only when its code is really there."""
     text = ""
-    for rel in ("overview/service.py", "overview/detectors.py", "ssl/service.py", "checks/host.py", "checks/panel.py"):
+    for rel in ("overview/service.py", "overview/detectors.py", "overview/forwards.py", "ssl/service.py", "checks/host.py",
+                "checks/panel.py"):
         try:
             text += (_FEATURES / rel).read_text(encoding="utf-8")
         except OSError:
@@ -570,6 +571,56 @@ _ENTRIES: List[Dict[str, Any]] = [
        ["Nothing to fix on the server; report the version so the reader can be adapted"],
        ["Do not give the agent a panel password or token to work around it: the reader needs none"],
        ["pasarguard.md sections 1, 7", "DETECTION-CATALOG.md (panel connector)"]),
+
+    # ---- forwards (agent 0.3.3 DNAT rules and relay-to-relay probes) ----
+    _p("dnat_dead_target", "tunnel", "DNAT rule forwards to a destination that does not answer",
+       "قانون DNAT به مقصدی می‌فرستد که روی آن پورت گوش نمی‌دهد یا جواب نمی‌دهد؛ معمولاً پس از جابه‌جایی هنوز به سرور قدیمی اشاره می‌کند.", AUTO,
+       ["A migration moved the location to a new server and the relay's DNAT line still names the old address (incident 77, tunnels section 17)",
+        "The destination's core or tunnel stopped, so the port closed there (listener_missing on that server)",
+        "A rule points at an L3 tunnel peer whose tunnel is dead (tunnels section 14)",
+        "A port was pointed at a server that does not terminate that location (tunnels section 6)"],
+       ["nft list ruleset | grep 'dnat to' (every forward: port and destination)",
+        "grep 'dnat to' /etc/nftables-relay-dnat.nft (what the boot unit will load)",
+        "nc -zv -w 5 HOST PORT from the relay to the destination in the rule",
+        "ss -Hltn '( sport = :PORT )' on the destination server",
+        "scripts/relay/forward_audit.sh lists every forwarded port and where it goes"],
+       ["Back up the file: cp -a /etc/nftables-relay-dnat.nft /etc/nftables-relay-dnat.nft.bak-$(date +%Y%m%d%H%M)",
+        "Edit the dnat to line and its masquerade line to the right destination, then validate: nft -c -f /etc/nftables-relay-dnat.nft",
+        "Reload with the owner's yes: systemctl restart relay-dnat (existing flows keep their conntrack mapping, new ones follow the file)",
+        "Or rebuild the whole map with scripts/relay/dnat.sh and DRYRUN=1 first: it replaces the table, so MAP must name every port"],
+       ["Do not run dnat.sh with a MAP that lists only the changed port: the table is replaced and the other ports vanish",
+        "Do not point a port at a server that does not terminate that location: users would exit in the wrong country"],
+       ["tunnels.md sections 6, 14, 17", "incidents.md 53, 77", "scripts/relay/dnat.sh", "scripts/relay/forward_audit.sh"]),
+
+    _p("dnat_unknown_target", "tunnel", "DNAT rule forwards to an address that is not a server of the workspace",
+       "قانون DNAT به آدرسی می‌فرستد که سرور این فضای کاری نیست؛ شاید سرور قدیمی پیش از جابه‌جایی که هنوز روشن است.", AUTO,
+       ["The old server of a migration is still up, so users of that port keep landing on it (incident 77)",
+        "A temporary forward left behind after an outage (incident 76)",
+        "Deliberate: a server outside the panel (acknowledge the issue)"],
+       ["nft list ruleset | grep 'dnat to' (every forward: port and destination)",
+        "nc -zv -w 5 HOST PORT from the relay to the destination in the rule",
+        "Compare the destination with the server list of the panel and the location's inventory"],
+       ["Point the rule at the current server of that location (see dnat_dead_target for the file and reload steps), with the owner's yes",
+        "Remove temporary forwards once nothing depends on them"],
+       ["Do not delete a forward before the location's DNS names have two working relays"],
+       ["incidents.md 76, 77", "tunnels.md sections 6, 17", "scripts/relay/forward_audit.sh"]),
+
+    _p("relay_forward_broken", "path", "A relay's forwarded port fails from the other relays",
+       "رله‌های دیگر با اتصال TCP هم‌نظرند که یک پورت فورواردشدهٔ این رله به مقصد نمی‌رسد؛ همان سهم از اتصال‌های لوکیشن که DNS به این رله می‌دهد قطع است.", AUTO,
+       ["The DNAT destination is dead or wrong (see dnat_dead_target on the same relay)",
+        "ip_forward off or the DNAT table gone after a reboot (tunnels section 6)",
+        "One dead member of a location's round-robin name stalls roughly its share of connections (incident 75)",
+        "The relay's path to that destination is filtered while other relays still reach it (relay_egress)",
+        "The relay is filtered for inbound traffic from other in-country networks"],
+       ["nc -zv -w 5 RELAY_IP PORT from another in-country server (a connect through DNAT completes only end to end)",
+        "nft list ruleset | grep 'dnat to' on the relay", "sysctl net.ipv4.ip_forward",
+        "nc -zv -w 5 HOST PORT from the relay to the destination in the rule",
+        "scripts/relay/data_matrix.sh for a real data test through each relay"],
+       ["Fix the destination or the forwarding on that relay (dnat_dead_target, dnat_missing, ip_forward_off), with the owner's yes",
+        "Until it works, take that relay out of the location's DNS names only while every name keeps two working relays"],
+       ["Do not judge one relay by one vantage point: two in-country relays must agree",
+        "Never leave a location with a single relay"],
+       ["tunnels.md section 6", "incidents.md 75", "scripts/relay/data_matrix.sh"]),
 
     # ---- detectors planned (panel extras, probes) ----
     _p("quota_exhausted", "quota", "Quota exhausted, host dark",

@@ -71,7 +71,8 @@ def test_unknown_codes_fall_back_and_ping_ip_is_the_ping_guide(owner):
 from app.features.reports import guides_fa  # noqa: E402
 
 PERSIAN = re.compile(r"[؀-ۿ]")
-ISSUE_SOURCES = ("overview/service.py", "overview/detectors.py", "ssl/service.py", "checks/host.py", "checks/panel.py")
+ISSUE_SOURCES = ("overview/service.py", "overview/detectors.py", "overview/forwards.py", "ssl/service.py", "checks/host.py",
+                 "checks/panel.py")
 
 
 def test_the_code_scan_sees_every_issue_constructor():
