@@ -166,8 +166,25 @@ def test_nft_tables_relay_dnat_and_rule_count(monkeypatch):
         .install(monkeypatch, {"/proc/sys/net/ipv4/ip_forward": "1\n"})
     got = agent.collect_nft({})
     assert got == {"tables": ["inet filter", "ip relay_dnat", "ip nat", "inet dl_acct"], "relay_dnat": True, "dnat_rules": 3,
-                   "dnat_by_table": {"relay_dnat": 2, "nat": 1}, "ip_forward": 1}
+                   "dnat_by_table": {"relay_dnat": 2, "nat": 1}, "ip_forward": 1, "dnat_unparsed": 0,
+                   "dnat": [{"table": "relay_dnat", "proto": "tcp", "port": 21001, "to": "198.51.100.10", "to_port": 21001},
+                            {"table": "relay_dnat", "proto": "tcp", "port": 21002, "to": "10.77.1.2", "to_port": 21002}]}
     assert agent.parse_nft_tables("table ip nat\n")[0] == "ip nat"
+
+
+def test_dnat_rule_lines_keep_only_plain_one_port_forwards():
+    p = agent.parse_dnat_rule
+    assert p("tcp dport 19444 counter packets 5 bytes 300 dnat to 159.195.193.165:19444") == ("tcp", 19444, "159.195.193.165", 19444)
+    assert p("ip daddr 203.0.113.1 udp dport 53 dnat ip to 198.51.100.9") == ("udp", 53, "198.51.100.9", 53)
+    assert p("tcp dport 8000 dnat to 198.51.100.9:80 comment \"old\"") == ("tcp", 8000, "198.51.100.9", 80)
+    for odd in ("tcp dport 2000-2010 dnat to 198.51.100.9", "tcp dport { 1, 2 } dnat to 198.51.100.9",
+                "tcp dport 443 dnat to numgen random mod 2 map { 0 : 198.51.100.9 }", "tcp dport 443 dnat to 300.1.1.1:443",
+                "tcp dport 443 dnat to 198.51.100.9:2000-2010", "tcp dport 70000 dnat to 198.51.100.9", "masquerade"):
+        assert p(odd) is None, odd
+    by_table, on_line = agent.nft_dnat_counter()
+    for line in ("table ip relay_dnat {", "chain pre {", "tcp dport 2000-2010 dnat to 198.51.100.9", "tcp dport 1 dnat to 198.51.100.9"):
+        on_line(line.encode())
+    assert by_table == {"relay_dnat": 2} and on_line.odd == [1] and len(on_line.rules) == 1
 
 
 def test_nft_without_relay_table(monkeypatch):

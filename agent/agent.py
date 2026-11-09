@@ -24,7 +24,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-VERSION = "0.3.2"
+VERSION = "0.3.3"
 UA = "DowntimeLess-Agent/" + VERSION
 SELF_PATH = os.path.realpath(__file__)
 # With no address they describe the caller's outbound address; with one, that address itself.
@@ -433,10 +433,10 @@ def run_pings(items, budget=20.0):
 
 # ---- TCP/TLS probes: a relay connects to real listening ports of the foreign servers (read-only) ----
 
-PROBE_MAX = 32
+PROBE_MAX = 48
 PROBE_TIMEOUT_S = 3.0
 PROBE_BUDGET_S = 12.0
-PROBE_WORKERS = 8
+PROBE_WORKERS = 12
 UNREACHABLE = (errno.ENETUNREACH, errno.EHOSTUNREACH)
 
 
@@ -1181,16 +1181,45 @@ def parse_nft_tables(text):
     return out
 
 
+# "tcp dport 21001 ... dnat to 198.51.100.10:21001"; ranges, sets and maps are only counted
+DNAT_RULE_RE = re.compile(r"\b(tcp|udp)\s+dport\s+(\d{1,5})(?![-\d])\b.*?\bdnat\s+(?:ip\s+)?to\s+"
+                          r"(\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?(?=\s|;|$)")
+DNAT_SKIP_CHAINS = ("DOCKER",)  # docker's own port publishing, not a relay forward
+DNAT_MAX = LIST_MAX
+
+
+def parse_dnat_rule(line):
+    """(proto, port, to, to_port) of one DNAT rule line, or None when it is not a plain one-port forward."""
+    m = DNAT_RULE_RE.search(line)
+    if not m:
+        return None
+    port, to_port = int(m.group(2)), int(m.group(4) or m.group(2))
+    if not (0 < port < 65536 and 0 < to_port < 65536) or any(int(x) > 255 for x in m.group(3).split(".")):
+        return None
+    return m.group(1), port, m.group(3), to_port
+
+
 def nft_dnat_counter():
-    by_table, cur = {}, [None]
+    """Counts DNAT rules per table and keeps the plain forwards (port and destination only, never comments)."""
+    by_table, cur, rules, odd = {}, [None, None], [], [0]
 
     def on_line(raw):
         line = raw.decode("utf-8", "replace").strip()
         if line.startswith("table "):
             f = line.split()
-            cur[0] = clean_text(f[2], 64) if len(f) >= 3 else None
-        elif "dnat to" in line and cur[0]:
+            cur[0], cur[1] = (clean_text(f[2], 64) if len(f) >= 3 else None), None
+        elif line.startswith("chain "):
+            cur[1] = line.split()[1] if len(line.split()) > 1 else None
+        elif "dnat" in line and " to " in line and cur[0]:
             by_table[cur[0]] = by_table.get(cur[0], 0) + 1
+            if cur[1] in DNAT_SKIP_CHAINS:
+                return
+            rule = parse_dnat_rule(line)
+            if rule is None:
+                odd[0] += 1
+            elif len(rules) < DNAT_MAX:
+                rules.append({"table": cur[0], "proto": rule[0], "port": rule[1], "to": rule[2], "to_port": rule[3]})
+    on_line.rules, on_line.odd = rules, odd
     return by_table, on_line
 
 
@@ -1203,6 +1232,7 @@ def collect_nft(memo):
         raise RuntimeError("nft list ruleset failed")
     return {"tables": tables[:LIST_MAX], "relay_dnat": any(t.split()[-1] == "relay_dnat" for t in tables),
             "dnat_rules": sum(by_table.values()), "dnat_by_table": dict(list(by_table.items())[:50]),
+            "dnat": on_line.rules, "dnat_unparsed": on_line.odd[0],
             "ip_forward": read_int("/proc/sys/net/ipv4/ip_forward")}
 
 
