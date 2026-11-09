@@ -73,6 +73,7 @@ def requests_into_b(w):
         ("GET", "/api/v1/reports/playbooks/{code}"): ("GET", "/api/v1/reports/playbooks/disk", None, "list"),
         ("GET", "/api/v1/reports/health"): ("GET", "/api/v1/reports/health", None, "list"),
         ("GET", "/api/v1/reports/changes"): ("GET", "/api/v1/reports/changes?server_id=%d" % bx, None, "empty_events"),
+        ("POST", "/api/v1/changes"): ("POST", "/api/v1/changes", {"text": "about B", "server_id": bx}, "nf"),
         ("GET", "/api/v1/reports/daily"): ("GET", "/api/v1/reports/daily", None, "list"),
         ("GET", "/api/v1/reports/incidents"): ("GET", "/api/v1/reports/incidents?since=%d" % (int(time.time()) - 86400 * 30), None, "list"),
         ("GET", "/api/v1/reports/traffic"): ("GET", "/api/v1/reports/traffic", None, "list"),
