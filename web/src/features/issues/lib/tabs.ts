@@ -1,9 +1,9 @@
 import { EVENT_KINDS } from "./events";
 import { type Band, BANDS } from "./health";
 
-export type IssuesTab = "now" | "history" | "health" | "changes";
+export type IssuesTab = "now" | "history" | "health" | "changes" | "guides";
 
-export const ISSUES_TABS: readonly IssuesTab[] = ["now", "history", "health", "changes"];
+export const ISSUES_TABS: readonly IssuesTab[] = ["now", "history", "health", "changes", "guides"];
 
 export const isIssuesTab = (value: unknown): value is IssuesTab =>
 	typeof value === "string" && (ISSUES_TABS as readonly string[]).includes(value);

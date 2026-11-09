@@ -1718,6 +1718,90 @@
         "title": "Gate",
         "type": "object"
       },
+      "GuideFa": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/GuideStep"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "fixed_when": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fixed When",
+            "type": "array"
+          },
+          "fixes": {
+            "items": {
+              "$ref": "#/components/schemas/GuideStep"
+            },
+            "title": "Fixes",
+            "type": "array"
+          },
+          "meaning": {
+            "title": "Meaning",
+            "type": "string"
+          },
+          "never": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Never",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "why": {
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "title",
+          "meaning",
+          "why",
+          "checks",
+          "fixes",
+          "fixed_when",
+          "never"
+        ],
+        "title": "GuideFa",
+        "type": "object"
+      },
+      "GuideStep": {
+        "properties": {
+          "cmd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cmd"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "GuideStep",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -4973,6 +5057,17 @@
             "title": "Detector",
             "type": "string"
           },
+          "meaning_fa": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meaning Fa"
+          },
           "summary_fa": {
             "title": "Summary Fa",
             "type": "string"
@@ -4984,6 +5079,17 @@
           "title": {
             "title": "Title",
             "type": "string"
+          },
+          "title_fa": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Fa"
           }
         },
         "required": [
@@ -5022,6 +5128,16 @@
       },
       "PlaybookOut": {
         "properties": {
+          "guide_fa": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GuideFa"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "matched": {
             "title": "Matched",
             "type": "boolean"
@@ -9742,7 +9858,7 @@
     },
     "/api/v1/reports/playbooks": {
       "get": {
-        "description": "Every fix guide (code, title, detector live or planned) plus the standing operating rules.",
+        "description": "Every fix guide (code, title, detector live or planned) plus the standing operating rules; lang=fa adds the Persian titles.",
         "operationId": "reports_playbooks",
         "parameters": [
           {
@@ -9752,6 +9868,16 @@
             "schema": {
               "default": "json",
               "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lang",
+            "required": false,
+            "schema": {
+              "default": "en",
+              "title": "Lang",
               "type": "string"
             }
           },
@@ -9802,7 +9928,7 @@
     },
     "/api/v1/reports/playbooks/{code}": {
       "get": {
-        "description": "Likely causes, read-only checks, safe fixes and never-do rules for an issue code (ping:<ip> works); unknown codes get the generic guide.",
+        "description": "Likely causes, read-only checks, safe fixes and never-do rules for an issue code (ping:<ip> works); unknown codes get the\ngeneric guide. lang=fa adds the guide written for a person: meaning, checks, commands to copy, how to know it is fixed.",
         "operationId": "reports_playbook",
         "parameters": [
           {
@@ -9821,6 +9947,16 @@
             "schema": {
               "default": "json",
               "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lang",
+            "required": false,
+            "schema": {
+              "default": "en",
+              "title": "Lang",
               "type": "string"
             }
           },

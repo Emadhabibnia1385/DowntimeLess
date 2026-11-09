@@ -10,8 +10,8 @@ from ...db import get_db
 from ...deps import Actor, current_workspace, require
 from . import briefing as briefing_svc
 from . import health as health_svc
-from . import periodic, playbooks, render, schemas
-from .common import DAY, check_detail, check_format, window
+from . import guides_fa, periodic, playbooks, render, schemas
+from .common import DAY, check_detail, check_format, check_lang, window
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 MAX_EVENTS = 500
@@ -33,19 +33,32 @@ def briefing(format: str = "json", detail: str = "brief", _: Actor = Depends(req
 
 
 @router.get("/playbooks", response_model=schemas.PlaybookList, operation_id="reports_playbooks")
-def list_playbooks(format: str = "json", _: Actor = Depends(require("viewer")), ws: int = Depends(current_workspace)):
-    """Every fix guide (code, title, detector live or planned) plus the standing operating rules."""
+def list_playbooks(format: str = "json", lang: str = "en", _: Actor = Depends(require("viewer")), ws: int = Depends(current_workspace)):
+    """Every fix guide (code, title, detector live or planned) plus the standing operating rules; lang=fa adds the Persian titles."""
     check_format(format)
-    items = [{k: p[k] for k in ("code", "theme", "title", "summary_fa", "detector")} for p in playbooks.all_playbooks()]
+    fa = check_lang(lang) == "fa"
+    items = []
+    for p in playbooks.all_playbooks():
+        item = {k: p[k] for k in ("code", "theme", "title", "summary_fa", "detector")}
+        g = guides_fa.guide(p["code"]) if fa else None
+        if g:
+            item.update(title_fa=g["title"], meaning_fa=g["meaning"])
+        items.append(item)
     return _answer(format, {"principles": playbooks.PRINCIPLES, "playbooks": items}, render.playbooks_md)
 
 
 @router.get("/playbooks/{code}", response_model=schemas.PlaybookOut, operation_id="reports_playbook")
-def get_playbook(code: str, format: str = "json", _: Actor = Depends(require("viewer")), ws: int = Depends(current_workspace)):
-    """Likely causes, read-only checks, safe fixes and never-do rules for an issue code (ping:<ip> works); unknown codes get the generic guide."""
+def get_playbook(code: str, format: str = "json", lang: str = "en", _: Actor = Depends(require("viewer")),
+                 ws: int = Depends(current_workspace)):
+    """Likely causes, read-only checks, safe fixes and never-do rules for an issue code (ping:<ip> works); unknown codes get the
+    generic guide. lang=fa adds the guide written for a person: meaning, checks, commands to copy, how to know it is fixed."""
     check_format(format)
+    fa = check_lang(lang) == "fa"
     pb, matched = playbooks.find(code)
-    return _answer(format, {"matched": matched, "playbook": pb}, lambda d: render.playbook_md(d["playbook"]))
+    out: Dict[str, Any] = {"matched": matched, "playbook": pb}
+    if fa:
+        out["guide_fa"] = guides_fa.guide(pb["code"]) or guides_fa.GENERIC
+    return _answer(format, out, lambda d: render.guide_fa_md(d["guide_fa"]) if fa else render.playbook_md(d["playbook"]))
 
 
 @router.get("/health", response_model=schemas.HealthOut, operation_id="reports_health")

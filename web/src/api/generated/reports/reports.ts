@@ -1045,7 +1045,7 @@ export const getReportsPlaybooksUrl = (params?: ReportsPlaybooksParams) => {
 };
 
 /**
- * Every fix guide (code, title, detector live or planned) plus the standing operating rules.
+ * Every fix guide (code, title, detector live or planned) plus the standing operating rules; lang=fa adds the Persian titles.
  * @summary List Playbooks
  */
 export const reportsPlaybooks = async (
@@ -1181,7 +1181,8 @@ export const getReportsPlaybookUrl = (code: string, params?: ReportsPlaybookPara
 };
 
 /**
- * Likely causes, read-only checks, safe fixes and never-do rules for an issue code (ping:<ip> works); unknown codes get the generic guide.
+ * Likely causes, read-only checks, safe fixes and never-do rules for an issue code (ping:<ip> works); unknown codes get the
+ * generic guide. lang=fa adds the guide written for a person: meaning, checks, commands to copy, how to know it is fixed.
  * @summary Get Playbook
  */
 export const reportsPlaybook = async (

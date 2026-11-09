@@ -8,7 +8,9 @@
 export interface PlaybookItem {
 	code: string;
 	detector: string;
+	meaning_fa?: string | null;
 	summary_fa: string;
 	theme: string;
 	title: string;
+	title_fa?: string | null;
 }

@@ -143,6 +143,21 @@ def playbook_md(p: Dict[str, Any]) -> str:
     return "\n".join(out) + "\n"
 
 
+def guide_fa_md(g: Dict[str, Any]) -> str:
+    """The Persian guide as plain Markdown: commands in fenced blocks, copied unchanged."""
+    out = ["# %s (%s)" % (g["title"], g["code"]), g["meaning"], "", g["why"]]
+    for label, key in (("بررسی (فقط خواندنی)", "checks"), ("رفع (با تأیید صاحب سرور)", "fixes")):
+        out.append("\n## " + label)
+        for step in g[key]:
+            out.append("- " + step["text"])
+            if step["cmd"]:
+                out += ["```", step["cmd"], "```"]
+    for label, key in (("از کجا بفهمیم رفع شد", "fixed_when"), ("هرگز", "never")):
+        out.append("\n## " + label)
+        out += ["- " + x for x in g[key]]
+    return "\n".join(out) + "\n"
+
+
 def playbooks_md(data: Dict[str, Any]) -> str:
     out = ["# Playbooks (%d)" % len(data["playbooks"])] + ["- " + x for x in data["principles"]] + [""]
     out.append(table(["code", "detector", "title"], ([p["code"], p["detector"], p["title"]] for p in data["playbooks"])))

@@ -7,6 +7,8 @@ import { useRefreshAll } from "@/shared/useRefreshAll";
 import { formatNumber, t } from "@/strings";
 import { severityTone } from "../lib/history";
 import { ServerLabel } from "../components/ServerLabel";
+import { GuideButton } from "../guides";
+import { familyOf } from "../lib/group";
 import { untilText } from "./lib";
 
 const C = t.issueAcks;
@@ -68,6 +70,7 @@ export function AckedSection({ issues }: { issues: readonly Issue[] }) {
 								size="sm"
 							/>
 							<span className="whitespace-normal text-sm">{issue.title}</span>
+							<GuideButton target={{ code: familyOf(issue.code), title: issue.title }} />
 						</span>,
 						issue.acked_by || t.common.none,
 						<span key="until" className="whitespace-nowrap tabular-nums">

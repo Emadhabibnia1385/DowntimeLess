@@ -2,6 +2,8 @@ import { Button, type DataColumn, DataTable, StatusChip } from "@nyxon/nasim";
 import type { IssueSummary } from "@/api/generated/model";
 import { formatDateTime, formatDuration, formatNumber, formatRelativeTime, t } from "@/strings";
 import { issueLabel, nextSort, severityTone, type SortKey, type SortState } from "../lib/history";
+import { GuideButton } from "../guides";
+import { familyOf } from "../lib/group";
 import { ServerLabel } from "./ServerLabel";
 
 const SEVERITIES: Record<string, string> = t.severity;
@@ -69,8 +71,13 @@ export function HistorySummary({
 			id: "issue",
 			header: COLUMNS.issue,
 			cell: (row) => (
-				<span className="block max-w-96 whitespace-normal text-sm">
-					{issueLabel(row.code, row.title)}
+				<span className="flex max-w-96 flex-col items-start gap-1.5">
+					<span className="block whitespace-normal text-sm">{issueLabel(row.code, row.title)}</span>
+					{row.code ? (
+						<GuideButton
+							target={{ code: familyOf(row.code), title: issueLabel(row.code, row.title) }}
+						/>
+					) : null}
 				</span>
 			),
 		},

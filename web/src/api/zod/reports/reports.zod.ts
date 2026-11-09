@@ -565,13 +565,15 @@ export const ReportsIncidentsResponse = zod.object({
 });
 
 /**
- * Every fix guide (code, title, detector live or planned) plus the standing operating rules.
+ * Every fix guide (code, title, detector live or planned) plus the standing operating rules; lang=fa adds the Persian titles.
  * @summary List Playbooks
  */
 export const reportsPlaybooksQueryFormatDefault = `json`;
+export const reportsPlaybooksQueryLangDefault = `en`;
 
 export const ReportsPlaybooksQueryParams = zod.object({
 	format: zod.string().default(reportsPlaybooksQueryFormatDefault),
+	lang: zod.string().default(reportsPlaybooksQueryLangDefault),
 });
 
 export const ReportsPlaybooksHeader = zod.object({
@@ -583,16 +585,19 @@ export const ReportsPlaybooksResponse = zod.object({
 		zod.object({
 			code: zod.string(),
 			detector: zod.string(),
+			meaning_fa: zod.union([zod.string(), zod.null()]).optional(),
 			summary_fa: zod.string(),
 			theme: zod.string(),
 			title: zod.string(),
+			title_fa: zod.union([zod.string(), zod.null()]).optional(),
 		}),
 	),
 	principles: zod.array(zod.string()),
 });
 
 /**
- * Likely causes, read-only checks, safe fixes and never-do rules for an issue code (ping:<ip> works); unknown codes get the generic guide.
+ * Likely causes, read-only checks, safe fixes and never-do rules for an issue code (ping:<ip> works); unknown codes get the
+ * generic guide. lang=fa adds the guide written for a person: meaning, checks, commands to copy, how to know it is fixed.
  * @summary Get Playbook
  */
 export const ReportsPlaybookParams = zod.object({
@@ -600,9 +605,11 @@ export const ReportsPlaybookParams = zod.object({
 });
 
 export const reportsPlaybookQueryFormatDefault = `json`;
+export const reportsPlaybookQueryLangDefault = `en`;
 
 export const ReportsPlaybookQueryParams = zod.object({
 	format: zod.string().default(reportsPlaybookQueryFormatDefault),
+	lang: zod.string().default(reportsPlaybookQueryLangDefault),
 });
 
 export const ReportsPlaybookHeader = zod.object({
@@ -610,6 +617,31 @@ export const ReportsPlaybookHeader = zod.object({
 });
 
 export const ReportsPlaybookResponse = zod.object({
+	guide_fa: zod
+		.union([
+			zod.object({
+				checks: zod.array(
+					zod.object({
+						cmd: zod.union([zod.string(), zod.null()]).optional(),
+						text: zod.string(),
+					}),
+				),
+				code: zod.string(),
+				fixed_when: zod.array(zod.string()),
+				fixes: zod.array(
+					zod.object({
+						cmd: zod.union([zod.string(), zod.null()]).optional(),
+						text: zod.string(),
+					}),
+				),
+				meaning: zod.string(),
+				never: zod.array(zod.string()),
+				title: zod.string(),
+				why: zod.string(),
+			}),
+			zod.null(),
+		])
+		.optional(),
 	matched: zod.boolean(),
 	playbook: zod.object({
 		causes: zod.array(zod.string()),

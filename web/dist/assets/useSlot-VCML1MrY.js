@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-WkwZ5CU-.js";import{Ur as t,Vr as n,ta as r}from"./auth-Q-5kzSOi.js";var i=e(r(),1);function a(e=!0){let[n,r]=(0,i.useState)(e),a=(0,i.useRef)(!1),o=(0,i.useCallback)(e=>{a.current=!0,r(!!e)},[]);return t(()=>{a.current||r(!1)},[]),[o,n]}function o(e=!0){let t=n(),[r,i]=a(e);return{id:i?t:void 0,ref:r}}export{o as t};

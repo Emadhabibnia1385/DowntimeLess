@@ -31,3 +31,4 @@ export { default as ChevronDownIcon } from "~icons/solar/alt-arrow-down-linear";
 export { default as UsersIcon } from "~icons/solar/users-group-rounded-linear";
 export { default as UserPlusIcon } from "~icons/solar/user-plus-linear";
 export { default as PanelIcon } from "~icons/solar/widget-5-linear";
+export { default as GuideIcon } from "~icons/solar/book-2-linear";

@@ -46,6 +46,8 @@ export * from "./fleetHistory";
 export * from "./fleetPoint";
 export * from "./fleetTraffic";
 export * from "./gate";
+export * from "./guideFa";
+export * from "./guideStep";
 export * from "./healthAttention";
 export * from "./healthBrief";
 export * from "./healthBriefCounts";

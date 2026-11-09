@@ -7,4 +7,5 @@
 
 export type ReportsPlaybookParams = {
 	format?: string;
+	lang?: string;
 };

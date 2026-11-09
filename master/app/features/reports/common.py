@@ -24,6 +24,12 @@ def check_format(fmt: str) -> str:
     return fmt
 
 
+def check_lang(lang: str) -> str:
+    if lang not in ("en", "fa"):
+        raise DLError("report.param_invalid")
+    return lang
+
+
 def check_detail(detail: str) -> str:
     if detail not in ("brief", "full"):
         raise DLError("report.param_invalid")

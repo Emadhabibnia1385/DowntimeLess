@@ -35,7 +35,7 @@ REGISTRY: Dict[str, Tuple[int, str]] = {
     "traffic.window_invalid": (422, "بازهٔ تاریخ نامعتبر است؛ شروع و پایان لازم است، پایان بعد از شروع و حداکثر ۳۶۶ روز."),
     "traffic.category_invalid": (422, "دسته‌بندی نامعتبر است؛ شناسهٔ عددی یا none."),
     "traffic.tz_invalid": (422, "اختلاف ساعت محلی نامعتبر است؛ از منفی ۷۲۰ تا ۸۴۰ دقیقه."),
-    "report.param_invalid": (422, "پارامتر گزارش نامعتبر است (format: json یا md، detail: brief یا full)."),
+    "report.param_invalid": (422, "پارامتر گزارش نامعتبر است (format: json یا md، detail: brief یا full، lang: en یا fa)."),
     "bot.not_configured": (409, "ربات تلگرام تنظیم نشده است."),
     "channel.not_found": (404, "کانال تلگرام پیدا نشد."),
     "channel.invalid": (422, "نام کانال یا شناسهٔ چت نامعتبر است؛ شناسهٔ عددی مثل -100… یا نام کاربری مثل @name بدهید."),

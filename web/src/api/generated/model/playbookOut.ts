@@ -4,9 +4,11 @@
  * DowntimeLess
  * OpenAPI spec version: 0.1.0
  */
+import type { GuideFa } from "./guideFa";
 import type { Playbook } from "./playbook";
 
 export interface PlaybookOut {
+	guide_fa?: GuideFa | null;
 	matched: boolean;
 	playbook: Playbook;
 }

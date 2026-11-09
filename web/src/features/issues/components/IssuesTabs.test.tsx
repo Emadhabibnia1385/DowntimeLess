@@ -118,7 +118,7 @@ describe("Issues page: health and changes tabs", () => {
 	});
 	afterEach(() => vi.unstubAllGlobals());
 
-	it("has the tabs in order: now, history, health, changes", async () => {
+	it("has the tabs in order: now, history, health, changes, guides", async () => {
 		open("/issues");
 		await screen.findAllByRole("tab");
 		expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
@@ -126,6 +126,7 @@ describe("Issues page: health and changes tabs", () => {
 			"تاریخچه",
 			"سلامت",
 			"تغییرات",
+			"راهنما",
 		]);
 	});
 

@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import type { Issue } from "@/api/generated/model";
 import { formatNumber, t } from "@/strings";
 import { AckButton } from "../acks";
+import { GuideButton } from "../guides";
 import { type GroupItem, groupIssues, type IssueGroup } from "../lib/group";
 
 const TONES = { critical: "danger", warning: "warning", info: "info" } as const;
@@ -75,6 +76,7 @@ export function IssueTable({ issues }: { issues: readonly Issue[] }) {
 						<div className="flex flex-col items-start gap-1">
 							<StatusChip tone={TONES[group.severity]} label={LABELS[group.severity]} size="sm" />
 							<span className="font-semibold">{group.title}</span>
+							<GuideButton target={{ code: group.family, title: group.title }} />
 						</div>
 					),
 				},

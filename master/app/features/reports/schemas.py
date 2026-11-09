@@ -246,6 +246,9 @@ class PlaybookItem(BaseModel):
     title: str
     summary_fa: str
     detector: str
+    # lang=fa only, and only for the codes that have a guide for people
+    title_fa: Optional[str] = None
+    meaning_fa: Optional[str] = None
 
 
 class PlaybookList(BaseModel):
@@ -253,9 +256,26 @@ class PlaybookList(BaseModel):
     playbooks: List[PlaybookItem]
 
 
+class GuideStep(BaseModel):
+    text: str
+    cmd: Optional[str] = None  # shown for the person to copy and run; the panel never runs it
+
+
+class GuideFa(BaseModel):
+    code: str
+    title: str
+    meaning: str
+    why: str
+    checks: List[GuideStep]
+    fixes: List[GuideStep]
+    fixed_when: List[str]
+    never: List[str]
+
+
 class PlaybookOut(BaseModel):
     matched: bool
     playbook: Playbook
+    guide_fa: Optional[GuideFa] = None  # lang=fa: the guide for people (the generic one when none is written)
 
 
 # ---- health ----

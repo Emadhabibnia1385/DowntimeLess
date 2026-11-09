@@ -4,6 +4,7 @@ import { useDocumentTitle } from "@/shared/useDocumentTitle";
 import { t } from "@/strings";
 import { AckedSection, splitAcked } from "../acks";
 import { useIssues } from "../api";
+import { GuidesTab } from "../guides";
 import { type HistoryRange, type IssuesFilters, type IssuesTab, isIssuesTab } from "../lib/tabs";
 import { ChangesTab } from "./ChangesTab";
 import { HealthTab } from "./HealthTab";
@@ -79,6 +80,7 @@ export function IssuesPage({
 							/>
 						),
 					},
+					{ id: "guides", label: t.issueGuides.tab, content: <GuidesTab /> },
 				]}
 			/>
 		</div>
