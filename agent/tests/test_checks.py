@@ -627,9 +627,9 @@ def test_real_collectors_on_a_host_without_any_tool_give_none_or_empty_parts(mon
     monkeypatch.setattr(agent, "SYSCTL_FILES", ())
     checks, errors, panel, panel_error = run_once({}, Clock())
     assert set(checks) == {"listeners", "units", "conntrack", "containers", "nft", "tunnels", "kernel", "security",
-                           "container_logs", "apt", "drift"}
+                           "container_logs", "apt", "drift", "paths", "tunnel_logs"}
     assert errors == [] and panel is None and panel_error is None
-    for name in ("listeners", "units", "containers", "nft", "tunnels", "container_logs", "apt", "drift"):
+    for name in ("listeners", "units", "containers", "nft", "tunnels", "container_logs", "apt", "drift", "paths", "tunnel_logs"):
         assert checks[name] is None
     assert checks["security"]["sshd_ports"] is None
 
@@ -804,3 +804,43 @@ def test_drift_without_tools_or_files_is_empty_not_an_error(monkeypatch):
 def test_shell_vars_and_ipset_save_parsing():
     assert agent.parse_shell_vars('A=1\nB="x y"\nexport C=\'z\'\n')["C"] == "z"
     assert agent.parse_ipset_save("create s hash:ip\nadd s 1.2.3.4\nadd s 1.2.3.5\ncreate t hash:ip\n") == {"s": 2, "t": 0}
+
+
+# ---- real-user path quality and tunnel log counts (agent 0.3.3) ----
+
+SS_LISTEN = ("tcp LISTEN 0 4096 0.0.0.0:21001 0.0.0.0:* users:((\"xray\",pid=1,fd=3))\n"
+             "tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:* users:((\"sshd\",pid=2,fd=3))\n"
+             "tcp LISTEN 0 4096 *:53671 *:* users:((\"xray\",pid=1,fd=4))\n")
+SS_INFO = """0 0 198.51.100.2:21001 203.0.113.1:40001
+\t cubic wscale:7,7 rto:204 rtt:100/20 mss:1448 bytes_acked:2000000 segs_out:1000 retrans:0/100
+0 0 198.51.100.2:21001 203.0.113.1:40002
+\t cubic rtt:300/20 bytes_acked:0 segs_out:1000
+0 0 [::ffff:198.51.100.2]:53671 [::ffff:10.77.1.2]:5000
+\t cubic rtt:50/5 bytes_acked:500000 segs_out:10
+0 0 198.51.100.2:21001 192.0.2.99:1234
+\t cubic rtt:900/5 bytes_acked:1000 segs_out:4 retrans:0/2
+0 0 198.51.100.2:22 192.0.2.50:5555
+\t cubic rtt:9/1 bytes_acked:99999 segs_out:10
+0 0 198.51.100.2:45000 203.0.113.1:443
+\t cubic rtt:9/1 bytes_acked:99999 segs_out:10
+"""
+
+
+def test_paths_sum_per_listening_port_and_known_peer_and_hide_user_addresses(monkeypatch):
+    FakeHost({"ss"}).on(["ss", "-H", "-tulnp"], SS_LISTEN).on(["ss", "-Htin"], SS_INFO).install(monkeypatch, {})
+    got = agent.collect_paths({"peers": ["203.0.113.1"]})
+    assert got == [
+        {"port": 21001, "peer": "203.0.113.1", "conns": 2, "mb_per_conn": 1.0, "rtt_ms": 200.0, "retrans_pct": 5.0},
+        {"port": 21001, "peer": "other", "conns": 1, "mb_per_conn": 0.001, "rtt_ms": 900.0, "retrans_pct": 50.0},
+        {"port": 53671, "peer": "10.77.1.2", "conns": 1, "mb_per_conn": 0.5, "rtt_ms": 50.0, "retrans_pct": 0.0},
+    ]
+    assert "192.0.2.99" not in json.dumps(got)  # a user's address never leaves the server
+
+
+def test_tunnel_logs_count_backpack_signatures_per_active_unit(monkeypatch):
+    log = "x handshake did not complete\ny did not answer in 6 attempts\nz did not answer in 6 attempts\nTOKEN=abc\n"
+    host = FakeHost({"systemctl", "journalctl"}).on(["systemctl", "list-units"], "backpack-de1.service loaded active running x\n") \
+        .on(["journalctl"], log).install(monkeypatch, {})
+    got = agent.collect_tunnel_logs({})
+    assert got == [{"unit": "backpack-de1.service", "no_answer": 2, "handshake_fail": 1, "wrong_tag": 0}]
+    assert all(t <= 8 for _, t, _ in host.calls)

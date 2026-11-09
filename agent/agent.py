@@ -1528,6 +1528,107 @@ def collect_tunnels(memo):
     return {"configs": found[:LIST_MAX], "links": links}
 
 
+# -- real-user path quality: `ss -Htin` per listening port and peer (like scripts/node/realuse.sh) --
+
+QUALITY_PEERS_MAX = 20  # peer rows per port; every other source address is summed into "other"
+QUALITY_ROWS_MAX = 300
+QUALITY_CONNS_MAX = 200000
+SS_INFO_RE = {k: re.compile(r"\b%s:([0-9.]+)" % k) for k in ("bytes_acked", "segs_out", "rtt")}
+SS_RETRANS_RE = re.compile(r"\bretrans:\d+/(\d+)")
+PRIVATE_V4 = re.compile(r"^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)")
+
+
+def _addr(text):
+    host, _, port = text.rpartition(":")
+    host = host.strip("[]").split("%")[0]
+    if host.startswith("::ffff:"):
+        host = host[7:]
+    return host, int(port) if port.isdigit() else None
+
+
+def quality_counter(ports, peers):
+    """Sums per (local port, peer) of established connections: count, bytes acked, RTT, segments, retransmits.
+
+    Only listening ports in `ports` count; a peer outside `peers` and the private ranges becomes "other"."""
+    sums, cur, seen = {}, [None], [0]
+
+    def on_line(raw):
+        line = raw.decode("utf-8", "replace")
+        if line[:1].isdigit():
+            f = line.split()
+            cur[0] = None
+            if len(f) >= 4:
+                _, lport = _addr(f[2])
+                peer, _ = _addr(f[3])
+                if lport in ports and seen[0] < QUALITY_CONNS_MAX:
+                    seen[0] += 1
+                    label = peer if peer in peers or PRIVATE_V4.match(peer) else "other"
+                    cur[0] = sums.setdefault((lport, label), [0, 0, 0.0, 0, 0])
+                    cur[0][0] += 1
+        elif cur[0] is not None:
+            row = cur[0]
+            vals = {k: rx.search(line) for k, rx in SS_INFO_RE.items()}
+            row[1] += int(float(vals["bytes_acked"].group(1))) if vals["bytes_acked"] else 0
+            row[2] += float(vals["rtt"].group(1)) if vals["rtt"] else 0.0
+            row[3] += int(float(vals["segs_out"].group(1))) if vals["segs_out"] else 0
+            m = SS_RETRANS_RE.search(line)
+            row[4] += int(m.group(1)) if m else 0
+            cur[0] = None
+    return sums, on_line
+
+
+def quality_rows(sums):
+    by_port = {}
+    for (port, peer), row in sums.items():
+        by_port.setdefault(port, []).append((peer, row))
+    out = []
+    for port in sorted(by_port):
+        rows = sorted(by_port[port], key=lambda x: (x[0] == "other", -x[1][0]))
+        named = [x for x in rows if x[0] != "other"][:QUALITY_PEERS_MAX]
+        rest = [x for x in rows if x not in named]
+        if rest:
+            other = [sum(r[1][i] for r in rest) for i in range(5)]
+            named.append(("other", other))
+        for peer, (n, acked, rtt, segs, retrans) in named:
+            out.append({"port": port, "peer": peer, "conns": n, "mb_per_conn": round(acked / n / 1e6, 3),
+                        "rtt_ms": round(rtt / n, 1), "retrans_pct": round(retrans * 100.0 / segs, 1) if segs else None})
+    return out[:QUALITY_ROWS_MAX]
+
+
+def collect_paths(memo):
+    if not has("ss"):
+        return None
+    ports = {x["port"] for x in parse_ss_listeners(check_out(["ss", "-H", "-tulnp"]))
+             if x["proto"] == "tcp" and x["port"] and x["proc"] != "sshd"}
+    if not ports:
+        return []
+    sums, on_line = quality_counter(ports, set(acct_peers(memo.get("peers"))))
+    stream_lines(["ss", "-Htin", "state", "established"], on_line, CMD_TIMEOUT_S)
+    return quality_rows(sums)
+
+
+# -- tunnel health: BackPack log signatures counted per unit (counts only, no log line leaves) --
+
+TUNNEL_LOG_SIGNATURES = (("no_answer", b"did not answer in"), ("handshake_fail", b"handshake did not complete"),
+                         ("wrong_tag", b"carry a different tunnel"))
+
+
+def collect_tunnel_logs(memo):
+    if not has("systemctl") or not has("journalctl"):
+        return None
+    units = [line.split()[0] for line in check_out(["systemctl", "list-units", "--type=service", "--state=active",
+                                                    "--no-legend", "--plain", "backpack-*"]).splitlines() if line.split()]
+    units = [u for u in units if UNIT_RE.match(u)][:20]
+    out, until = [], time.monotonic() + 30
+    for u in units:
+        if time.monotonic() > until:
+            break
+        counts, _ = count_lines(["journalctl", "-u", u, "--since", "-10min", "--no-pager", "-o", "cat"],
+                                [n for _, n in TUNNEL_LOG_SIGNATURES], SLOW_TIMEOUT_S)
+        out.append(dict({"unit": u}, **{k: c for (k, _), c in zip(TUNNEL_LOG_SIGNATURES, counts)}))
+    return out
+
+
 # -- drift: live state against the files that rebuild it at boot (counts, hashes, ports, sysctl numbers only) --
 
 # access list file, the variable in it, the ipset its service builds from it (vpnopsnyx fleet: nyxon-access)
@@ -1912,6 +2013,8 @@ COLLECTORS = (
     ("container_logs", collect_container_logs, 300),
     ("apt", collect_apt, 600),
     ("drift", collect_drift, 300),
+    ("paths", collect_paths, 60),
+    ("tunnel_logs", collect_tunnel_logs, 300),
 )
 PANEL_COLLECTOR = ("panel", collect_panel, 60)
 
@@ -1950,6 +2053,7 @@ def start_checks(state, clock=time.monotonic):
         s = ck.setdefault(name, {"next": 0.0, "value": None, "error": None, "at": None, "job": None, "memo": {}})
         if s["job"] is not None and now - s["started"] > STUCK_S:
             s["job"], s["error"], s["next"] = None, "Timeout", now + every
+        s["memo"]["peers"] = list(state.get("peers") or [])
         if s["job"] is None and now >= s["next"]:
             s["job"], s["started"] = launch(fn, s["memo"]), now
     return now
@@ -2279,6 +2383,7 @@ def run_cycle(state):
     state["ping_targets"] = [t for t in resp.get("ping_targets") or [] if isinstance(t, dict)]
     state["probe_targets"] = probe_targets(resp.get("probe_targets"))
     state["acct_peers"] = resp.get("acct_peers") or []
+    state["peers"] = acct_peers(resp.get("peers"))
     if not state["restart"]:
         for job in resp.get("jobs") or []:
             state["jobs_done"].append(run_job(job, state))
