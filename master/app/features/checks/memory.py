@@ -82,8 +82,13 @@ def dnat_rules(rep: Dict[str, Any]) -> List[Dict[str, Any]]:
     return out[:MAX_BASELINE]
 
 
-def listener_keys(items: Any) -> Optional[Dict[Tuple[str, int], Optional[str]]]:
-    """(proto, port) -> process of the report's listeners; None when the agent did not send a list."""
+def _loopback(addr: Any) -> bool:
+    return isinstance(addr, str) and (addr.startswith("127.") or addr in ("::1", "[::1]", "localhost"))
+
+
+def listener_keys(items: Any, outward_only: bool = False) -> Optional[Dict[Tuple[str, int], Optional[str]]]:
+    """(proto, port) -> process of the report's listeners; None when the agent did not send a list.
+    `outward_only` leaves out loopback-only sockets (xray's internal ports change on every start); they never join the baseline."""
     rows = dicts(items)
     if rows is None:
         return None
@@ -93,6 +98,8 @@ def listener_keys(items: Any) -> Optional[Dict[Tuple[str, int], Optional[str]]]:
         if proto not in ("tcp", "udp") or port is None or not 0 < port < 65536:
             continue  # port 0 is the agent's collapsed UDP summary row
         if proto == "udp" and port >= EPHEMERAL_UDP:
+            continue
+        if outward_only and _loopback(x.get("addr")):
             continue
         out.setdefault((proto, port), text(x.get("proc"), 40))
     return out
@@ -166,6 +173,7 @@ def _listeners(db: sqlite3.Connection, ws: int, sid: int, items: Any, now: int) 
     current = listener_keys(items)
     if current is None:
         return
+    outward = listener_keys(items, outward_only=True) or {}
     known = {(r["proto"], r["port"]): r for r in baseline(db, ws, sid)}
     for key, row in known.items():
         if key in current:
@@ -181,7 +189,7 @@ def _listeners(db: sqlite3.Connection, ws: int, sid: int, items: Any, now: int) 
         else:  # not yet 24 hours without a gap: it starts over when it comes back
             db.execute("DELETE FROM listener_baseline WHERE workspace_id=? AND server_id=? AND proto=? AND port=?", (ws, sid, key[0], key[1]))
     room = MAX_BASELINE - len(known)
-    for (proto, port), proc in sorted(current.items(), key=lambda kv: kv[0][1]):
+    for (proto, port), proc in sorted(outward.items(), key=lambda kv: kv[0][1]):
         if (proto, port) in known or room <= 0:
             continue
         room -= 1
@@ -358,3 +366,12 @@ def observe(db: sqlite3.Connection, server: sqlite3.Row, rep: Dict[str, Any], no
 
 UNIT_FAMILY = re.compile(r"^(backpack-|relay-dnat|backhaul|gre-|wattun@|panel-dnat|mobin-dnat|rathole|frp|gost)")
 FORWARD_UNIT = re.compile(r"^(relay-dnat|panel-dnat|mobin-dnat)")
+
+
+def forward_unit_enabled(checks: Optional[Dict[str, Any]]) -> Optional[bool]:
+    """Whether an enabled DNAT unit (relay-dnat, panel-dnat, mobin-dnat) exists; None while the report has no unit list.
+    The agent lists enabled units only, so a missing one was switched off on purpose and its rules are not expected."""
+    rows = dicts((checks or {}).get("units"))
+    if rows is None:
+        return None
+    return any(isinstance(u.get("name"), str) and FORWARD_UNIT.match(u["name"]) and u.get("enabled") is True for u in rows)

@@ -44,12 +44,12 @@ def fleet(owner):
 def test_low_mb_per_connection_from_one_relay_must_hold_ten_minutes(owner, clock):
     ek = fleet(owner)
     for _ in range(10):
-        send(owner, ek, clock, paths=[row(), row(peer="other", mb=0.0)])
+        send(owner, ek, clock, paths=[row(conns=400), row(peer="other", mb=0.0)])
     assert found(owner, "path_quality_low") == {}
-    send(owner, ek, clock, paths=[row(), row(peer="other", mb=0.0)])
+    send(owner, ek, clock, paths=[row(conns=400), row(peer="other", mb=0.0)])
     issue = found(owner, "path_quality_low")["path_quality_low:" + RELAY_IP]
     assert issue["severity"] == "warning" and issue["server_name"] == "nl-1" and issue["evidence"]["relay"] == "iran-1"
-    assert issue["evidence"]["mb_per_conn"] == 0.01 and issue["evidence"]["conns"] == 120 and issue["evidence"]["ports"] == ["tcp/21001"]
+    assert issue["evidence"]["mb_per_conn"] == 0.01 and issue["evidence"]["conns"] == 400 and issue["evidence"]["ports"] == ["tcp/21001"]
     assert len(found(owner, "path_quality_low")) == 1  # the users' own bucket is never judged
 
 
@@ -65,13 +65,20 @@ def test_high_retransmits_count_too_and_good_samples_clear_after_five_minutes(ow
     assert found(owner, "path_quality_low") == {}
 
 
+def test_a_hundred_tiny_control_connections_are_not_users(owner, clock):
+    ek = fleet(owner)
+    for _ in range(14):
+        send(owner, ek, clock, paths=[row(conns=120, mb=0.0)])  # health checks and panel API ports: no data by nature
+    assert found(owner, "path_quality_low") == {}
+
+
 def test_few_connections_say_nothing_and_the_switch_hides_it(owner, clock):
     ek = fleet(owner)
     for _ in range(12):
         send(owner, ek, clock, paths=[row(conns=4)])
     assert found(owner, "path_quality_low") == {}
     for _ in range(12):
-        send(owner, ek, clock, paths=[row()])
+        send(owner, ek, clock, paths=[row(conns=400)])
     assert found(owner, "path_quality_low")
     owner.put("/api/v1/settings", json={"on_path_quality_low": 0})
     assert found(owner, "path_quality_low") == {}
@@ -100,6 +107,13 @@ def test_backpack_handshake_failures_make_an_unhealthy_tunnel(owner, clock):
     issue = found(owner, "tunnel_unhealthy")["tunnel_unhealthy:de1"]
     assert issue["severity"] == "warning" and issue["evidence"]["handshake_fails_10m"] == 7 and issue["evidence"]["iface"] == "bp-de1"
     send(owner, key, clock, tunnels=tunnels(10, 10), tunnel_logs=[dict(logs[0], no_answer=1, handshake_fail=1)])
+    assert found(owner, "tunnel_unhealthy") == {}
+
+
+def test_foreign_tags_alone_do_not_make_a_tunnel_unhealthy(owner, clock):
+    _, key = make_server(owner, "nl-1", "exit")
+    logs = [{"unit": "backpack-de1.service", "no_answer": 0, "handshake_fail": 0, "wrong_tag": 5000}]  # another tunnel's echoes
+    send(owner, key, clock, tunnels=tunnels(10, 10), tunnel_logs=logs)
     assert found(owner, "tunnel_unhealthy") == {}
 
 

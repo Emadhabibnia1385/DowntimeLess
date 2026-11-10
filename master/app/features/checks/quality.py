@@ -17,6 +17,7 @@ QUALITY_HOLD_S = 600
 QUALITY_CLEAR_S = 300
 TX_RECENT_S = 300  # "still sends": its tx counter moved this recently
 TUNNEL_KEEP = 100
+LOW_DATA_MIN_CONNS = 300  # a few dozen tiny connections (health checks, panel API, control ports) are not users
 
 
 def _num(v: Any) -> Optional[float]:
@@ -50,7 +51,8 @@ def bad(p: Dict[str, Any], th: Dict[str, float]) -> Optional[bool]:
     """True below the quality floor, False above it, None with too few connections to say."""
     if p["conns"] < th["quality_min_conns"]:
         return None
-    return p["mb_per_conn"] < th["quality_mb_min"] or (p["retrans_pct"] is not None and p["retrans_pct"] > th["quality_retrans_max"])
+    low_data = p["conns"] >= max(th["quality_min_conns"], LOW_DATA_MIN_CONNS) and p["mb_per_conn"] < th["quality_mb_min"]
+    return low_data or (p["retrans_pct"] is not None and p["retrans_pct"] > th["quality_retrans_max"])
 
 
 def observe(state: Dict[str, Any], checks: Optional[Dict[str, Any]], th: Dict[str, float], now: int) -> None:
@@ -140,7 +142,7 @@ def _tunnel_issues(s, th, checks, state, now) -> List[Dict[str, Any]]:
         unit = m.text(r.get("unit"), 100)
         fails = (m.num(r.get("no_answer")) or 0) + (m.num(r.get("handshake_fail")) or 0)
         tag = m.num(r.get("wrong_tag")) or 0
-        if unit and (fails >= th["tunnel_log_fails"] or tag > 0):
+        if unit and fails >= th["tunnel_log_fails"]:  # foreign tags alone are tunnels hearing each other's echoes
             c = by_unit.get(unit) or {}
             name = m.text(c.get("name"), 64) or unit.replace(".service", "")
             found.setdefault(name, {"unit": unit, "iface": m.text(c.get("iface"), 15)}).update(handshake_fails_10m=fails, wrong_tag_10m=tag)

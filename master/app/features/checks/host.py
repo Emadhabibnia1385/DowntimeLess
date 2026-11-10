@@ -76,7 +76,8 @@ def issues(s, th: Dict[str, float], rep: Dict[str, Any], state: Dict[str, Any], 
 
     nft = checks.get("nft") if isinstance(checks.get("nft"), dict) else None
     had = state.get("had_dnat") if isinstance(state.get("had_dnat"), dict) else None
-    if th["on_dnat_missing"] and nft is not None and had and (m.num(state.get("dnat_gone")) or 0) >= DNAT_GONE_REPORTS:
+    if (th["on_dnat_missing"] and nft is not None and had and (m.num(state.get("dnat_gone")) or 0) >= DNAT_GONE_REPORTS
+            and m.forward_unit_enabled(checks) is not False):
         if nft.get("relay_dnat") is not True and (m.num(nft.get("dnat_rules")) or 0) == 0:
             out.append(make(s, "dnat_missing", "critical", "جدول یا قوانین DNAT که قبلاً بود حالا نیست",
                             "واحد DNAT را بررسی کنید (systemctl status relay-dnat) و با تأیید مالک فایل nft ذخیره‌شده را دوباره بارگذاری کنید؛ اگر حذف عمدی بود، آن را در کارت سلامت میزبان تأیید کنید.",
@@ -163,7 +164,11 @@ def _kernel_issues(s, th, rep, state, now) -> List[Dict[str, Any]]:
                             conntrack_max=limit, expected_max=int(floor) if floor else None, tcp_established_timeout_s=timeout,
                             timeout_max_s=int(th["ct_timeout_max"])))
     drops = _events(state, "ct", now)
-    if th["on_conntrack_drops"] and drops and ct:
+    count, cmax = m.num(ct.get("count")), m.num(ct.get("max"))
+    fill = 100.0 * count / cmax if count is not None and cmax else None
+    # insert_failed from a DNS/UDP race on a nearly empty table loses nothing; only real drops or a filling table matter
+    real = sum(m.num(e.get("drop")) or 0 for e in drops) > 0 or fill is None or fill >= 50
+    if th["on_conntrack_drops"] and drops and ct and real:
         out.append(make(s, "conntrack_drops", "critical", "conntrack اتصال‌ها را دور می‌ریزد (insert_failed یا drop بالا رفت)",
                         "dmesg را برای «table full, dropping packet» بگردید و nf_conntrack_max را زنده بالا ببرید و timeout اتصال‌های برقرار را کم کنید.",
                         insert_failed_delta=sum(m.num(e.get("insert_failed")) or 0 for e in drops),

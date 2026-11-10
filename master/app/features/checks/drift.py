@@ -33,10 +33,11 @@ def findings(checks: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
     if sets:
         out["drift_ipset"] = {"sets": sets}
     tables = []
+    switched_off = m.forward_unit_enabled(checks) is False
     for r in _rows(drift, "dnat"):
         table, live, have = m.text(r.get("table"), 64), m.num(r.get("live")), m.num(r.get("file_rules"))
-        if not table or live is None:
-            continue
+        if not table or live is None or (switched_off and live == 0):
+            continue  # the DNAT unit is disabled on purpose: an empty live table is the intended state
         ports = [p for p in r.get("ports") or [] if m.num(p) is not None][:50] if isinstance(r.get("ports"), list) else []
         if have is None and live > 0:
             tables.append({"table": table, "live": live, "file": None, "path": None, "ports": []})

@@ -65,6 +65,16 @@ def test_baseline_needs_a_day_and_skips_udp_summary_and_ephemeral(owner, clock):
     assert 0 not in ports and 51820 not in ports
 
 
+def test_loopback_only_listeners_never_join_the_baseline(owner, clock):
+    sid, key = make_server(owner, "ir-1", "relay")
+    inner = {"proto": "tcp", "port": 40123, "proc": "xray", "addr": "127.0.0.1"}  # xray's internal port, new on every start
+    send(owner, key, clock, checks=checks(listeners=checks()["listeners"] + [inner]))
+    db = connect()
+    assert not db.execute("SELECT 1 FROM listener_baseline WHERE server_id=? AND port=40123", (sid,)).fetchone()
+    assert db.execute("SELECT 1 FROM listener_baseline WHERE server_id=? AND port=443", (sid,)).fetchone()
+    db.close()
+
+
 def test_a_young_port_that_disappears_is_forgotten_not_alarmed(owner, clock):
     sid, key = make_server(owner, "ir-1", "relay")
     send(owner, key, clock)
@@ -274,13 +284,25 @@ def test_conntrack_drops_and_oom_kills_are_increases_not_levels(owner, clock):
     send(owner, key, clock, checks=high)  # high but steady counters from boot are not an alarm
     send(owner, key, clock, checks=high)
     assert not set(found(owner)) & {"conntrack_drops", "oom_kill"}
-    send(owner, key, clock, checks=checks(conntrack=dict(base["conntrack"], insert_failed=530, drop=20), kernel=dict(base["kernel"], oom_kill=4)))
+    send(owner, key, clock, checks=checks(conntrack=dict(base["conntrack"], insert_failed=530, drop=25), kernel=dict(base["kernel"], oom_kill=4)))
     got = found(owner)
     assert got["conntrack_drops"]["severity"] == "critical" and got["conntrack_drops"]["evidence"]["insert_failed_delta"] == 30
     assert got["oom_kill"]["evidence"]["oom_kills"] == 1
     # a reboot resets the counters: lower values are a new start, and the alarm fades after 30 minutes
     send(owner, key, clock, step=1900, checks=base)
     assert not set(found(owner)) & {"conntrack_drops", "oom_kill"}
+
+
+def test_insert_failed_on_an_almost_empty_table_is_not_an_alert(owner, clock):
+    sid, key = make_server(owner, "ir-1", "relay")
+    base = checks()
+    send(owner, key, clock, checks=base)
+    send(owner, key, clock, checks=base)
+    send(owner, key, clock, checks=checks(conntrack=dict(base["conntrack"], insert_failed=900)))  # a DNS/UDP race, table 1% full
+    assert "conntrack_drops" not in found(owner)
+    full = dict(base["conntrack"], count=700000, insert_failed=950)
+    send(owner, key, clock, checks=checks(conntrack=full))  # the same counter with a filling table is real
+    assert "conntrack_drops" in found(owner)
 
 
 def test_inodes_journal_time_and_reboot_packages(owner, clock):
