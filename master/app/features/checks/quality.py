@@ -66,7 +66,7 @@ def observe(state: Dict[str, Any], checks: Optional[Dict[str, Any]], th: Dict[st
             b, since, good = bad(p, th), m.num(mem.get("bad_since")), m.num(mem.get("good_since"))
             if b:
                 since, good = since or now, None
-            elif b is False and since:
+            elif b is not True and since:  # fine, or too few connections left to judge: the alarm fades
                 good = good or now
                 if now - good >= QUALITY_CLEAR_S:
                     since = good = None

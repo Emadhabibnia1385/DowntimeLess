@@ -72,6 +72,16 @@ def test_a_hundred_tiny_control_connections_are_not_users(owner, clock):
     assert found(owner, "path_quality_low") == {}
 
 
+def test_a_path_that_goes_quiet_clears_after_five_minutes(owner, clock):
+    ek = fleet(owner)
+    for _ in range(12):
+        send(owner, ek, clock, paths=[row(conns=400)])
+    assert found(owner, "path_quality_low")
+    for _ in range(7):
+        send(owner, ek, clock, paths=[row(conns=3)])  # almost no connections: nothing left to judge
+    assert found(owner, "path_quality_low") == {}
+
+
 def test_few_connections_say_nothing_and_the_switch_hides_it(owner, clock):
     ek = fleet(owner)
     for _ in range(12):
